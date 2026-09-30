@@ -1,10 +1,12 @@
-# VRAM Sizer
+# LLM Inference Sizer
 
-A single-page calculator for sizing LLM inference. Pick a model, the number of concurrent users, a workload and a speed goal, and it recommends the cheapest GPU deployment that fits:
+How many GPUs your model and users need: memory, speed and capacity.
+
+A single-page tool for sizing LLM inference. Pick a model, the number of concurrent users, a workload and a speed goal, and it recommends the setup that meets the goal with the least GPU memory in total:
 
 - **Memory:** model weights, KV cache, activations and overhead, per GPU and in total, in GB or GiB.
-- **Speed:** estimated tokens per second per user and time to first reply.
-- **Cost:** hourly and monthly cost, cost per million output tokens, and how many users the setup can handle.
+- **Speed:** estimated tokens per second per user and time to first reply, including thinking time for models that reason before answering.
+- **Capacity:** how many GPUs of each board it takes, and how many users the setup can handle.
 
 It covers 40+ popular open models (Qwen, Gemma, Llama, DeepSeek, gpt-oss, GLM, Kimi, Mistral and others) on NVIDIA L4, L40S, H100, H200, B200, B300, RTX PRO 4500/6000 Blackwell, and AMD MI350P.
 
@@ -21,4 +23,4 @@ Open `index.html` in a browser. It is one self-contained file with no build step
 
 ## Accuracy
 
-These are planning estimates, not benchmarks. Memory figures follow each model's published architecture. Speed comes from a simple roofline model of memory bandwidth and compute. Prices are September 2026 on-demand medians, and you can edit them on the page. Before committing to hardware, confirm with a real serving run (for example vLLM or SGLang).
+These are planning estimates, not benchmarks. Memory figures follow each model's published architecture, and board memory is the size on the box, with about 90% treated as usable. Speed comes from a simple model of memory bandwidth, compute and interconnect; real serving engines usually land within about ±30%. Before committing to hardware, confirm with a real serving run (for example vLLM or SGLang).

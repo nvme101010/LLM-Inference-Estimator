@@ -2,8 +2,8 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Estimate GPU memory, speed and cost for serving open LLMs: weights, KV cache, activations and overhead across NVIDIA and AMD boards.">
-<title>VRAM Sizer</title>
+<meta name="description" content="How many GPUs your model and users need: memory, speed and capacity for serving open LLMs on NVIDIA and AMD boards.">
+<title>LLM Inference Sizer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
@@ -321,14 +321,7 @@
   .adv-grid{display:grid; grid-template-columns:1fr 1fr; gap:24px 34px; padding:18px 20px 22px; border-top:1px solid var(--line)}
   @media (max-width:720px){ .adv-grid{grid-template-columns:1fr} }
   .adv-grid .eyebrow{margin-bottom:10px}
-  .adv-wide{grid-column:1 / -1}
-  .adv-wide .linkbtn{margin-top:0}
-  .price-grid{display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px 16px; margin-top:4px}
-  @media (max-width:900px){ .price-grid{grid-template-columns:repeat(3,minmax(0,1fr))} }
-  @media (max-width:520px){ .price-grid{grid-template-columns:repeat(2,minmax(0,1fr))} }
-  .price span{display:block; font-size:11.5px; color:var(--ink-2); margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-  .price input{padding:6px 8px; font-family:"IBM Plex Mono",monospace; font-size:13px; font-variant-numeric:tabular-nums}
-  .gpu .cost{margin-top:3px}
+  .gpu .mem{margin-top:3px}
   .gpu .why{font-family:"IBM Plex Mono",monospace; font-size:10px; color:var(--ink-2); padding-left:6px; margin-top:8px}
   .math-body{border-top:1px solid var(--line); padding-bottom:6px}
   .math-body h3{font-size:13px; font-weight:600; margin:0; padding:18px 18px 8px}
@@ -342,8 +335,8 @@
     <div class="brand">
       <div class="glyph" aria-hidden="true"></div>
       <div>
-        <h1>VRAM Sizer</h1>
-        <div class="sub">GPU memory footprint for LLM inference — weights · KV cache · activations · overhead</div>
+        <h1>LLM Inference Sizer</h1>
+        <div class="sub">How many GPUs your model and users need: memory, speed and capacity</div>
       </div>
     </div>
     <div class="top-actions">
@@ -404,7 +397,7 @@
         <div class="field">
           <div class="sliderhead"><label class="fld" for="goal">Speed goal <span class="i" data-tip="goal" tabindex="0">i</span></label></div>
           <select id="goal">
-            <option value="any">Any speed — cheapest that fits</option>
+            <option value="any">Any speed — smallest that fits</option>
             <option value="read">Readable</option>
             <option value="smooth" selected>Smooth chat</option>
             <option value="fast">Fast</option>
@@ -552,14 +545,6 @@
           <div class="ticks"><span>0%</span><span>25%</span></div>
           <div class="hint">Allocator fragmentation and framework buffers, on top of a fixed ~1 GB CUDA context per GPU.</div>
         </div>
-        <div class="adv-wide">
-          <div class="sliderhead">
-            <p class="eyebrow" style="margin:0">GPU prices — $ per GPU-hour <span class="i" data-tip="prices" tabindex="0">i</span></p>
-            <button type="button" class="linkbtn" id="priceReset" hidden>Reset to medians</button>
-          </div>
-          <div class="price-grid" id="priceGrid"></div>
-          <div class="hint">Defaults are September 2026 on-demand medians across cloud providers. The MI350P has no public rental price yet, so its default is an estimate. Reserved and spot capacity is often 30–60% cheaper. Your prices are saved in this browser.</div>
-        </div>
       </div>
     </details>
 
@@ -583,13 +568,13 @@
           <p><b>KV cache</b> is added up per kind of layer, from each model's config.json. A standard attention layer stores <code>2 × kv_heads × head_dim × bytes</code> per token (the 2 is K and V). <b>Sliding-window</b> layers keep only their last N tokens. <b>Latent attention (MLA)</b> stores one compressed vector per token, and DeepSeek V4 keeps one entry per 4 or 128 tokens. <b>Linear-attention and Mamba</b> layers keep a fixed-size state per user (counted in fp32) that never grows with context, which is why hybrid models like Qwen 3.5+, Kimi K3 and Nemotron hold long contexts cheaply. Each user's cache is sized at <b>prompt + reply</b>, the most it holds, at the end of its reply; engines fill it as tokens arrive, so this is the peak. Total = one user's cache × users.</p>
           <p><b>Activations</b> = <code>T × (hidden × 4 + ffn × 2) × 2 B</code> plus <code>users × vocab × 4 B</code> of fp32 logits, where <code>T</code> is tokens per step — the prompt piece size set by <b>Optimize for</b>, or the number of users, whichever is larger. The <b>MLP intermediate</b> (<code>ffn</code>, 3.5–4× hidden for SwiGLU) dominates, which is why activations track the piece size rather than context length. Compute stays bf16 even when weights are quantized, and FlashAttention keeps the T² score matrix off HBM — so there is no quadratic term. Genuinely the smallest of the four on most configs; choose Fast first reply to see it grow.</p>
           <p><b>Overhead</b> = a fixed <code>~1.0 GB</code> CUDA/driver context plus a slider % of the three above, standing in for allocator fragmentation, framework buffers, and CUDA graphs.</p>
-          <p><b>Tensor-parallel overhead</b> — the page picks TP for you as part of the cheapest layout, fixed in Advanced settings if you prefer. With TP &gt; 1 the model is sharded across GPUs: weights and activations divide by TP, and the KV cache divides by <code>min(TP, kv_heads)</code>. Sharding <i>adds</i> memory: every GPU carries its own <code>~1 GB</code> CUDA context, plus NCCL all-reduce workspace and comm buffers (<code>~0.3 GB + users × hidden × 8 B</code> per GPU). When <b>TP exceeds a layer's KV heads</b>, that part of the cache can't split further and copies to every GPU — watch it stop shrinking. Latent and compressed caches have a single head, so they always copy; linear-attention state splits cleanly.</p>
+          <p><b>Tensor-parallel overhead</b> — the page picks TP for you as part of the smallest layout, fixed in Advanced settings if you prefer. With TP &gt; 1 the model is sharded across GPUs: weights and activations divide by TP, and the KV cache divides by <code>min(TP, kv_heads)</code>. Sharding <i>adds</i> memory: every GPU carries its own <code>~1 GB</code> CUDA context, plus NCCL all-reduce workspace and comm buffers (<code>~0.3 GB + users × hidden × 8 B</code> per GPU). When <b>TP exceeds a layer's KV heads</b>, that part of the cache can't split further and copies to every GPU — watch it stop shrinking. Latent and compressed caches have a single head, so they always copy; linear-attention state splits cleanly.</p>
           <p><b>Throughput</b> — generating a token means reading this GPU's weight shard plus every active request's KV cache, so a decode step takes <code>bytes read ÷ (memory bandwidth × 0.65)</code>. At very large batches the compute cost <code>users × 2 × active params ÷ (FLOPs × 0.5)</code> takes over, so the step uses whichever is slower. Tensor parallelism adds two all-reduces per layer, sized to the batch's activations and sent over NVLink or PCIe, and the engine adds ~1.5 ms per step. Output = <code>users ÷ step time</code>. Reading a prompt is compute-bound: <code>prompt × (2 × active params + layers × prompt × hidden) ÷ (FLOPs × 0.45)</code>. The prompt is read in pieces (512, 2,048 or 8,192 tokens, set by <b>Optimize for</b>), and each piece shares a step with everyone else's next token. So <b>time to first token</b> = prompt compute + pieces × step time, and the <b>pause</b> other users feel = one piece's compute + one step. Smaller pieces mean more steps before the first reply but shorter freezes. Requests are assumed to be halfway through their reply (prompt + half the reply in cache), and the first reply waits on the whole prompt. Quantized weights read fewer bytes but lose some of that gain to dequantization; FP8 also speeds up compute on boards with native FP8 cores. MoE models read more experts as the batch grows. Bandwidth and link speeds are published specs; FLOPs are rough estimates.</p>
           <p><b>Thinking</b> — a model that reasons step by step writes thinking tokens before its answer. They're generated like any other token, so a user's cache peaks at prompt + thinking + reply, speed is judged halfway through thinking and reply together, and cost per output token counts them. First reply is when the first token appears, which for a thinking model is the start of its thinking; the stat also says how long the thinking runs before the answer begins. Earlier turns' thinking is normally dropped by the model's chat template, so it doesn't build up in the prompt. The switch starts at each model's own default, taken from its model card and chat template.</p>
           <p><b>Concurrent users from traffic</b> — requests in progress at once = requests per second × seconds each one takes. A request takes the wait before its first token plus its thinking and reply, streamed at your speed goal's rate; the goal is a minimum speed, so this errs on the high side. The busiest-hour multiple covers traffic that isn't spread evenly through the day; 2× suits a typical workday.</p>
           <p><b>Sharing</b> — on a hosted copy of this page, the address always holds the current settings, so Copy link sends the exact scenario. Download summary saves a one-page report of the recommendation, the inputs and every board, which prints to PDF.</p>
-          <p><b>Suggestion, cost and capacity</b> — every board is tried at 1, 2, 4 and 8 GPUs per copy (splitting a copy only across NVLink boards), with as many copies as it takes to serve every user, and the suggestion is the cheapest that reaches the speed goal; if none reaches it, the one that comes closest. Cost = <code>GPUs × $ per GPU-hour</code>; per million output tokens = <code>$/hour ÷ (output tok/s × 3,600) × 10⁶</code>, counting generated tokens only. <b>Handles up to</b> is the most users the setup holds at the current prompt and reply lengths while fitting in memory and, with a goal, still reaching it. Default prices are September 2026 on-demand medians; edit them in Advanced settings.</p>
-          <p><b>Copies (replicas)</b> — for more users, the page runs more copies of the model instead of splitting one copy wider. Each copy has its own GPUs and an even share of the users, so memory, the bar and the breakdown describe one copy, while cost, output and capacity add up across all of them. Copies don't exchange data while generating, so they need no NVLink and can run on separate servers; that's why PCIe boards scale out well even though they split a single copy poorly, and why, when two layouts cost the same, a PCIe board takes more copies over splitting one. When a board needs more GPUs than memory alone calls for, the extra ones are there to reach the speed goal, and the page says so. This assumes a load balancer spreads requests evenly.</p>
+          <p><b>Suggestion and capacity</b> — every board is tried at 1, 2, 4 and 8 GPUs per copy (splitting a copy only across NVLink boards), with as many copies as it takes to serve every user. The suggestion is the setup that reaches the speed goal with the least GPU memory in total (on any one board, the fewest GPUs); if none reaches it, the one that comes closest. <b>Handles up to</b> is the most users the setup holds at the current prompt and reply lengths while fitting in memory and, with a goal, still reaching it.</p>
+          <p><b>Copies (replicas)</b> — for more users, the page runs more copies of the model instead of splitting one copy wider. Each copy has its own GPUs and an even share of the users, so memory, the bar and the breakdown describe one copy, while GPU count, output and capacity add up across all of them. Copies don't exchange data while generating, so they need no NVLink and can run on separate servers; that's why PCIe boards scale out well even though they split a single copy poorly, and why, when two layouts use the same number of GPUs, a PCIe board takes more copies over splitting one. When a board needs more GPUs than memory alone calls for, the extra ones are there to reach the speed goal, and the page says so. This assumes a load balancer spreads requests evenly.</p>
           <p><b>Units</b> — every amount is computed in bytes and shown in the unit picked at the top: <b>GB</b> is 10⁹ bytes (spec sheets, download pages), <b>GiB</b> is 2³⁰ bytes (nvidia-smi, PyTorch and vLLM's logs). Switching changes the labels, never the answer. Board capacities are the size on the box, counted as GB, so an H100 is 80 GB or 74.5 GiB. Real boards expose that much or slightly more, so a fit here errs on the safe side.</p>
         </div>
           <div class="disc">Estimates for planning, not a guarantee. Real usage varies with the serving framework (vLLM, TensorRT-LLM, SGLang), paged-attention block sizing, speculative decoding, and MoE routing. MoE models load <i>all</i> expert weights even though only a few activate per token. The newest attention designs (DeepSeek V4's compressed sparse attention, sparse-attention index keys) are modeled from their configs, so treat those cache figures as ±25%. Model list and architectures checked against Hugging Face in September 2026.</div>
@@ -762,27 +747,24 @@ const THINK_LABEL = {always:"always thinks before answering", default:"thinks be
    flops = effective BF16 compute, TFLOPS — rough estimate, sets prefill speed
    fp8 / fp4 = native FP8 / FP4 tensor cores · lbw = GPU-to-GPU link, GB/s per direction · lname = link label */
 const GPUS = [
-  {n:"L4",         cap:24, mem:"GDDR6",  bw:300,  flops:80,   fp8:true,  fp4:false, link:false, lbw:32,  lname:"PCIe Gen4", usd:0.85},
-  {n:"RTX PRO 4500 Blackwell", cap:32, mem:"GDDR7", bw:800, flops:135, fp8:true, fp4:true, link:false, lbw:64, lname:"PCIe Gen5", usd:0.72},
-  {n:"L40S",       cap:48, mem:"GDDR6",  bw:864,  flops:240,  fp8:true,  fp4:false, link:false, lbw:32,  lname:"PCIe Gen4", usd:1.29},
-  {n:"H100 80GB",  cap:80, mem:"HBM3",   bw:3350, flops:720,  fp8:true,  fp4:false, link:true,  lbw:450, lname:"NVLink 4",  usd:3.25},
-  {n:"RTX PRO 6000 Blackwell", cap:96, mem:"GDDR7", bw:1792, flops:330, fp8:true, fp4:true, link:false, lbw:64, lname:"PCIe Gen5", usd:2.19},
-  {n:"H200",       cap:141, mem:"HBM3e",  bw:4800, flops:720,  fp8:true,  fp4:false, link:true,  lbw:450, lname:"NVLink 4",  usd:4.40},
-  {n:"AMD MI350P", cap:144, mem:"HBM3E",  bw:4000, flops:800,  fp8:true,  fp4:true,  link:false, lbw:64,  lname:"PCIe Gen5", usd:2.20},
-  {n:"B200",       cap:180, mem:"HBM3e",  bw:7700, flops:1400, fp8:true,  fp4:true,  link:true,  lbw:900, lname:"NVLink 5",  usd:6.52},
-  {n:"B300",       cap:288, mem:"HBM3e",  bw:8000, flops:1400, fp8:true,  fp4:true,  link:true,  lbw:900, lname:"NVLink 5",  usd:7.87},
+  {n:"L4",         cap:24, mem:"GDDR6",  bw:300,  flops:80,   fp8:true,  fp4:false, link:false, lbw:32,  lname:"PCIe Gen4"},
+  {n:"RTX PRO 4500 Blackwell", cap:32, mem:"GDDR7", bw:800, flops:135, fp8:true, fp4:true, link:false, lbw:64, lname:"PCIe Gen5"},
+  {n:"L40S",       cap:48, mem:"GDDR6",  bw:864,  flops:240,  fp8:true,  fp4:false, link:false, lbw:32,  lname:"PCIe Gen4"},
+  {n:"H100 80GB",  cap:80, mem:"HBM3",   bw:3350, flops:720,  fp8:true,  fp4:false, link:true,  lbw:450, lname:"NVLink 4"},
+  {n:"RTX PRO 6000 Blackwell", cap:96, mem:"GDDR7", bw:1792, flops:330, fp8:true, fp4:true, link:false, lbw:64, lname:"PCIe Gen5"},
+  {n:"H200",       cap:141, mem:"HBM3e",  bw:4800, flops:720,  fp8:true,  fp4:false, link:true,  lbw:450, lname:"NVLink 4"},
+  {n:"AMD MI350P", cap:144, mem:"HBM3E",  bw:4000, flops:800,  fp8:true,  fp4:true,  link:false, lbw:64,  lname:"PCIe Gen5"},
+  {n:"B200",       cap:180, mem:"HBM3e",  bw:7700, flops:1400, fp8:true,  fp4:true,  link:true,  lbw:900, lname:"NVLink 5"},
+  {n:"B300",       cap:288, mem:"HBM3e",  bw:8000, flops:1400, fp8:true,  fp4:true,  link:true,  lbw:900, lname:"NVLink 5"},
 ];
 
 const USABLE = 0.90; // share of board memory the server may use (vLLM's gpu_memory_utilization default)
 const BIGGEST = GPUS.reduce((a,b)=> b.cap>a.cap ? b : a);   // what "too big" is measured against
 
-/* ---------------- speed goals and prices ----------------
-   A goal is a floor on each user's speed and a ceiling on the wait for a first reply.
-   usd above is the default $ per GPU-hour: September 2026 on-demand medians across cloud
-   providers (the MI350P has no public rental price yet, so its default is an estimate).
-   Prices the user edits are kept in this browser. */
+/* ---------------- speed goals ----------------
+   A goal is a floor on each user's speed and a ceiling on the wait for a first reply. */
 const GOALS = {
-  any:    {tps:0,  ttft:Infinity, desc:"No speed goal: the cheapest setup that holds the model."},
+  any:    {tps:0,  ttft:Infinity, desc:"No speed goal: the smallest setup that holds the model."},
   read:   {tps:10, ttft:5,        desc:"10+ tok/s per user, first reply under 5 s."},
   smooth: {tps:20, ttft:2,        desc:"20+ tok/s per user, first reply under 2 s."},
   fast:   {tps:40, ttft:1,        desc:"40+ tok/s per user, first reply under 1 s."},
@@ -806,20 +788,9 @@ const WORKLOADS = {
 };
 
 /* memory units are display only; the viewer's choice is remembered in this browser */
-const UNIT_KEY = "vram-sizer-unit";
+const UNIT_KEY = "vram-sizer-unit";   // kept from the tool's old name so saved choices carry over
 function loadUnit(){ try { return localStorage.getItem(UNIT_KEY)==="GiB" ? "GiB" : "GB"; } catch(e) { return "GB"; } }
 
-const PRICE_KEY = "vram-sizer-prices";
-function loadPrices(){
-  const p = Object.fromEntries(GPUS.map(g=>[g.n, g.usd]));
-  try {
-    const saved = JSON.parse(localStorage.getItem(PRICE_KEY) || "{}");
-    for(const [k, v] of Object.entries(saved)) if(k in p && Number.isFinite(v) && v>=0) p[k] = v;
-  } catch(e) {}                       // storage blocked or corrupt: fall back to defaults
-  return p;
-}
-function savePrices(){ try { localStorage.setItem(PRICE_KEY, JSON.stringify(S.prices)); } catch(e) {} }
-const pricesEdited = () => GPUS.some(g=> S.prices[g.n]!==g.usd);
 
 /* ---------------- state ---------------- */
 /* tpo = TP override ("auto" or 1/2/4/8) · tp = the TP of the deployment on screen · board = "auto" or a clicked board */
@@ -828,7 +799,7 @@ const pricesEdited = () => GPUS.some(g=> S.prices[g.n]!==g.usd);
    think = the Thinking switch · thinkTok = thinking tokens asked for · thinking = tokens in use (0 when off).
    ctxTok = prompt + thinking + reply. */
 const S = { wq:2, wqLbl:"NATIVE", kq:2, tp:1, tpo:"auto", chunk:512, ovpct:7, users:16, board:"auto",
-            goal:"smooth", prices:loadPrices(),
+            goal:"smooth",
             workload:"chat", prompt:2048, reply:512, wantPrompt:2048, wantReply:512, ctxTok:2560,
             think:false, thinkTok:4096, thinking:0,
             traffic:{people:1000, req:20, hours:8, peak:2},   // the traffic estimator's inputs
@@ -1045,13 +1016,12 @@ const fitsOn = (g, perGB) => perGB <= g.cap*USABLE;
    A deployment is copies of the model × GPUs per copy, on one kind of board. Each copy (replica)
    is an independent instance serving its share of the users; within a copy the model can be split
    across up to 8 GPUs (TP). Copies never talk to each other, so they need no fast link and can sit
-   on separate servers. Every deployment is judged on fit, speed against the goal, and cost. */
+   on separate servers. Every deployment is judged on fit, speed against the goal, and size. */
 const TP_OPTIONS = [1,2,4,8];
 function evaluate(g, tp, reps, upr = Math.ceil(S.users/reps)){      // upr = users on each copy
   const r = compute(tp, upr), perGB = r.perGPU/GB, fits = fitsOn(g, perGB);
-  const t = fits ? throughput(g, tp, S.chunk, upr) : null, gpus = tp*reps, usdHr = gpus*S.prices[g.n];
-  return {g, tp, reps, upr, gpus, r, perGB, fits, t, meets: !!t && meetsGoal(t), usdHr,
-          usdPerM: t ? usdHr/(t.total*reps*3600)*1e6 : null};     // $ per million output tokens, all copies
+  const t = fits ? throughput(g, tp, S.chunk, upr) : null, gpus = tp*reps;
+  return {g, tp, reps, upr, gpus, r, perGB, fits, t, meets: !!t && meetsGoal(t), memGB: gpus*g.cap};   // memGB = GPU memory bought
 }
 /* The most users one copy (tp GPUs of g) can serve, up to upTo: memory must fit and, unless memOnly,
    every user must still reach the goal. Both only get worse as users grow, so bisect. */
@@ -1064,12 +1034,13 @@ function copyCapacity(g, tp, upTo, memOnly){
   while(hi-lo > 1){ const mid = (lo+hi) >> 1; if(ok(mid)) lo = mid; else hi = mid; }
   return lo;
 }
-const closest  = ds => ds.sort((a,b)=> goalGap(a.t)-goalGap(b.t) || a.usdHr-b.usdHr)[0];
-/* cheapest first; at equal cost a PCIe-only board prefers copies to splitting one (copies need no
-   link between cards), and otherwise the faster layout wins */
-const cheapest = ds => ds.sort((a,b)=> a.usdHr-b.usdHr || (a.g.link ? 0 : a.tp-b.tp) || b.t.perUser-a.t.perUser)[0];
+const closest  = ds => ds.sort((a,b)=> goalGap(a.t)-goalGap(b.t) || a.memGB-b.memGB)[0];
+/* smallest first: the least GPU memory in total, which on one board means the fewest GPUs. At equal
+   size a PCIe-only board prefers copies to splitting one (copies need no link between cards), and
+   otherwise the faster layout wins. */
+const smallest = ds => ds.sort((a,b)=> a.memGB-b.memGB || (a.g.link ? 0 : a.tp-b.tp) || b.t.perUser-a.t.perUser)[0];
 /* On one board: at each size of copy, the fewest copies that serve everyone within the goal, then the
-   cheapest of those. If the goal is out of reach, the fewest copies that fit, at the size that comes
+   smallest of those. If the goal is out of reach, the fewest copies that fit, at the size that comes
    closest. If even one user can't fit, the largest copy tried, to show how far off it is.
    The size of a copy (TP) can be fixed in Advanced settings. memOnly is the leanest layout that
    merely holds everyone, so the page can say when extra GPUs are there for speed rather than memory. */
@@ -1080,8 +1051,8 @@ function deploymentFor(g){
     return cap ? evaluate(g, tp, Math.ceil(S.users/cap)) : null;
   }).filter(Boolean);
   const fitting = layouts(true), meeting = layouts(false).filter(d=>d.meets);
-  const leanest = cheapest(fitting.slice()) || null;
-  const pick = meeting.length ? cheapest(meeting)
+  const leanest = smallest(fitting.slice()) || null;
+  const pick = meeting.length ? smallest(meeting)
              : fitting.length ? closest(fitting)
              : evaluate(g, tps[tps.length-1], 1, 1);
   pick.memOnly = leanest;
@@ -1089,17 +1060,19 @@ function deploymentFor(g){
 }
 /* extra GPUs beyond what memory needs, added to reach the speed goal */
 const forSpeed = d => d.fits && d.meets && d.memOnly && d.gpus > d.memOnly.gpus;
-/* The suggestion: the cheapest deployment that reaches the goal (faster wins a tie), splitting a copy
-   only across NVLink boards. If nothing reaches it, the one that comes closest. deps: board → deployment. */
+/* The suggestion: the deployment that reaches the goal with the least GPU memory in total (fewer GPUs,
+   then faster, win a tie), splitting a copy only across NVLink boards. Memory is what's being sized,
+   and the smallest setup that does the job is the fairest proxy for the least hardware without
+   pricing. If nothing reaches the goal, the one that comes closest. deps: board → deployment. */
 const suggestable = deps => [...deps.values()].filter(d=> d.fits && (d.tp===1 || d.g.link));
 function suggestDeployment(deps){
   const ok = suggestable(deps);
-  return cheapest(ok.filter(d=>d.meets)) || closest(ok) || null;
+  return smallest(ok.filter(d=>d.meets)) || closest(ok) || null;
 }
-/* A step up worth mentioning: the cheapest other deployment at least 1.5× faster per user. */
+/* A step up worth mentioning: the smallest other deployment at least 1.5× faster per user. */
 function fasterOption(active, deps){
   if(!active || !active.t) return null;
-  return cheapest(suggestable(deps).filter(d=> d.g.n!==active.g.n && d.t.perUser >= active.t.perUser*1.5)) || null;
+  return smallest(suggestable(deps).filter(d=> d.g.n!==active.g.n && d.t.perUser >= active.t.perUser*1.5)) || null;
 }
 /* How many users the deployment could serve at these lengths: what one copy holds, times copies. */
 function capacityFor(d){
@@ -1207,7 +1180,8 @@ function render(){
 
 
 /* the headline: which deployment, why, and the five numbers behind it */
-const fmtUsd = x => "$" + (x>=100 ? commas(Math.round(x)) : x>=0.1 ? x.toFixed(2) : x.toFixed(3));
+/* a total of box sizes: "192 GB" as sold, or its GiB equivalent */
+const boxTotal = gb => S.unit==="GiB" ? fmtMem(gb) : `${commas(gb)} GB`;
 function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, speed, faster, cap}){
   const goal = GOALS[S.goal], hasGoal = S.goal!=="any", goalText = goal.desc.replace(/\.$/, "");
   const prec = S.wqLbl==="NATIVE" ? `${m.nat.f}, as released` : S.wqLbl;
@@ -1233,9 +1207,9 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
       why += layout + (hasGoal && !active.meets ? `<span class="warnx">Below your speed goal</span> — ${goalText}.` : "");
     } else {
       why += layout + (active.meets
-        ? `The cheapest setup that serves everyone${hasGoal ? " within your speed goal" : ""}.`
+        ? `${hasGoal ? "Serves everyone within your speed goal" : "Holds everyone"} with the least GPU memory in total (${boxTotal(active.memGB)}).`
         : `<span class="warnx">Nothing reaches your speed goal</span> (${goalText}), so this is the setup that comes closest. Try FP8 or shorter prompts.`);
-      if(faster) why += ` Faster: <button type="button" class="linkbtn" data-act="pick" data-board="${faster.g.n}">${faster.gpus} × ${faster.g.n}</button> at ${fmtTps(faster.t.perUser)} tok/s per user for ${fmtUsd(faster.usdHr)}/hr.`;
+      if(faster) why += ` Faster: <button type="button" class="linkbtn" data-act="pick" data-board="${faster.g.n}">${faster.gpus} × ${faster.g.n}</button> at ${fmtTps(faster.t.perUser)} tok/s per user.`;
     }
   } else if(active){
     lbl = "Your pick";
@@ -1272,8 +1246,6 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
                  (hasGoal ? `${slowTtft ? "over" : "within"} the ${goal.ttft} s goal` : `${commas(speed.prompt)}-token prompt`)
                  + (S.thinking ? ` · then ${fmtWait(S.thinking / speed.perUser)} of thinking` : ""), slowTtft ? "warn" : "")
              : statCell("ttft", "First reply", "—", "", na))
-    + (active && fits ? statCell("cost", "Cost", fmtUsd(active.usdHr), "/hr", `${fmtUsd(active.usdPerM)}/M output tok · ${fmtUsd(active.usdHr*730)}/mo`)
-                      : statCell("cost", "Cost", "—", "", na))
     + (cap ? statCell("capacity", "Handles up to", commas(cap.users), cap.users===1 ? "user" : "users",
                cap.users===0 ? "none at these lengths"
                  : reps>1 ? `${reps} copies × ${commas(cap.perCopy)} · ${limit}` : `at ${fmtCtx(r.ctx)} each · ${limit}`,
@@ -1298,7 +1270,7 @@ function renderBar(comps, totGB, capGB, g, tp, reps){
 }
 
 
-/* every board in its cheapest layout that serves everyone within the goal, with its cost */
+/* every board in its smallest layout that serves everyone within the goal */
 function renderCards(deps, active, suggested, picked){
   const hasGoal = S.goal!=="any";
   $('fitcap').innerHTML = (S.tpo==="auto"
@@ -1328,7 +1300,7 @@ function renderCards(deps, active, suggested, picked){
       ${forSpeed(d) ? `<div class="why">${d.memOnly.gpus} hold${d.memOnly.gpus===1 ? "s" : ""} it in memory; ${d.gpus} for your speed goal</div>` : ""}
       <div class="util"><div style="width:${Math.min(100, d.perGB/b.cap*100).toFixed(0)}%;background:${utilColor}"></div></div>
       <div class="tps">${d.t ? `≈ <b>${fmtTps(d.t.total*d.reps)}</b> tok/s · ${fmtTps(d.t.perUser)}/user` : "— tok/s"}</div>
-      <div class="tps cost">${d.fits ? `<b>${fmtUsd(d.usdHr)}</b>/hr · ${fmtUsd(d.usdPerM)}/M tok` : "—"}</div>`;
+      <div class="tps mem">${d.fits ? `<b>${boxTotal(d.memGB)}</b> of GPU memory` : "—"}</div>`;
     cards.appendChild(el);
   });
 }
@@ -1398,7 +1370,7 @@ function renderThroughput(d){
 function renderTpNote(m, tp, active){
   const per = `${tp} GPU${tp>1?"s":""} per copy`;
   let t = S.tpo!=="auto" ? `<b>Fixed at ${per}</b> on every board, with as many copies as your users need.`
-        : active ? `<b>Auto</b> — ${per}${active.reps>1 ? `, ${active.reps} copies` : ""}: the cheapest layout on ${active.g.n}.`
+        : active ? `<b>Auto</b> — ${per}${active.reps>1 ? `, ${active.reps} copies` : ""}: the smallest layout on ${active.g.n}.`
         : `<b>Auto</b> — one copy doesn't fit, even split 8 ways.`;
   if(tp>1){
     const minHeads = Math.min(...m.kv.filter(g=>!g.state).map(g=>g.heads));
@@ -1412,11 +1384,9 @@ function renderTpNote(m, tp, active){
 
 /* the collapsed Advanced header still says what's set, and how much differs from the defaults */
 function renderAdvState(){
-  const edited = pricesEdited();
-  const changed = [S.kq!==2, S.tpo!=="auto", S.chunk!==S.chunkBase, S.ovpct!==7, edited].filter(Boolean).length;
+  const changed = [S.kq!==2, S.tpo!=="auto", S.chunk!==S.chunkBase, S.ovpct!==7].filter(Boolean).length;
   $('advState').innerHTML = (changed ? `<b>${changed} changed</b> · ` : "")
-    + `KV ${kqLabel()} · TP ${S.tpo==="auto" ? "auto" : S.tpo} · ${CHUNK_NAME[S.chunk]} · ${S.ovpct}% overhead · ${edited ? "your GPU prices" : "median GPU prices"}`;
-  $('priceReset').hidden = !edited;
+    + `KV ${kqLabel()} · TP ${S.tpo==="auto" ? "auto" : S.tpo} · ${CHUNK_NAME[S.chunk]} · ${S.ovpct}% overhead`;
 }
 
 
@@ -1606,24 +1576,6 @@ document.querySelector('.verdict').addEventListener('click', e=>{
 const updateGoalHint = () => { $('goalHint').textContent = GOALS[S.goal].desc; };
 $('goal').addEventListener('change', e=>{ S.goal = e.target.value; updateGoalHint(); render(); });
 
-/* GPU prices: typed values apply as you type and are saved in this browser */
-function buildPriceGrid(){
-  $('priceGrid').innerHTML = GPUS.map(g=>
-    `<label class="price"><span>${g.n}</span><input type="number" min="0" step="0.01" inputmode="decimal" data-gpu="${g.n}" value="${S.prices[g.n].toFixed(2)}"></label>`).join("");
-}
-$('priceGrid').addEventListener('input', e=>{
-  const f = e.target.closest('input[data-gpu]'); if(!f) return;
-  const v = +f.value;
-  if(f.value==="" || !(v>=0)) return;          // mid-edit or invalid — keep the last good price
-  S.prices[f.dataset.gpu] = v; savePrices(); render();
-});
-$('priceGrid').addEventListener('change', e=>{
-  const f = e.target.closest('input[data-gpu]'); if(f) f.value = S.prices[f.dataset.gpu].toFixed(2);
-});
-$('priceReset').addEventListener('click', ()=>{
-  GPUS.forEach(g=>{ S.prices[g.n] = g.usd; }); savePrices(); buildPriceGrid(); render();
-});
-
 /* model change */
 modelSel.addEventListener('change', ()=>{
   M = findModel(modelSel.value);
@@ -1737,8 +1689,6 @@ function stateToHash(){
   if(S.chunk!==S.chunkBase) q.set("ck", S.chunk);
   if(S.ovpct!==7) q.set("ov", S.ovpct);
   if(S.board!=="auto") q.set("b", S.board);
-  const pr = GPUS.filter(g=> S.prices[g.n]!==g.usd).map(g=> `${g.n}-${S.prices[g.n]}`);
-  if(pr.length) q.set("pr", pr.join("_"));
   if(trafficInUse()){ const t = S.trafficApplied; q.set("tf", [t.people, t.req, t.hours, t.peak].join("_")); }
   return q.toString();
 }
@@ -1779,12 +1729,6 @@ function applyHash(){
     pressSeg('tp', 'tpo', q.get("tp") || "auto");
     const ov = Math.round(+q.get("ov"));
     ovSlider.value = q.has("ov") && ov>=0 && ov<=25 ? ov : 7; syncOv();
-    S.prices = loadPrices();
-    (q.get("pr") || "").split("_").forEach(s=>{
-      const i = s.lastIndexOf("-"), n = s.slice(0, i), v = +s.slice(i+1);
-      if(n in S.prices && Number.isFinite(v) && v>=0) S.prices[n] = v;   // shown, not saved as this viewer's prices
-    });
-    buildPriceGrid();
     S.board = GPUS.some(g=> g.n===q.get("b")) ? q.get("b") : "auto";
     const tf = (q.get("tf") || "").split("_").map(Number);
     if(tf.length===4 && tf.every(x=> x>0)){
@@ -1843,7 +1787,7 @@ function buildSummary(){
     ["Speed per user", `${fmtTps(t.perUser)} tok/s`, hasGoal ? `${t.perUser>=goal.tps ? "meets" : "below"} the ${goal.tps}+ goal` : feelFor(t.perUser)],
     ["First reply", fmtTime(t.ttft).join(" "), (hasGoal ? `${t.ttft<=goal.ttft ? "within" : "over"} the ${goal.ttft} s goal` : `${commas(S.prompt)}-token prompt`)
                     + (S.thinking ? `, then ${fmtWait(S.thinking/t.perUser)} of thinking` : "")],
-    ["Cost", `${fmtUsd(a.usdHr)}/hr`, `${fmtUsd(a.usdHr*730)}/month · ${fmtUsd(a.usdPerM)}/M output tokens`],
+    ["GPU memory in all", boxTotal(a.memGB), `${a.gpus} × ${boxMem(a.g)}`],
     ["Handles up to", `${commas(L.cap.users)} user${L.cap.users===1 ? "" : "s"}`,
       L.cap.users===0 ? (L.cap.limit==="speed" ? "none within the speed goal" : "none at these lengths")
                       : L.cap.limit==="speed" ? "before the speed goal slips" : "before memory runs out"],
@@ -1854,7 +1798,7 @@ function buildSummary(){
     ["Concurrent users", commas(S.users) + (tf ? ` · estimated from ${commas(tf.people)} people × ${tf.req} requests a day over ${tf.hours} hours, busiest hour ${tf.peak}× the average` : "")],
     ["Workload", `${WORKLOADS[S.workload].name}: ${commas(S.prompt)}-token prompts, ${commas(S.reply)}-token replies`
                  + (S.thinking ? `, ${commas(S.thinking)} thinking tokens per reply` : "")],
-    ["Speed goal", hasGoal ? goal.desc.replace(/\.$/, "") : "None: the cheapest setup that fits"],
+    ["Speed goal", hasGoal ? goal.desc.replace(/\.$/, "") : "None: the smallest setup that fits"],
     ["Layout", layout],
     ["Advanced", `KV cache ${kqLabel()} · GPUs per copy ${S.tpo==="auto" ? "chosen automatically" : S.tpo} · ${CHUNK_NAME[S.chunk]} · ${S.ovpct}% overhead`],
   ];
@@ -1867,18 +1811,17 @@ function buildSummary(){
     const shape = !d.fits ? "—" : d.reps>1 ? `${d.reps} copies × ${d.tp}` : d.tp===1 ? "1 GPU" : `1 copy × ${d.tp}`;
     return `<tr${a && a.g.n===g.n ? ' class="hl"' : ""}><td>${esc(g.n)}${L.suggested && L.suggested.g.n===g.n ? ' <span class="tag">suggested</span>' : ""}</td>`
       + `<td class="n">${d.fits ? d.gpus : "—"}</td><td>${shape}</td><td>${status}</td>`
-      + `<td class="n">${d.t ? fmtTps(d.t.perUser) : "—"}</td><td class="n">${d.fits ? fmtUsd(d.usdHr) : "—"}</td><td class="n">${d.fits ? fmtUsd(d.usdHr*730) : "—"}</td></tr>`;
+      + `<td class="n">${d.fits ? boxTotal(d.memGB) : "—"}</td><td class="n">${d.t ? fmtTps(d.t.perUser) : "—"}</td></tr>`;
   }).join("");
   const notes = [
     `Board memory is the size on the box; about 90% is treated as usable, the rest going to the driver and runtime. Amounts are in ${S.unit==="GiB" ? "GiB (2³⁰ bytes)" : "GB (10⁹ bytes)"}.`,
     `Memory is sized for every concurrent user at full length: prompt + ${S.thinking ? "thinking + " : ""}reply.`,
     `Speed and first-reply times are estimates from each board's memory bandwidth, compute and interconnect, not benchmarks. Real serving engines usually land within about ±30%.`,
-    pricesEdited() ? `GPU prices were set by whoever prepared this summary. A month is 730 hours.`
-                   : `Prices are September 2026 on-demand medians per GPU-hour across cloud providers; reserved or committed pricing is usually lower. A month is 730 hours.`,
+    `The recommendation is the setup that ${hasGoal ? "reaches the speed goal" : "holds every user"} with the least GPU memory in total; on any one board, that means the fewest GPUs.`,
   ];
   if(S.thinking) notes.push(`First reply is when the first token appears; for a thinking model that's the start of its thinking, and the answer follows once the thinking is done.`);
   if(fits && a.reps>1) notes.push(`Copies run independently behind a load balancer, so they need no NVLink between them and can sit in separate servers.`);
-  const link = CAN_LINK ? `<p class="foot">Open this scenario in VRAM Sizer: <a href="${esc(location.href.split("#")[0] + "#" + stateToHash())}">interactive version</a></p>` : "";
+  const link = CAN_LINK ? `<p class="foot">Open this scenario in LLM Inference Sizer: <a href="${esc(location.href.split("#")[0] + "#" + stateToHash())}">interactive version</a></p>` : "";
   const title = `GPU sizing: ${name}, ${commas(S.users)} user${S.users===1 ? "" : "s"}`;
   const html = `<!DOCTYPE html>
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -1922,19 +1865,19 @@ function buildSummary(){
 </style>
 <main>
   <button class="print" onclick="print()">Print or save as PDF</button>
-  <div class="eyebrow">VRAM Sizer · ${esc(role)}</div>
+  <div class="eyebrow">LLM Inference Sizer · ${esc(role)}</div>
   <h1>${esc(head)}</h1>
   <p class="sub">${esc(name)} · ${commas(S.users)} concurrent user${S.users===1 ? "" : "s"} · ${esc(WORKLOADS[S.workload].name)} · ${esc(prec)}</p>
   <div class="date">Prepared ${esc(date)}</div>
   ${stats.length ? `<div class="stats">${stats.map(([k, v, s])=> `<div class="stat"><span>${esc(k)}</span><b>${esc(v)}</b><small>${esc(s)}</small></div>`).join("")}</div>` : ""}
   <p class="memline"><b>Memory for ${esc(memScope)}:</b> ${mem}</p>
   <section><h2>What was sized</h2><table class="kv">${inputs.map(([k, v])=> `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join("")}</table></section>
-  <section><h2>Every board</h2><table><tr><th>Board</th><th class="n">GPUs</th><th>Layout</th><th>Status</th><th class="n">tok/s per user</th><th class="n">$/hr</th><th class="n">$/month</th></tr>${boards}</table></section>
+  <section><h2>Every board</h2><table><tr><th>Board</th><th class="n">GPUs</th><th>Layout</th><th>Status</th><th class="n">GPU memory</th><th class="n">tok/s per user</th></tr>${boards}</table></section>
   <section class="notes"><h2>Assumptions</h2><ul>${notes.map(n=> `<li>${esc(n)}</li>`).join("")}</ul></section>
   ${link}
 </main>
 </html>`;
-  return {filename: `vram-sizing-${slug(name)}-${S.users}-users.html`, html};
+  return {filename: `llm-inference-sizing-${slug(name)}-${S.users}-users.html`, html};
 }
 async function downloadSummary(btn){
   if(!LAST) return;
@@ -1963,7 +1906,7 @@ const TIPS = {
   weights:"The parameters themselves, loaded once and held for the life of the process. Size = params × bytes per parameter. Fixed — it never grows with users or context.",
   kv:"Cached keys and values for every token already processed, so the model never recomputes them. Grows with context length AND with concurrent users at the same time — usually the first thing to blow the budget. Newer models shrink it with sliding windows, compression, or linear-attention layers that keep a fixed-size state.",
   act:"Short-lived tensors inside one forward pass: hidden states and the MLP intermediates. Freed after each pass, so it scales with how many tokens run at once — not with context length.",
-  tpov:"The price of splitting across GPUs. Every GPU carries its own CUDA context, plus NCCL buffers for the all-reduce that runs after each layer. It is added memory, not saved memory.",
+  tpov:"What splitting across GPUs adds. Every GPU carries its own CUDA context, plus NCCL buffers for the all-reduce that runs after each layer. It is added memory, not saved memory.",
   overhead:"CUDA/driver context, allocator fragmentation, framework workspaces and CUDA graphs. Real but hard to predict — the slider sets how conservative you want to be.",
   wq:"Bytes per weight. As released uses the checkpoint exactly as published; many new models ship in FP8 or FP4. BF16 is 2 bytes; FP8 and INT8 halve it; FP4 and INT4 cut it about 4×. FP8 runs natively on H100, MI350P and newer; FP4 on Blackwell and MI350P.",
   model:"The most-used open models on Hugging Face as of September 2026, grouped by lab. Layer counts, attention types and cache sizes come from each model's published config.json.",
@@ -1976,17 +1919,15 @@ const TIPS = {
   users:"How many requests are served at once — the batch. Each carries its own KV cache, so this scales cache memory linearly and is the main lever on serving capacity.",
   chunk:"When a new question arrives, the server reads the prompt in pieces while it keeps writing replies for everyone else. Small pieces keep other people's replies flowing smoothly, but a long prompt waits longer to start. Big pieces start long prompts sooner, but everyone else's text briefly freezes while each piece is read. The numbers on each choice show both effects on your setup.",
   pause:"While a new prompt is being read, everyone already mid-reply waits. This is the longest gap they would see between words. Under 0.1 s is unnoticeable; choose Smooth streaming to shorten it.",
-  tp:"How many GPUs one copy of the model is split across (tensor parallelism). Every layer's weights are divided and the GPUs all-reduce after each layer, so splitting needs NVLink to be fast. Auto picks the cheapest layout; a fixed number applies to every board.",
+  tp:"How many GPUs one copy of the model is split across (tensor parallelism). Every layer's weights are divided and the GPUs all-reduce after each layer, so splitting needs NVLink to be fast. Auto picks the smallest layout; a fixed number applies to every board.",
   copies:"A copy (replica) is a full, independent instance of the model on its own GPUs, serving its share of the users. More copies serve more users without slowing each other down, and unlike splitting one copy across GPUs, they need no fast link between them.",
   prefill:"How fast a new prompt is read, in tokens per second. Reading is limited by compute rather than memory speed, so faster chips and FP8 or FP4 help most. Optimize for, in Advanced settings, sets the piece size.",
   ovpct:"Headroom for allocator fragmentation and framework buffers, as a percentage of weights + cache + activations. 5–10% is typical; raise it if you have hit OOM under load.",
-  goal:"How fast each user should see answers: at least this many tokens per second, and a first reply within the time limit. The suggestion is the cheapest setup that reaches it. Any speed just finds the cheapest setup that fits.",
-  cost:"What the setup costs to rent: GPUs × price per GPU-hour. Per million output tokens divides that by how many tokens it generates in an hour for your users. Edit prices in Advanced settings.",
+  goal:"How fast each user should see answers: at least this many tokens per second, and a first reply within the time limit. The suggestion is the setup that reaches it with the least GPU memory in total. Any speed just finds the smallest setup that fits.",
   capacity:"The most users this setup holds at the current prompt and reply lengths, across all copies. Either memory runs out, or each user's speed drops below your goal, whichever comes first. The gap to your user count is your room to grow.",
-  prices:"Price per GPU per hour. Defaults are September 2026 on-demand medians across cloud providers; enter what you actually pay. The suggestion picks the cheapest setup, so these decide which board it recommends.",
   units:"GB is 1,000,000,000 bytes, the unit on spec sheets and download pages. GiB is 1,073,741,824 bytes, the unit nvidia-smi, PyTorch and vLLM report. Switching only relabels memory; the recommendation doesn't change. Board capacities are the size on the box, counted as GB: 80 GB is 74.5 GiB.",
   perGPU:"What each individual board must hold. This is the number that determines fit — a model can need 300 GB total and still run fine on 4 × 80 GB.",
-  fit:"How many of each board it takes to serve everyone: up to 8 GPUs per copy of the model, plus more copies for more users, and what that costs. Assumes ~90% of board memory is usable; drivers and the CUDA context claim the rest.",
+  fit:"How many of each board it takes to serve everyone: up to 8 GPUs per copy of the model, plus more copies for more users, and how much GPU memory that adds up to. Assumes ~90% of board memory is usable; drivers and the CUDA context claim the rest.",
   nvlink:"This board sits on an NVLink/NVSwitch fabric (up to 8 GPUs in one domain), which is what tensor parallelism needs to perform.",
   pcie:"PCIe-only — no NVLink. Fine for a single GPU, but tensor parallelism must all-reduce over a far slower link after every layer, so throughput suffers badly.",
   tput:"A first-order estimate from the board's memory bandwidth, compute and interconnect, not a benchmark. Real engines usually land within about ±30%, depending on kernels, CUDA graphs and traffic shape. Use it to compare setups, not to promise an SLA.",
@@ -2039,7 +1980,7 @@ function labelTips(){
 /* init */
 usersSlider.max = USER_STOPS.length-1;
 usersSlider.value = stopIndex(USER_STOPS, S.users);
-updateCfgNote(); syncWq(); resetThink(); updateGoalHint(); buildPriceGrid(); applyWorkload(S.workload); syncUsers(); syncOv();
+updateCfgNote(); syncWq(); resetThink(); updateGoalHint(); applyWorkload(S.workload); syncUsers(); syncOv();
 applyHash();   // a shared link's settings, if the address has any
 render();
 </script>
