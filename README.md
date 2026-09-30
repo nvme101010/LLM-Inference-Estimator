@@ -8,9 +8,16 @@ A single-page calculator for sizing LLM inference. Pick a model, the number of c
 
 It covers 40+ popular open models (Qwen, Gemma, Llama, DeepSeek, gpt-oss, GLM, Kimi, Mistral and others) on NVIDIA L4, L40S, H100, H200, B200, B300, RTX PRO 4500/6000 Blackwell, and AMD MI350P.
 
+Not sure how many concurrent users to plan for? **Estimate from daily traffic** turns people, requests per day and hours of use into a concurrent-user count.
+
 ## Use it
 
 Open `index.html` in a browser. It is one self-contained file with no build step and no server.
+
+## Share a sizing
+
+- **Download summary** saves a one-page report of the recommendation, the inputs, every board compared and the assumptions. Open it and choose Print to save it as a PDF.
+- **Copy link** appears when the page is served from the web, for example GitHub Pages. The address holds every setting, so the link opens the same scenario.
 
 ## Accuracy
 
