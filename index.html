@@ -128,6 +128,17 @@
   .ask-grid{display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:16px 26px; align-items:start}
   .ask-grid > .field{grid-column:span 2}
   .reply-row{margin-top:12px}
+  .think-row{margin-top:4px}
+  .think-row[hidden]{display:none}
+  .think-row .val{display:flex; align-items:center; gap:8px}
+  .think-row .valinput:disabled{opacity:.45}
+  .switch{-webkit-appearance:none; appearance:none; flex:none; width:34px; height:20px; margin:0; border-radius:20px; background:var(--line-2); position:relative; cursor:pointer; transition:background .15s}
+  .switch::after{content:""; position:absolute; top:3px; left:3px; width:14px; height:14px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.3); transition:transform .15s}
+  .switch:checked{background:var(--accent)}
+  .switch:checked::after{transform:translateX(14px)}
+  .switch:disabled{cursor:default; opacity:.6}
+  .switch:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  @media (prefers-reduced-motion:reduce){ .switch, .switch::after{transition:none} }
   @media (max-width:760px){
     .ask-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
     .ask-grid > .field{grid-column:span 1}
@@ -350,7 +361,6 @@
           <div class="sliderhead"><label class="fld" for="workload">Workload <span class="i" data-tip="workload" tabindex="0">i</span></label></div>
           <select id="workload">
             <option value="chat" selected>Chat</option>
-            <option value="reason">Reasoning (thinking models)</option>
             <option value="rag">RAG / document Q&amp;A</option>
             <option value="agent">Coding agent</option>
             <option value="summary">Long-document summary</option>
@@ -393,6 +403,13 @@
           <div class="sliderhead reply-row">
             <label class="fld" for="replyNum">Reply length <span class="i" data-tip="reply" tabindex="0">i</span></label>
             <div class="val"><input type="number" id="replyNum" class="valinput" min="1" max="1048576" step="1" value="512" inputmode="numeric"> <small>tok</small></div>
+          </div>
+          <div class="sliderhead think-row" id="thinkRow" hidden>
+            <label class="fld" id="thinkLbl">Thinking <span class="i" data-tip="think" tabindex="0">i</span></label>
+            <div class="val">
+              <input type="checkbox" id="thinkOn" class="switch" role="switch" aria-labelledby="thinkLbl">
+              <input type="number" id="thinkNum" class="valinput" min="0" max="131072" step="1" value="4096" inputmode="numeric" aria-label="Thinking tokens per reply"> <small>tok</small>
+            </div>
           </div>
         </div>
       </div>
@@ -526,6 +543,7 @@
           <p><b>Overhead</b> = a fixed <code>~1.0 GB</code> CUDA/driver context plus a slider % of the three above, standing in for allocator fragmentation, framework buffers, and CUDA graphs.</p>
           <p><b>Tensor-parallel overhead</b> — the page picks TP for you as part of the cheapest layout, fixed in Advanced settings if you prefer. With TP &gt; 1 the model is sharded across GPUs: weights and activations divide by TP, and the KV cache divides by <code>min(TP, kv_heads)</code>. Sharding <i>adds</i> memory: every GPU carries its own <code>~1 GB</code> CUDA context, plus NCCL all-reduce workspace and comm buffers (<code>~0.3 GB + users × hidden × 8 B</code> per GPU). When <b>TP exceeds a layer's KV heads</b>, that part of the cache can't split further and copies to every GPU — watch it stop shrinking. Latent and compressed caches have a single head, so they always copy; linear-attention state splits cleanly.</p>
           <p><b>Throughput</b> — generating a token means reading this GPU's weight shard plus every active request's KV cache, so a decode step takes <code>bytes read ÷ (memory bandwidth × 0.65)</code>. At very large batches the compute cost <code>users × 2 × active params ÷ (FLOPs × 0.5)</code> takes over, so the step uses whichever is slower. Tensor parallelism adds two all-reduces per layer, sized to the batch's activations and sent over NVLink or PCIe, and the engine adds ~1.5 ms per step. Output = <code>users ÷ step time</code>. Reading a prompt is compute-bound: <code>prompt × (2 × active params + layers × prompt × hidden) ÷ (FLOPs × 0.45)</code>. The prompt is read in pieces (512, 2,048 or 8,192 tokens, set by <b>Optimize for</b>), and each piece shares a step with everyone else's next token. So <b>time to first token</b> = prompt compute + pieces × step time, and the <b>pause</b> other users feel = one piece's compute + one step. Smaller pieces mean more steps before the first reply but shorter freezes. Requests are assumed to be halfway through their reply (prompt + half the reply in cache), and the first reply waits on the whole prompt. Quantized weights read fewer bytes but lose some of that gain to dequantization; FP8 also speeds up compute on boards with native FP8 cores. MoE models read more experts as the batch grows. Bandwidth and link speeds are published specs; FLOPs are rough estimates.</p>
+          <p><b>Thinking</b> — a model that reasons step by step writes thinking tokens before its answer. They're generated like any other token, so a user's cache peaks at prompt + thinking + reply, speed is judged halfway through thinking and reply together, and cost per output token counts them. First reply is when the first token appears, which for a thinking model is the start of its thinking; the stat also says how long the thinking runs before the answer begins. Earlier turns' thinking is normally dropped by the model's chat template, so it doesn't build up in the prompt. The switch starts at each model's own default, taken from its model card and chat template.</p>
           <p><b>Suggestion, cost and capacity</b> — every board is tried at 1, 2, 4 and 8 GPUs per copy (splitting a copy only across NVLink boards), with as many copies as it takes to serve every user, and the suggestion is the cheapest that reaches the speed goal; if none reaches it, the one that comes closest. Cost = <code>GPUs × $ per GPU-hour</code>; per million output tokens = <code>$/hour ÷ (output tok/s × 3,600) × 10⁶</code>, counting generated tokens only. <b>Handles up to</b> is the most users the setup holds at the current prompt and reply lengths while fitting in memory and, with a goal, still reaching it. Default prices are September 2026 on-demand medians; edit them in Advanced settings.</p>
           <p><b>Copies (replicas)</b> — for more users, the page runs more copies of the model instead of splitting one copy wider. Each copy has its own GPUs and an even share of the users, so memory, the bar and the breakdown describe one copy, while cost, output and capacity add up across all of them. Copies don't exchange data while generating, so they need no NVLink and can run on separate servers; that's why PCIe boards scale out well even though they split a single copy poorly, and why, when two layouts cost the same, a PCIe board takes more copies over splitting one. When a board needs more GPUs than memory alone calls for, the extra ones are there to reach the speed goal, and the page says so. This assumes a load balancer spreads requests evenly.</p>
           <p><b>Units</b> — every amount is computed in bytes and shown in the unit picked at the top: <b>GB</b> is 10⁹ bytes (spec sheets, download pages), <b>GiB</b> is 2³⁰ bytes (nvidia-smi, PyTorch and vLLM's logs). Switching changes the labels, never the answer. Board capacities are the size on the box, counted as GB, so an H100 is 80 GB or 74.5 GiB. Real boards expose that much or slightly more, so a fit here errs on the safe side.</p>
@@ -681,16 +699,18 @@ const MODELS = [
 ];
 const findModel = id => MODELS.flatMap(g=>g.items).find(m=>m.id===id);
 
-/* Does the model reason before answering? From each model card and chat template, September 2026.
-   always = reasoning can't be switched off · default = on unless switched off ·
-   optional = off unless switched on (or no stated default). Anything unlisted doesn't reason. */
+/* Does the model think (reason step by step) before answering? From each model card and chat template,
+   September 2026. always = thinking can't be switched off · default = on unless switched off ·
+   optional = off unless switched on (or no stated default). Anything unlisted doesn't think.
+   The Thinking switch starts at the model's default; a custom model is treated as optional. */
 const THINKS = {
   always:   ["q38-2t","gptoss-120b","gptoss-20b","r1d-32b","glm53","glm53-flash","kimi-k3","mm-m27"],
   default:  ["q38-27b","q38-flash","q36-35b","q35-9b","q35-4b","q3-32b","q3-30b","q3-8b","glm47-flash","nemo-super","nemo-nano"],
   optional: ["dsv4-flash","dsv4-pro","dsv32","ms4","mm35","g4-31b","g4-26b","g4-12b","g4-e4b"],
 };
-const thinksOf = m => Object.keys(THINKS).find(k=> THINKS[k].includes(m.id)) || "none";
-const THINK_LABEL = {always:"always reasons", default:"thinks by default", optional:"optional thinking mode", none:"no reasoning mode"};
+const thinksOf = m => m.custom ? "optional" : Object.keys(THINKS).find(k=> THINKS[k].includes(m.id)) || "none";
+const THINK_LABEL = {always:"always thinks before answering", default:"thinks before answering by default",
+                     optional:"thinking can be switched on", none:"answers without thinking"};
 
 /* link:true = NVSwitch/NVLink board (HGX/DGX, up to 8 in one NVLink domain).
    link:false = PCIe-only — TP all-reduce crosses PCIe and is much slower.
@@ -728,12 +748,13 @@ const meetsGoal = t => t.perUser >= GOALS[S.goal].tps && t.ttft <= GOALS[S.goal]
 const goalGap = t => Math.max(GOALS[S.goal].tps / t.perUser, t.ttft / GOALS[S.goal].ttft);
 
 /* ---------------- workloads ----------------
-   A workload is what each request sends in (prompt) and gets back (reply). A user's cache peaks
-   at prompt + reply; speed is judged halfway through a reply; the first reply waits on the whole
-   prompt. Each preset also picks how prompts are read (Optimize for). */
+   A workload is what each request sends in (prompt) and gets back (reply). A thinking model also
+   writes thinking tokens before the reply, set separately since any task can run on any model.
+   A user's cache peaks at prompt + thinking + reply; speed is judged halfway through generating
+   thinking + reply; the first reply waits on the whole prompt. Each preset also picks how prompts
+   are read (Optimize for). */
 const WORKLOADS = {
   chat:    {name:"Chat",                  prompt:2048,  reply:512,  chunk:512,  desc:"Multi-turn chat with a system prompt: 2K-token prompts, 512-token replies."},
-  reason:  {name:"Reasoning",             prompt:2048,  reply:8192, chunk:2048, desc:"Thinking models write a long reasoning trace before answering: 2K in, 8K out."},
   rag:     {name:"RAG",                   prompt:8192,  reply:512,  chunk:2048, desc:"Retrieved documents plus a question: 8K in, 512 out."},
   agent:   {name:"Coding agent",          prompt:32768, reply:2048, chunk:8192, desc:"Files, diffs and tool output sent on every step: 32K in, 2K out."},
   summary: {name:"Long-document summary", prompt:65536, reply:1024, chunk:8192, desc:"A long report or transcript condensed to a page: 64K in, 1K out."},
@@ -759,10 +780,13 @@ const pricesEdited = () => GPUS.some(g=> S.prices[g.n]!==g.usd);
 /* ---------------- state ---------------- */
 /* tpo = TP override ("auto" or 1/2/4/8) · tp = the TP of the deployment on screen · board = "auto" or a clicked board */
 /* prompt/reply = lengths in use; wantPrompt/wantReply = what the workload asked for, kept so a
-   model with a shorter context trims them and switching back restores them. ctxTok = prompt + reply. */
+   model with a shorter context trims them and switching back restores them.
+   think = the Thinking switch · thinkTok = thinking tokens asked for · thinking = tokens in use (0 when off).
+   ctxTok = prompt + thinking + reply. */
 const S = { wq:2, wqLbl:"NATIVE", kq:2, tp:1, tpo:"auto", chunk:512, ovpct:7, users:16, board:"auto",
             goal:"smooth", prices:loadPrices(),
             workload:"chat", prompt:2048, reply:512, wantPrompt:2048, wantReply:512, ctxTok:2560,
+            think:false, thinkTok:4096, thinking:0,
             chunkBase:512,     // the Optimize-for choice the last preset made, so Advanced can flag your own change
             unit:loadUnit() };
 let M = findModel("l31-8b");
@@ -922,7 +946,7 @@ const PREC = {                  // d = share of the bandwidth saving realized ·
 
 function throughput(g, tp, chunk = S.chunk, users = S.users){
   const m = activeModel();
-  const fill = S.prompt + S.reply/2;             // a request halfway through its reply
+  const fill = S.prompt + (S.thinking + S.reply)/2;   // a request halfway through thinking + reply
   const cls = precClass(m);
   let {d, p} = PREC[cls];
   if(cls==="FP8" && !g.fp8){ d=0.85; p=0.9; }   // weight-only FP8 kernels on boards without FP8 cores
@@ -1040,6 +1064,7 @@ function capacityFor(d){
 
 const fmtTps = x => x>=100 ? commas(Math.round(x)) : x>=10 ? x.toFixed(0) : x.toFixed(1);
 const fmtTime = s => s>=1 ? [s.toFixed(2), "s"] : [s>=0.01 ? String(Math.round(s*1000)) : (s*1000).toFixed(1), "ms"];
+const fmtWait = s => s>=90 ? `${(s/60).toFixed(1)} min` : s>=1 ? `${Math.round(s)} s` : "under 1 s";
 
 /* ---------------- render ---------------- */
 const $ = id => document.getElementById(id);
@@ -1056,7 +1081,7 @@ function kvFormula(r){
   const lines = cache.parts.map(({g, bytes})=> g.state
     ? `${LAYER_LABEL.linear(g)}: fixed ${fmtBytes(g.state)} state each = ${fmtBytes(bytes)}`
     : `${LAYER_LABEL[g.t](g)}: ${fmtBytes(g.n*g.per*S.kq/(g.r||1))}/tok × ${commas(Math.min(ctx, g.win ?? Infinity))} tok = ${fmtBytes(bytes)}`);
-  lines.push(`= ${fmtBytes(cache.req)} per user at ${commas(ctx)} tokens (prompt + reply) × ${commas(users)} user${users>1?"s":""} (${kqLabel()} cache)`);
+  lines.push(`= ${fmtBytes(cache.req)} per user at ${commas(ctx)} tokens (prompt + ${S.thinking ? "thinking + " : ""}reply) × ${commas(users)} user${users>1?"s":""} (${kqLabel()} cache)`);
   if(tp>1) lines.push(`split across ${tp} GPUs${cache.replicated ? " — layers with fewer KV heads than GPUs copy to every GPU" : ""} = <b>${fmtMem(r.kv_pg/GB)}/GPU</b>`);
   return lines.join("<br>");
 }
@@ -1136,7 +1161,7 @@ const fmtUsd = x => "$" + (x>=100 ? commas(Math.round(x)) : x>=0.1 ? x.toFixed(2
 function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, speed, faster, cap}){
   const goal = GOALS[S.goal], hasGoal = S.goal!=="any", goalText = goal.desc.replace(/\.$/, "");
   const prec = S.wqLbl==="NATIVE" ? `${m.nat.f}, as released` : S.wqLbl;
-  const who = `${m.custom ? "Custom model" : m.n} · ${commas(S.users)} user${S.users>1?"s":""} · ${WORKLOADS[S.workload].name}: ${commas(S.prompt)} in, ${commas(S.reply)} out · ${prec}`;
+  const who = `${m.custom ? "Custom model" : m.n} · ${commas(S.users)} user${S.users>1?"s":""} · ${WORKLOADS[S.workload].name}: ${commas(S.prompt)} in, ${commas(S.reply)} out${S.thinking ? ` + ${commas(S.thinking)} thinking` : ""} · ${prec}`;
   const back = `<button type="button" class="linkbtn" data-act="auto">Back to the suggestion</button>`;
   const autoTp = S.tpo!=="auto" ? `<button type="button" class="linkbtn" data-act="tpauto">Let TP choose automatically</button>` : "";
   let lbl, main, sub = who, acts = "", why = "";
@@ -1194,7 +1219,8 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
                  hasGoal ? `${slowTps ? "below" : "meets"} the ${goal.tps}+ goal` : feelFor(speed.perUser), slowTps ? "warn" : "")
              : statCell("tpsUser", "Speed per user", "—", "", na))
     + (speed ? statCell("ttft", "First reply", ...fmtTime(speed.ttft),
-                 hasGoal ? `${slowTtft ? "over" : "within"} the ${goal.ttft} s goal` : `${commas(speed.prompt)}-token prompt`, slowTtft ? "warn" : "")
+                 (hasGoal ? `${slowTtft ? "over" : "within"} the ${goal.ttft} s goal` : `${commas(speed.prompt)}-token prompt`)
+                 + (S.thinking ? ` · then ${fmtWait(S.thinking / speed.perUser)} of thinking` : ""), slowTtft ? "warn" : "")
              : statCell("ttft", "First reply", "—", "", na))
     + (active && fits ? statCell("cost", "Cost", fmtUsd(active.usdHr), "/hr", `${fmtUsd(active.usdPerM)}/M output tok · ${fmtUsd(active.usdHr*730)}/mo`)
                       : statCell("cost", "Cost", "—", "", na))
@@ -1380,13 +1406,16 @@ function updateWqNote(){
 
 /* ---------------- inputs ---------------- */
 const ctxSlider=$('ctx'), usersSlider=$('users'), ovSlider=$('ovpct'), replyNum=$('replyNum'), workloadSel=$('workload');
+const thinkOn=$('thinkOn'), thinkNum=$('thinkNum');
 
-/* prompt + reply must fit the model's context: the reply is capped first, the prompt slider
-   then runs up to whatever is left */
-const promptStops = () => ctxStops(Math.max(512, activeModel().ctx - S.reply));
+/* prompt + thinking + reply must fit the model's context: thinking is capped at half of it, the
+   reply at what's left after 512 prompt tokens, and the prompt slider runs up to the remainder */
+const promptStops = () => ctxStops(Math.max(512, activeModel().ctx - S.thinking - S.reply));
 const nearestStop = (stops, v) => stops.reduce((best, s, i) => Math.abs(Math.log(s/v)) < Math.abs(Math.log(stops[best]/v)) ? i : best, 0);
 function setLengths(){                   // fit the wanted lengths to this model and re-range the slider
-  S.reply = Math.max(1, Math.min(S.wantReply, activeModel().ctx - 512));
+  const ctx = activeModel().ctx;
+  S.thinking = S.think ? Math.min(S.thinkTok, Math.floor(ctx/2)) : 0;
+  S.reply = Math.max(1, Math.min(S.wantReply, ctx - 512 - S.thinking));
   const stops = promptStops();
   ctxSlider.max = stops.length-1;
   ctxSlider.value = nearestStop(stops, Math.min(S.wantPrompt, stops[stops.length-1]));
@@ -1396,29 +1425,28 @@ function setLengths(){                   // fit the wanted lengths to this model
 function syncPrompt(){                   // slider → state, then everything that shows the lengths
   const stops = promptStops();
   S.prompt = stops[+ctxSlider.value] ?? stops[stops.length-1];
-  S.ctxTok = S.prompt + S.reply;
+  S.ctxTok = S.prompt + S.thinking + S.reply;
   $('ctxVal').textContent = commas(S.prompt);
   ctxSlider.setAttribute('aria-valuetext', `${commas(S.prompt)} tokens`);
   if(document.activeElement!==replyNum) replyNum.value = S.reply;   // don't fight someone typing
-  const trimmed = S.wantPrompt > stops[stops.length-1] || S.wantReply > S.reply;
-  $('workloadHint').innerHTML = WORKLOADS[S.workload].desc
-    + (trimmed ? ` Trimmed to fit this model's ${fmtCtx(activeModel().ctx)} context.` : "")
-    + reasoningNote();
+  if(document.activeElement!==thinkNum) thinkNum.value = S.think ? S.thinking : S.thinkTok;
+  const trimmed = S.wantPrompt > stops[stops.length-1] || S.wantReply > S.reply || S.thinking < (S.think ? S.thinkTok : 0);
+  $('workloadHint').textContent = WORKLOADS[S.workload].desc
+    + (trimmed ? ` Trimmed to fit this model's ${fmtCtx(activeModel().ctx)} context.` : "");
 }
-/* A nudge when the workload and the model disagree about reasoning. A model that reasons writes a
-   hidden trace before its answer, so sizing it for short replies undersizes it; sizing a model that
-   doesn't reason for long replies oversizes it. Advice only — long outputs are sometimes the point. */
-function reasoningNote(){
-  const m = activeModel(), think = thinksOf(m), long = S.reply >= 4096;
-  if(m.custom) return "";
-  const fix = (key, label) => ` <button type="button" class="linkbtn" data-wl="${key}">${label}</button>`;
-  if(long && think==="none")
-    return `<br><span class="warnx">${m.n} isn't a reasoning model, so replies this long are unusual.</span> Unless you expect long outputs, Chat or RAG fits better.${fix("chat", "Use Chat")}`;
-  if(!long && think==="always")
-    return `<br><span class="warnx">${m.n} always reasons before answering</span>, and that hidden reasoning often runs to thousands of tokens, so these replies are probably too short.${fix("reason", "Use Reasoning")}`;
-  if(!long && think==="default")
-    return `<br><span class="warnx">${m.n} reasons before answering unless you switch thinking off.</span> If you'll leave it on, size for longer replies.${fix("reason", "Use Reasoning")}`;
-  return "";
+/* the Thinking row: hidden for models that never think, locked on for ones that always do */
+function syncThink(){
+  const m = activeModel(), mode = thinksOf(m);
+  $('thinkRow').hidden = mode==="none";
+  thinkOn.checked = S.think;
+  thinkOn.disabled = mode==="always";
+  thinkOn.title = mode==="always" ? `${m.n} always thinks before answering` : "";
+  thinkNum.disabled = !S.think;
+}
+function resetThink(){                   // a newly picked model starts at its own default
+  const mode = thinksOf(activeModel());
+  S.think = mode==="always" || mode==="default";
+  syncThink();
 }
 function setChunk(v){
   S.chunk = v;
@@ -1432,10 +1460,13 @@ function applyWorkload(key){             // a preset sets both lengths and how p
   setLengths();
 }
 function markCustom(){ S.workload = "custom"; workloadSel.value = "custom"; }
-$('workloadHint').addEventListener('click', e=>{   // the fix offered by a reasoning note
-  const b = e.target.closest('[data-wl]');
-  if(b){ applyWorkload(b.dataset.wl); render(); }
+thinkOn.addEventListener('change', ()=>{ S.think = thinkOn.checked; syncThink(); setLengths(); render(); });
+thinkNum.addEventListener('input', ()=>{
+  const n = Math.round(+thinkNum.value);
+  if(thinkNum.value==="" || !(n>=0)) return;   // mid-edit or invalid — keep last good value
+  S.thinkTok = Math.min(n, 131072); setLengths(); render();
 });
+thinkNum.addEventListener('change', ()=>{ thinkNum.value = S.think ? S.thinking : S.thinkTok; });   // show the value actually used
 
 workloadSel.addEventListener('change', ()=>{ applyWorkload(workloadSel.value); render(); });
 replyNum.addEventListener('input', ()=>{
@@ -1547,7 +1578,7 @@ $('priceReset').addEventListener('click', ()=>{
 modelSel.addEventListener('change', ()=>{
   M = findModel(modelSel.value);
   $('customWrap').hidden = !M.custom;
-  updateCfgNote(); syncWq();
+  updateCfgNote(); syncWq(); resetThink();
   setLengths();                            // trims to the new model's context, or restores
   render();
 });
@@ -1590,8 +1621,9 @@ const TIPS = {
   model:"The most-used open models on Hugging Face as of September 2026, grouped by lab. Layer counts, attention types and cache sizes come from each model's published config.json.",
   kq:"Precision of the cached keys and values. FP8 KV roughly halves cache size with little quality loss — often a better first move than quantizing the weights themselves.",
   ctx:"Tokens each request sends in: system prompt, conversation history, documents, code. The whole prompt is read before the first reply, and it stays in the user's cache while the reply is written.",
-  reply:"Tokens each reply generates. Reasoning models write long hidden traces, so their replies run to thousands of tokens. Prompt + reply is the most cache one user holds.",
-  workload:"What each request looks like: how long the prompt is and how long the reply is. Presets cover common patterns and pick how prompts are read; move the prompt slider or type a reply length to set your own. If the preset doesn't match whether the model reasons before answering, a note says so.",
+  reply:"Tokens in each answer the user reads. Thinking, if the model does it, is set separately below. Prompt + thinking + reply is the most cache one user holds.",
+  think:"Many newer models reason step by step before they answer. Those thinking tokens are generated like any others, so they take cache memory and time even though users usually don't see them. The switch starts at the model's own default. About 4K tokens is typical; hard math or code can run past 10K. Earlier turns' thinking is normally dropped from the conversation, so it doesn't pile up in the prompt.",
+  workload:"What each request looks like: how long the prompt is and how long the reply is. Presets cover common patterns and pick how prompts are read; move the prompt slider or type a reply length to set your own. Whether the model thinks before answering is set separately, under Reply length.",
   users:"How many requests are served at once — the batch. Each carries its own KV cache, so this scales cache memory linearly and is the main lever on serving capacity.",
   chunk:"When a new question arrives, the server reads the prompt in pieces while it keeps writing replies for everyone else. Small pieces keep other people's replies flowing smoothly, but a long prompt waits longer to start. Big pieces start long prompts sooner, but everyone else's text briefly freezes while each piece is read. The numbers on each choice show both effects on your setup.",
   pause:"While a new prompt is being read, everyone already mid-reply waits. This is the longest gap they would see between words. Under 0.1 s is unnoticeable; choose Smooth streaming to shorten it.",
@@ -1611,7 +1643,7 @@ const TIPS = {
   tput:"A first-order estimate from the board's memory bandwidth, compute and interconnect, not a benchmark. Real engines usually land within about ±30%, depending on kernels, CUDA graphs and traffic shape. Use it to compare setups, not to promise an SLA.",
   tpsTotal:"Output tokens per second summed across every concurrent user — what the deployment produces. Adding users usually raises it, because the weights are read once per step no matter how many requests share that step.",
   tpsUser:"How fast one person sees text stream in. More users slow each one down, since every step must also read their KV caches. Around 20 tok/s or more feels smooth in chat; under 10 feels sluggish.",
-  ttft:"Time to first token: how long someone waits before the answer starts appearing. Uses the full prompt length, read in pieces while the other users keep being served. Faster chips, FP8 and Fast first reply all shorten it.",
+  ttft:"Time to first token: how long someone waits before the answer starts appearing. Uses the full prompt length, read in pieces while the other users keep being served. Faster chips, FP8 and Fast first reply all shorten it. For a thinking model this is when the thinking starts; the answer follows once it's done.",
   step:"Everything needed to produce one token for every active user. The largest segment is the bottleneck. A big blue interconnect segment means tensor parallelism is costing you real speed.",
   bneck:"What limits token generation right now. Memory-bound is normal for decode: the GPU waits on reading weights and cache. Compute-bound appears at very large batches. Interconnect-bound means the GPUs spend more time talking than working.",
 };
@@ -1658,7 +1690,7 @@ function labelTips(){
 /* init */
 usersSlider.max = USER_STOPS.length-1;
 usersSlider.value = stopIndex(USER_STOPS, S.users);
-updateCfgNote(); syncWq(); updateGoalHint(); buildPriceGrid(); applyWorkload(S.workload); syncUsers(); syncOv(); render();
+updateCfgNote(); syncWq(); resetThink(); updateGoalHint(); buildPriceGrid(); applyWorkload(S.workload); syncUsers(); syncOv(); render();
 </script>
 
 </html>
