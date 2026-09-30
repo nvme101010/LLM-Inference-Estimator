@@ -1070,11 +1070,6 @@ function suggestDeployment(deps){
   const ok = suggestable(deps);
   return smallest(ok.filter(d=>d.meets)) || closest(ok) || null;
 }
-/* A step up worth mentioning: the smallest other deployment at least 1.5× faster per user. */
-function fasterOption(active, deps){
-  if(!active || !active.t) return null;
-  return smallest(suggestable(deps).filter(d=> d.g.n!==active.g.n && d.t.perUser >= active.t.perUser*1.5)) || null;
-}
 /* How many users the deployment could serve at these lengths: what one copy holds, times copies. */
 function capacityFor(d){
   const byMem = copyCapacity(d.g, d.tp, 1e6, true);
@@ -1123,7 +1118,6 @@ function render(){
   const reps = active ? active.reps : 1;
   const g = active ? active.g : null, fits = !!(active && active.fits);
   const speed = active ? active.t : null;
-  const faster = picked ? null : fasterOption(active, deps);
   const cap = fits ? capacityFor(active) : null;
 
   const comps=[
@@ -1142,7 +1136,7 @@ function render(){
   ];
   const shown = comps.filter(c=> !(c.tponly && tp<=1));
 
-  renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, speed, faster, cap});
+  renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, speed, cap});
   const gauge = g || BIGGEST;
   renderBar(comps, totGB, gauge.cap*tp, gauge, tp, reps);
 
@@ -1183,7 +1177,7 @@ function render(){
 /* the headline: which deployment, why, and the five numbers behind it */
 /* a total of box sizes: "192 GB" as sold, or its GiB equivalent */
 const boxTotal = gb => S.unit==="GiB" ? fmtMem(gb) : `${commas(gb)} GB`;
-function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, speed, faster, cap}){
+function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, speed, cap}){
   const goal = GOALS[S.goal], hasGoal = S.goal!=="any", goalText = goal.desc.replace(/\.$/, "");
   const prec = S.wqLbl==="NATIVE" ? `${m.nat.f}, as released` : S.wqLbl;
   const who = `${m.custom ? "Custom model" : m.n} · ${commas(S.users)} user${S.users>1?"s":""} · ${WORKLOADS[S.workload].name}: ${commas(S.prompt)} in, ${commas(S.reply)} out${S.thinking ? ` + ${commas(S.thinking)} thinking` : ""} · ${prec}`;
@@ -1210,7 +1204,6 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
       why += layout + (active.meets
         ? `${hasGoal ? "Serves everyone within your speed goal" : "Holds everyone"} with the least GPU memory in total (${boxTotal(active.memGB)}).`
         : `<span class="warnx">Nothing reaches your speed goal</span> (${goalText}), so this is the setup that comes closest. Try FP8 or shorter prompts.`);
-      if(faster) why += ` Faster: <button type="button" class="linkbtn" data-act="pick" data-board="${faster.g.n}">${faster.gpus} × ${faster.g.n}</button> at ${fmtTps(faster.t.perUser)} tok/s per user.`;
     }
   } else if(active){
     lbl = "Your pick";
@@ -1569,7 +1562,6 @@ gpuCards.addEventListener('keydown', e=>{
 document.querySelector('.verdict').addEventListener('click', e=>{
   const b = e.target.closest('[data-act]'); if(!b) return;
   if(b.dataset.act==="auto"){ S.board = "auto"; render(); }
-  if(b.dataset.act==="pick"){ S.board = b.dataset.board; render(); }
   if(b.dataset.act==="tpauto") $('tp').querySelector('[data-v="auto"]').click();
 });
 
