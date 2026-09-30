@@ -528,7 +528,7 @@
           <p><b>Throughput</b> — generating a token means reading this GPU's weight shard plus every active request's KV cache, so a decode step takes <code>bytes read ÷ (memory bandwidth × 0.65)</code>. At very large batches the compute cost <code>users × 2 × active params ÷ (FLOPs × 0.5)</code> takes over, so the step uses whichever is slower. Tensor parallelism adds two all-reduces per layer, sized to the batch's activations and sent over NVLink or PCIe, and the engine adds ~1.5 ms per step. Output = <code>users ÷ step time</code>. Reading a prompt is compute-bound: <code>prompt × (2 × active params + layers × prompt × hidden) ÷ (FLOPs × 0.45)</code>. The prompt is read in pieces (512, 2,048 or 8,192 tokens, set by <b>Optimize for</b>), and each piece shares a step with everyone else's next token. So <b>time to first token</b> = prompt compute + pieces × step time, and the <b>pause</b> other users feel = one piece's compute + one step. Smaller pieces mean more steps before the first reply but shorter freezes. Requests are assumed to be halfway through their reply (prompt + half the reply in cache), and the first reply waits on the whole prompt. Quantized weights read fewer bytes but lose some of that gain to dequantization; FP8 also speeds up compute on boards with native FP8 cores. MoE models read more experts as the batch grows. Bandwidth and link speeds are published specs; FLOPs are rough estimates.</p>
           <p><b>Suggestion, cost and capacity</b> — every board is tried at 1, 2, 4 and 8 GPUs per copy (splitting a copy only across NVLink boards), with as many copies as it takes to serve every user, and the suggestion is the cheapest that reaches the speed goal; if none reaches it, the one that comes closest. Cost = <code>GPUs × $ per GPU-hour</code>; per million output tokens = <code>$/hour ÷ (output tok/s × 3,600) × 10⁶</code>, counting generated tokens only. <b>Handles up to</b> is the most users the setup holds at the current prompt and reply lengths while fitting in memory and, with a goal, still reaching it. Default prices are September 2026 on-demand medians; edit them in Advanced settings.</p>
           <p><b>Copies (replicas)</b> — for more users, the page runs more copies of the model instead of splitting one copy wider. Each copy has its own GPUs and an even share of the users, so memory, the bar and the breakdown describe one copy, while cost, output and capacity add up across all of them. Copies don't exchange data while generating, so they need no NVLink and can run on separate servers; that's why PCIe boards scale out well even though they split a single copy poorly, and why, when two layouts cost the same, a PCIe board takes more copies over splitting one. When a board needs more GPUs than memory alone calls for, the extra ones are there to reach the speed goal, and the page says so. This assumes a load balancer spreads requests evenly.</p>
-          <p><b>Units</b> — every amount is computed in bytes and shown in the unit picked at the top: <b>GB</b> is 10⁹ bytes (spec sheets, download pages), <b>GiB</b> is 2³⁰ bytes (nvidia-smi, PyTorch and vLLM's logs). Switching changes the labels, never the answer. Board capacities are what each driver actually reports, not the round number on the box: an H100 "80 GB" exposes 81,559 MiB, which is 79.6 GiB or 85.5 GB. Vendors' GB figures for HBM parts are really GiB, which is why the two differ.</p>
+          <p><b>Units</b> — every amount is computed in bytes and shown in the unit picked at the top: <b>GB</b> is 10⁹ bytes (spec sheets, download pages), <b>GiB</b> is 2³⁰ bytes (nvidia-smi, PyTorch and vLLM's logs). Switching changes the labels, never the answer. Board capacities are the size on the box, counted as GB, so an H100 is 80 GB or 74.5 GiB. Real boards expose that much or slightly more, so a fit here errs on the safe side.</p>
         </div>
           <div class="disc">Estimates for planning, not a guarantee. Real usage varies with the serving framework (vLLM, TensorRT-LLM, SGLang), paged-attention block sizing, speculative decoding, and MoE routing. MoE models load <i>all</i> expert weights even though only a few activate per token. The newest attention designs (DeepSeek V4's compressed sparse attention, sparse-attention index keys) are modeled from their configs, so treat those cache figures as ±25%. Model list and architectures checked against Hugging Face in September 2026.</div>
         </div>
@@ -694,29 +694,22 @@ const THINK_LABEL = {always:"always reasons", default:"thinks by default", optio
 
 /* link:true = NVSwitch/NVLink board (HGX/DGX, up to 8 in one NVLink domain).
    link:false = PCIe-only — TP all-reduce crosses PCIe and is much slower.
-   rated = the size on the box (GB), shown on the board cards · mib = total memory the driver reports (nvidia-smi / rocm-smi),
-   the real capacity every fit is checked against · mem = memory type · bw = memory bandwidth, GB/s (sets decode speed)
+   cap = memory on the box, GB (10⁹ bytes) · mem = memory type · bw = memory bandwidth, GB/s (sets decode speed)
    flops = effective BF16 compute, TFLOPS — rough estimate, sets prefill speed
    fp8 / fp4 = native FP8 / FP4 tensor cores · lbw = GPU-to-GPU link, GB/s per direction · lname = link label */
 const GPUS = [
-  {n:"L4",         rated:24,  mib:23034,  mem:"GDDR6",  bw:300,  flops:80,   fp8:true,  fp4:false, link:false, lbw:32,  lname:"PCIe Gen4", usd:0.85},
-  {n:"RTX PRO 4500 Blackwell", rated:32, mib:32416, mem:"GDDR7", bw:800, flops:135, fp8:true, fp4:true, link:false, lbw:64, lname:"PCIe Gen5", usd:0.72},
-  {n:"L40S",       rated:48,  mib:46068,  mem:"GDDR6",  bw:864,  flops:240,  fp8:true,  fp4:false, link:false, lbw:32,  lname:"PCIe Gen4", usd:1.29},
-  {n:"H100 80GB",  rated:80,  mib:81559,  mem:"HBM3",   bw:3350, flops:720,  fp8:true,  fp4:false, link:true,  lbw:450, lname:"NVLink 4",  usd:3.25},
-  {n:"RTX PRO 6000 Blackwell", rated:96, mib:97248, mem:"GDDR7", bw:1792, flops:330, fp8:true, fp4:true, link:false, lbw:64, lname:"PCIe Gen5", usd:2.19},
-  {n:"H200",       rated:141, mib:143771, mem:"HBM3e",  bw:4800, flops:720,  fp8:true,  fp4:false, link:true,  lbw:450, lname:"NVLink 4",  usd:4.40},
-  {n:"AMD MI350P", rated:144, mib:147456, mem:"HBM3E",  bw:4000, flops:800,  fp8:true,  fp4:true,  link:false, lbw:64,  lname:"PCIe Gen5", usd:2.20},
-  {n:"B200",       rated:180, mib:183359, mem:"HBM3e",  bw:7700, flops:1400, fp8:true,  fp4:true,  link:true,  lbw:900, lname:"NVLink 5",  usd:6.52},
-  {n:"B300",       rated:288, mib:270844, mem:"HBM3e",  bw:8000, flops:1400, fp8:true,  fp4:true,  link:true,  lbw:900, lname:"NVLink 5",  usd:7.87},
+  {n:"L4",         cap:24, mem:"GDDR6",  bw:300,  flops:80,   fp8:true,  fp4:false, link:false, lbw:32,  lname:"PCIe Gen4", usd:0.85},
+  {n:"RTX PRO 4500 Blackwell", cap:32, mem:"GDDR7", bw:800, flops:135, fp8:true, fp4:true, link:false, lbw:64, lname:"PCIe Gen5", usd:0.72},
+  {n:"L40S",       cap:48, mem:"GDDR6",  bw:864,  flops:240,  fp8:true,  fp4:false, link:false, lbw:32,  lname:"PCIe Gen4", usd:1.29},
+  {n:"H100 80GB",  cap:80, mem:"HBM3",   bw:3350, flops:720,  fp8:true,  fp4:false, link:true,  lbw:450, lname:"NVLink 4",  usd:3.25},
+  {n:"RTX PRO 6000 Blackwell", cap:96, mem:"GDDR7", bw:1792, flops:330, fp8:true, fp4:true, link:false, lbw:64, lname:"PCIe Gen5", usd:2.19},
+  {n:"H200",       cap:141, mem:"HBM3e",  bw:4800, flops:720,  fp8:true,  fp4:false, link:true,  lbw:450, lname:"NVLink 4",  usd:4.40},
+  {n:"AMD MI350P", cap:144, mem:"HBM3E",  bw:4000, flops:800,  fp8:true,  fp4:true,  link:false, lbw:64,  lname:"PCIe Gen5", usd:2.20},
+  {n:"B200",       cap:180, mem:"HBM3e",  bw:7700, flops:1400, fp8:true,  fp4:true,  link:true,  lbw:900, lname:"NVLink 5",  usd:6.52},
+  {n:"B300",       cap:288, mem:"HBM3e",  bw:8000, flops:1400, fp8:true,  fp4:true,  link:true,  lbw:900, lname:"NVLink 5",  usd:7.87},
 ];
-/* Driver-reported totals, checked September 2026: L4, L40S, H100 and H200 from published nvidia-smi
-   readouts; B200 from nvidia-smi output in NVIDIA's own issue trackers; RTX PRO 6000 from a CUDA device
-   query. Estimates: RTX PRO 4500 (the PRO 6000's ~1% reserve applied to 32 GB), MI350P (four 36 GiB
-   HBM3E stacks, fully exposed as on MI300X), B300 (reports conflict; the lower, ~284 × 10⁹ bytes).
-   cap is that capacity in GB (10⁹ bytes), the unit all the math below works in. */
-for(const g of GPUS) g.cap = g.mib * 2**20 / 1e9;
 
-const USABLE = 0.90; // share of the driver-reported memory the server may use (vLLM's gpu_memory_utilization default)
+const USABLE = 0.90; // share of board memory the server may use (vLLM's gpu_memory_utilization default)
 const BIGGEST = GPUS.reduce((a,b)=> b.cap>a.cap ? b : a);   // what "too big" is measured against
 
 /* ---------------- speed goals and prices ----------------
@@ -810,6 +803,8 @@ const fmtGB = x => x>=1000 ? commas(Math.round(x)) : x>=100 ? x.toFixed(0) : x>=
 const GIB = 2**30;
 const fmtMemN = gb => fmtGB(S.unit==="GiB" ? gb*1e9/GIB : gb);   // a GB amount, as a number in the chosen unit
 const fmtMem  = gb => `${fmtMemN(gb)} ${S.unit}`;
+/* a board's box size: "32 GB" as sold, or its GiB equivalent */
+const boxMem  = g => S.unit==="GiB" ? fmtMem(g.cap) : `${g.cap} GB`;
 const fmtBytes = b => {
   const k = S.unit==="GiB" ? 1024 : 1000;
   const names = S.unit==="GiB" ? ["B","KiB","MiB","GiB","TiB"] : ["B","KB","MB","GB","TB"];
@@ -1191,7 +1186,7 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
   const slowTtft = hasGoal && speed && speed.ttft > goal.ttft;
   const limit = cap && (cap.limit==="speed" ? "speed goal hits first" : "memory runs out first");
   $('vstats').innerHTML =
-      (g ? statCell("perGPU", "Per GPU", fmtMemN(perGB), `of ${fmtMem(g.cap)}`,
+      (g ? statCell("perGPU", "Per GPU", fmtMemN(perGB), `of ${boxMem(g)}`,
              fits ? `${Math.round(perGB/g.cap*100)}% full${active.gpus>1 ? ` · ${fmtMem(totGB*reps)} in all` : ""}`
                   : `${fmtMem(perGB - g.cap*USABLE)} over the usable ${fmtMem(g.cap*USABLE)}`, fits ? "" : "bad")
          : statCell("perGPU", "Per GPU", fmtMemN(perGB), S.unit, `split ${tp} ways — more than any board holds`, "bad"))
@@ -1250,7 +1245,7 @@ function renderCards(deps, active, suggested, picked){
     el.dataset.gpu=b.n; el.tabIndex=0; el.setAttribute('role','button'); el.setAttribute('aria-pressed', isPicked);
     el.innerHTML=`<div class="stripe"></div>
       <div class="gname">${b.n}</div>
-      <div class="gcap">${b.rated} GB ${b.mem}</div>
+      <div class="gcap">${boxMem(b)} ${b.mem}</div>
       <span class="lb ${lbCls}" data-tip="${b.link?'nvlink':'pcie'}" tabindex="0">${lbTxt}</span>
       <div class="count">${d.fits ? d.gpus : "—"}<small> × GPU</small></div>
       <span class="pill ${pill}">${ptxt}</span>${suggested && suggested.g.n===b.n ? `<span class="pill sugg">Suggested</span>` : ""}
@@ -1608,8 +1603,8 @@ const TIPS = {
   cost:"What the setup costs to rent: GPUs × price per GPU-hour. Per million output tokens divides that by how many tokens it generates in an hour for your users. Edit prices in Advanced settings.",
   capacity:"The most users this setup holds at the current prompt and reply lengths, across all copies. Either memory runs out, or each user's speed drops below your goal, whichever comes first. The gap to your user count is your room to grow.",
   prices:"Price per GPU per hour. Defaults are September 2026 on-demand medians across cloud providers; enter what you actually pay. The suggestion picks the cheapest setup, so these decide which board it recommends.",
-  units:"GB is 1,000,000,000 bytes, the unit on spec sheets and download pages. GiB is 1,073,741,824 bytes, the unit nvidia-smi, PyTorch and vLLM report. Switching only relabels memory; the recommendation doesn't change. Board capacities are what each driver actually exposes, not the round number on the box.",
-  perGPU:"What each individual board must hold. This is the number that determines fit — a model can need 300 GB total and still run fine on 4 × 80 GB. It's measured against the memory the board actually exposes, which isn't the size on the box: an H100 sold as 80 GB exposes 85.5 GB, or 79.6 GiB.",
+  units:"GB is 1,000,000,000 bytes, the unit on spec sheets and download pages. GiB is 1,073,741,824 bytes, the unit nvidia-smi, PyTorch and vLLM report. Switching only relabels memory; the recommendation doesn't change. Board capacities are the size on the box, counted as GB: 80 GB is 74.5 GiB.",
+  perGPU:"What each individual board must hold. This is the number that determines fit — a model can need 300 GB total and still run fine on 4 × 80 GB.",
   fit:"How many of each board it takes to serve everyone: up to 8 GPUs per copy of the model, plus more copies for more users, and what that costs. Assumes ~90% of board memory is usable; drivers and the CUDA context claim the rest.",
   nvlink:"This board sits on an NVLink/NVSwitch fabric (up to 8 GPUs in one domain), which is what tensor parallelism needs to perform.",
   pcie:"PCIe-only — no NVLink. Fine for a single GPU, but tensor parallelism must all-reduce over a far slower link after every layer, so throughput suffers badly.",
