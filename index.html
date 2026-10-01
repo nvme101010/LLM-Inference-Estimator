@@ -337,7 +337,7 @@
       <div class="glyph" aria-hidden="true"></div>
       <div>
         <h1>LLM Inference Sizer</h1>
-        <div class="sub">How many GPUs your model and users need: memory, speed and capacity</div>
+        <div class="sub">How many GPUs your model and users need: memory, speed and capacity. Does not cover NVL rack-scale systems.</div>
       </div>
     </div>
     <div class="top-actions">
@@ -574,7 +574,7 @@
           <p><b>Thinking</b> — a model that reasons step by step writes thinking tokens before its answer. They're generated like any other token, so a user's cache peaks at prompt + thinking + reply, speed is judged halfway through thinking and reply together, and cost per output token counts them. First reply is when the first token appears, which for a thinking model is the start of its thinking; the stat also says how long the thinking runs before the answer begins. Earlier turns' thinking is normally dropped by the model's chat template, so it doesn't build up in the prompt. The switch starts at each model's own default, taken from its model card and chat template.</p>
           <p><b>Concurrent users from traffic</b> — requests in progress at once = requests per second × seconds each one takes. A request takes the wait before its first token plus its thinking and reply, streamed at your speed goal's rate; the goal is a minimum speed, so this errs on the high side. The busiest-hour multiple covers traffic that isn't spread evenly through the day; 2× suits a typical workday.</p>
           <p><b>Sharing</b> — on a hosted copy of this page, the address always holds the current settings, so Copy link sends the exact scenario. Download summary saves a one-page report of the recommendation, the inputs and every board, which prints to PDF.</p>
-          <p><b>Suggestion and capacity</b> — every board is tried at 1, 2, 4 and 8 GPUs per copy (splitting a copy only across NVLink boards), with as many copies as it takes to serve every user. The suggestion is the setup that reaches the speed goal with the least GPU memory in total (on any one board, the fewest GPUs); if none reaches it, the one that comes closest. <b>Handles up to</b> is the most users the setup holds at the current prompt and reply lengths while fitting in memory and, with a goal, still reaching it.</p>
+          <p><b>Suggestion and capacity</b> — every board is tried at 1, 2, 4 and 8 GPUs per copy (splitting a copy only across NVLink boards), with as many copies as it takes to serve every user. The suggestion is the setup that reaches the speed goal with the least GPU memory in total (on any one board, the fewest GPUs); if none reaches it, the one that comes closest. A board sold only as a complete system is counted in whole systems: the B200 and B300 ship as 8-GPU systems, so they always show 8, 16 or more GPUs. NVL rack-scale systems are not covered. <b>Handles up to</b> is the most users the setup holds at the current prompt and reply lengths while fitting in memory and, with a goal, still reaching it.</p>
           <p><b>Copies (replicas)</b> — for more users, the page runs more copies of the model instead of splitting one copy wider. Each copy has its own GPUs and an even share of the users, so memory, the bar and the breakdown describe one copy, while GPU count, output and capacity add up across all of them. Copies don't exchange data while generating, so they need no NVLink and can run on separate servers; that's why PCIe boards scale out well even though they split a single copy poorly, and why, when two layouts use the same number of GPUs, a PCIe board takes more copies over splitting one. When a board needs more GPUs than memory alone calls for, the extra ones are there to reach the speed goal, and the page says so. This assumes a load balancer spreads requests evenly.</p>
           <p><b>Units</b> — every amount is computed in bytes and shown in the unit picked at the top: <b>GB</b> is 10⁹ bytes (spec sheets, download pages), <b>GiB</b> is 2³⁰ bytes (nvidia-smi, PyTorch and vLLM's logs). Switching changes the labels, never the answer. Board capacities are the size on the box, counted as GB, so an H100 is 80 GB or 74.5 GiB. Real boards expose that much or slightly more, so a fit here errs on the safe side.</p>
         </div>
@@ -746,7 +746,9 @@ const THINK_LABEL = {always:"always thinks before answering", default:"thinks be
    link:false = PCIe-only — TP all-reduce crosses PCIe and is much slower.
    cap = memory on the box, GB (10⁹ bytes) · mem = memory type · bw = memory bandwidth, GB/s (sets decode speed)
    flops = effective BF16 compute, TFLOPS — rough estimate, sets prefill speed
-   fp8 / fp4 = native FP8 / FP4 tensor cores · lbw = GPU-to-GPU link, GB/s per direction · lname = link label */
+   fp8 / fp4 = native FP8 / FP4 tensor cores · lbw = GPU-to-GPU link, GB/s per direction · lname = link label
+   sys = GPUs per system, for a board sold only as a complete system (the B200 and B300 ship as 8-GPU
+   HGX systems; NVL rack-scale systems are out of scope), so its deployments are counted in whole systems */
 const GPUS = [
   {n:"L4",         cap:24, mem:"GDDR6",  bw:300,  flops:80,   fp8:true,  fp4:false, link:false, lbw:32,  lname:"PCIe Gen4"},
   {n:"RTX PRO 4500 Blackwell", cap:32, mem:"GDDR7", bw:800, flops:135, fp8:true, fp4:true, link:false, lbw:64, lname:"PCIe Gen5"},
@@ -755,8 +757,8 @@ const GPUS = [
   {n:"RTX PRO 6000 Blackwell", cap:96, mem:"GDDR7", bw:1792, flops:330, fp8:true, fp4:true, link:false, lbw:64, lname:"PCIe Gen5"},
   {n:"H200",       cap:141, mem:"HBM3e",  bw:4800, flops:720,  fp8:true,  fp4:false, link:true,  lbw:450, lname:"NVLink 4"},
   {n:"AMD MI350P", cap:144, mem:"HBM3E",  bw:4000, flops:800,  fp8:true,  fp4:true,  link:false, lbw:64,  lname:"PCIe Gen5"},
-  {n:"B200",       cap:180, mem:"HBM3e",  bw:7700, flops:1400, fp8:true,  fp4:true,  link:true,  lbw:900, lname:"NVLink 5"},
-  {n:"B300",       cap:288, mem:"HBM3e",  bw:8000, flops:1400, fp8:true,  fp4:true,  link:true,  lbw:900, lname:"NVLink 5"},
+  {n:"B200",       cap:180, mem:"HBM3e",  bw:7700, flops:1400, fp8:true,  fp4:true,  link:true,  lbw:900, lname:"NVLink 5", sys:8},
+  {n:"B300",       cap:288, mem:"HBM3e",  bw:8000, flops:1400, fp8:true,  fp4:true,  link:true,  lbw:900, lname:"NVLink 5", sys:8},
 ];
 
 const USABLE = 0.90; // share of board memory the server may use (vLLM's gpu_memory_utilization default)
@@ -1045,11 +1047,14 @@ const smallest = ds => ds.sort((a,b)=> a.memGB-b.memGB || (a.g.link ? 0 : a.tp-b
    closest. If even one user can't fit, the largest copy tried, to show how far off it is.
    The size of a copy (TP) can be fixed in Advanced settings. memOnly is the leanest layout that
    merely holds everyone, so the page can say when extra GPUs are there for speed rather than memory. */
+/* copies rounded up so the GPUs come to whole systems, on a board sold only that way: the spare GPUs
+   run extra copies, which spreads the users thinner and only helps fit and speed */
+const wholeSystems = (g, tp, reps) => g.sys ? Math.ceil(tp*reps/g.sys) * g.sys / tp : reps;
 function deploymentFor(g){
   const tps = S.tpo==="auto" ? TP_OPTIONS : [S.tpo];
   const layouts = memOnly => tps.map(tp=>{
     const cap = copyCapacity(g, tp, S.users, memOnly);
-    return cap ? evaluate(g, tp, Math.ceil(S.users/cap)) : null;
+    return cap ? evaluate(g, tp, wholeSystems(g, tp, Math.ceil(S.users/cap))) : null;
   }).filter(Boolean);
   const fitting = layouts(true), meeting = layouts(false).filter(d=>d.meets);
   const leanest = smallest(fitting.slice()) || null;
@@ -1189,8 +1194,9 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
     main = `${active.gpus} × ${g.n}`;
     if(tp>1 && !g.link) sub += ` · <span class="warnx">PCIe only, so splitting a copy is slow</span>`;
     const layout = reps>1
-      ? `Runs as <b>${reps} copies</b> of the model <span class="i" data-tip="copies" tabindex="0">i</span> on ${tp} GPU${tp>1?"s":""} each, ~${commas(active.upr)} users per copy. `
+      ? `Runs as <b>${reps} copies</b> of the model <span class="i" data-tip="copies" tabindex="0">i</span> on ${tp} GPU${tp>1?"s":""} each, ~${commas(active.upr)} user${active.upr===1 ? "" : "s"} per copy. `
       : "";
+    if(g.sys) why += `The ${g.n} is sold only as ${g.sys}-GPU systems, so this is ${active.gpus/g.sys} whole system${active.gpus/g.sys===1 ? "" : "s"}. `;
     if(forSpeed(active)){
       const lean = active.memOnly;
       why += `${lean.gpus} × ${g.n} would hold the model, but at ${fmtTps(lean.t.perUser)} tok/s per user`
@@ -1274,7 +1280,9 @@ function renderCards(deps, active, suggested, picked){
   const cards=$('gpucards'); cards.innerHTML="";
   GPUS.forEach(b=>{
     const d = deps.get(b.n), slow = d.tp>1 && !b.link;
-    const shape = d.reps>1 ? `${d.reps} copies${d.tp>1 ? ` × ${d.tp}` : ""}` : d.tp===1 ? "Fits on one" : `Needs ${d.tp}`;
+    const systems = b.sys ? d.gpus/b.sys : 0;
+    const shape = b.sys ? `${systems} system${systems===1 ? "" : "s"}`
+                : d.reps>1 ? `${d.reps} copies${d.tp>1 ? ` × ${d.tp}` : ""}` : d.tp===1 ? "Fits on one" : `Needs ${d.tp}`;
     let cls, pill, ptxt;
     if(!d.fits){ cls="s-bad"; pill="bad"; ptxt = S.tpo==="auto" ? "Won't fit on 8" : `Not at TP ${d.tp}`; }
     else if(!d.meets){ cls="s-warn"; pill="warn"; ptxt="Below goal"; }
@@ -1287,7 +1295,7 @@ function renderCards(deps, active, suggested, picked){
     el.dataset.gpu=b.n; el.tabIndex=0; el.setAttribute('role','button'); el.setAttribute('aria-pressed', isPicked);
     el.innerHTML=`<div class="stripe"></div>
       <div class="gname">${b.n}</div>
-      <div class="gcap">${boxMem(b)} ${b.mem}</div>
+      <div class="gcap">${boxMem(b)} ${b.mem}${b.sys ? ` · ${b.sys}-GPU systems only` : ""}</div>
       <span class="lb ${lbCls}" data-tip="${b.link?'nvlink':'pcie'}" tabindex="0">${lbTxt}</span>
       <div class="count">${d.fits ? d.gpus : "—"}<small> × GPU</small></div>
       <span class="pill ${pill}">${ptxt}</span>${suggested && suggested.g.n===b.n ? `<span class="pill sugg">Suggested</span>` : ""}
@@ -1813,6 +1821,7 @@ function buildSummary(){
     `The recommendation is the setup that ${hasGoal ? "reaches the speed goal" : "holds every user"} with the least GPU memory in total; on any one board, that means the fewest GPUs.`,
   ];
   if(S.thinking) notes.push(`First reply is when the first token appears; for a thinking model that's the start of its thinking, and the answer follows once the thinking is done.`);
+  GPUS.filter(b=> b.sys).forEach(b=> notes.push(`The ${b.n} is sold only as ${b.sys}-GPU systems, so its GPU counts are whole systems.`));
   if(fits && a.reps>1) notes.push(`Copies run independently behind a load balancer, so they need no NVLink between them and can sit in separate servers.`);
   const link = CAN_LINK ? `<p class="foot">Open this scenario in LLM Inference Sizer: <a href="${esc(location.href.split("#")[0] + "#" + stateToHash())}">interactive version</a></p>` : "";
   const title = `GPU sizing: ${name}, ${commas(S.users)} user${S.users===1 ? "" : "s"}`;

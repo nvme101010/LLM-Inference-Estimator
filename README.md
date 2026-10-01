@@ -1,6 +1,6 @@
 # LLM Inference Sizer
 
-How many GPUs your model and users need: memory, speed and capacity.
+How many GPUs your model and users need: memory, speed and capacity. Does not cover NVL rack-scale systems.
 
 A single-page tool for sizing LLM inference. Pick a model, the number of concurrent users, a workload and a speed goal, and it recommends the setup that meets the goal with the least GPU memory in total:
 
@@ -9,6 +9,8 @@ A single-page tool for sizing LLM inference. Pick a model, the number of concurr
 - **Capacity:** how many GPUs of each board it takes, and how many users the setup can handle.
 
 It covers 40+ popular open models (Qwen, Gemma, Llama, DeepSeek, gpt-oss, GLM, Kimi, Mistral and others) on NVIDIA L4, L40S, H100, H200, B200, B300, RTX PRO 4500/6000 Blackwell, and AMD MI350P.
+
+The B200 and B300 are sold only as 8-GPU systems, so the tool counts them in whole systems.
 
 Not sure how many concurrent users to plan for? **Estimate from daily traffic** turns people, requests per day and hours of use into a concurrent-user count.
 
