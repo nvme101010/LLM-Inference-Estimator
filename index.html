@@ -1105,6 +1105,20 @@ function systemsIn(d){
   const big = d.g.pop ? Math.max(...d.g.pop) : 0;
   return big>1 && d.fits && d.gpus>=big && d.gpus%big===0 ? d.gpus/big : 0;
 }
+/* Why memory alone takes this many GPUs, for a layout that isn't there for speed. With several copies,
+   one copy holds only some of the users. With one copy split across GPUs, half as many GPUs hold only
+   some of the users, or the model is too big for them even with one user. over = that case's numbers:
+   what one user needs on those GPUs against what they can use. */
+function memoryReason(d){
+  if(d.reps>1){
+    const holds = copyCapacity(d.g, d.tp, 1e6, true);
+    return holds < S.users ? {holds, on: d.tp===1 ? "one GPU" : "one copy", verb:"holds"} : null;
+  }
+  const n = d.tp/2, holds = copyCapacity(d.g, n, 1e6, true);
+  const r = {holds, on: n===1 ? "one GPU" : `${n} GPUs`, verb: n===1 ? "holds" : "hold"};
+  if(!holds) r.over = {need: compute(n, 1).perGPU*n/GB, usable: d.g.cap*USABLE*n};
+  return r;
+}
 /* how the node's GPUs are used, in words: the model can run once per GPU, as a few copies of several
    GPUs each, or as one copy spread across them */
 function layoutText(d){
@@ -1251,9 +1265,12 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
       : "";
     if(systemOf(g)) why += `The ${g.n} is sold only as ${systemOf(g)}-GPU systems, so this is a whole system. `;
     else if(g.pop && active.need < active.gpus) why += `${g.n} servers take ${popText(g)} GPUs, so the ${active.need} this needs rounds up to ${active.gpus}. `;
-    if(reps>1 && !active.partial && !forSpeed(active)){        // more than one copy because of memory, not speed
-      const holds = copyCapacity(g, tp, 1e6, true);
-      if(holds < S.users) why += `One ${tp===1 ? "GPU" : "copy"} holds ${commas(holds)} of your ${commas(S.users)} users in memory, so this runs ${reps}${tp===1 ? "" : " copies"}. `;
+    if(active.gpus>1 && !active.partial && !forSpeed(active) && !systemOf(g) && !(active.need < active.gpus)){   // more than one GPU because of memory, not speed
+      const mr = memoryReason(active), On = mr && mr.on[0].toUpperCase() + mr.on.slice(1);
+      const then = reps>1 ? `this runs ${reps}${tp===1 ? "" : " copies"}` : `one copy is split across ${tp}`;
+      if(mr) why += mr.over
+        ? `Even with one user the model needs ${fmtMem(mr.over.need)}, more than the ${fmtMem(mr.over.usable)} ${mr.on} can use (90% of capacity), so ${then}. `
+        : `${On} ${mr.verb} ${commas(mr.holds)} of your ${commas(S.users)} users in memory, so ${then}. `;
     }
     if(forSpeed(active) && !active.partial){
       const lean = active.memOnly;
@@ -1352,12 +1369,12 @@ function renderCards(deps, active, suggested, picked){
     else { cls = slow ? "s-warn" : "s-good"; pill = slow ? "warn" : "good"; ptxt = shape; }
     const [lbCls, lbTxt] = b.link ? ["lb-nv", systemOf(b) ? "NVLink · all 8" : "NVLink · 2, 4 or 8"] : slow ? ["lb-warn","PCIe · Not recommended"] : ["lb-pcie","PCIe only"];
     const rounded = d.fits && b.pop && !systemOf(b) && d.need < d.gpus;
-    /* why memory alone takes more than one GPU: too many users for one copy, or a copy too big for one card */
+    /* why memory alone takes more than one GPU: too many users for fewer, or a model too big for fewer */
     let memWhy = "";
     if(d.fits && d.gpus>1 && !d.partial && !forSpeed(d) && !rounded && !systemOf(b)){
-      const holds = d.reps>1 ? copyCapacity(b, d.tp, 1e6, true) : 0;
-      memWhy = d.reps>1 ? (holds < S.users ? `one ${d.tp===1 ? "GPU" : "copy"} holds ${commas(holds)} of your ${commas(S.users)} users` : "")
-                        : `one copy needs ${fmtMem(d.perGB*d.tp)}; one GPU holds ${fmtMem(b.cap*USABLE)}`;
+      const mr = memoryReason(d);
+      if(mr) memWhy = mr.over ? `too big for ${mr.on}: needs ${fmtMem(mr.over.need)}, ${fmtMem(mr.over.usable)} usable (90%)`
+                              : `${mr.on} ${mr.verb} ${commas(mr.holds)} of your ${commas(S.users)} users`;
     }
     const isActive = !!active && active.g.n===b.n, isPicked = !!picked && picked.n===b.n;
     const utilColor = !d.fits ? "var(--bad)" : (!d.meets || slow || d.partial) ? "var(--warn)" : "var(--good)";
@@ -1370,7 +1387,7 @@ function renderCards(deps, active, suggested, picked){
       <span class="lb ${lbCls}" data-tip="${b.link ? 'nvlink' : slow ? 'pcieSlow' : 'pcie'}" tabindex="0">${lbTxt}</span>
       <div class="count">${!d.fits ? "—" : systems || d.gpus}<small> × ${systems ? `${Math.max(...b.pop)}-GPU system${systems===1 ? "" : "s"}` : "GPU"}</small></div>
       <span class="pill ${pill}">${ptxt}</span>${suggested && suggested.g.n===b.n ? `<span class="pill sugg">${d.partial ? "Closest" : "Suggested"}</span>` : ""}
-      ${!d.fits ? `<div class="why">One copy needs ${fmtMem(d.perGB*d.tp)}; ${d.tp} hold${d.tp===1 ? "s" : ""} ${fmtMem(b.cap*USABLE*d.tp)}.</div>`
+      ${!d.fits ? `<div class="why">One copy needs ${fmtMem(d.perGB*d.tp)}; ${d.tp} hold${d.tp===1 ? "s" : ""} ${fmtMem(b.cap*USABLE*d.tp)} usable (90%).</div>`
         : d.partial ? `<div class="why">the most one node ${d.meets ? "serves" : "holds"}${hasGoal && d.meets ? " at your speed goal" : hasGoal ? ", below your speed goal" : ""}</div>`
         : forSpeed(d) ? `<div class="why">${d.memOnly.gpus} hold${d.memOnly.gpus===1 ? "s" : ""} it in memory; ${d.gpus} for your speed goal</div>`
         : rounded ? `<div class="why">${d.need} needed; servers take ${popText(b)}</div>`
