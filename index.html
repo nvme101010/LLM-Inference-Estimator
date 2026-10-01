@@ -1196,7 +1196,9 @@ function render(){
     {k:"Model weights", v:r.weights, c:"var(--w)", bar:"bw", tip:"weights",
      f:`${fmtB(m.p)} params × ${+S.wq.toFixed(3)} B/param (${S.wqLbl==="NATIVE" ? m.nat.f+", as released" : S.wqLbl})`
        + (tp>1?`<br>÷ TP ${tp} = <b>${fmtMem(r.w_pg/GB)}/GPU</b>`:``)},
-    {k:"KV cache", v:r.kv, c:"var(--kv)", bar:"bkv", tip:"kv", f:kvFormula(r)},
+    {k:"KV cache", v:r.kv, c:"var(--kv)", bar:"bkv", tip:"kv", f:kvFormula(r),
+     // split across more GPUs than a layer has KV heads, each GPU keeps that layer's cache: say how much that adds
+     extra: r.cache.replicated ? `incl. ${fmtMem((r.kv - r.users*r.cache.req)/GB)} repeated across ${tp} GPUs` : ""},
     {k:"Activations", v:r.act, c:"var(--act)", bar:"bact", tip:"act",
      f:`${commas(r.T)} tokens per step × (${commas(m.h)}h × 4 + ${commas(r.ffn)}ffn × 2) × 2 B = ${fmtMem(r.actBuf/GB)}`
        + `<br>+ ${commas(r.users)} × ${commas(r.vocab)} vocab × 4 B fp32 logits = ${fmtMem(r.actLogit/GB)}`
@@ -1218,7 +1220,7 @@ function render(){
     d.innerHTML=`<span class="dot" style="background:${c.c}"></span>
       <div><div class="k">${c.k} <span class="i" data-tip="${c.tip}" tabindex="0">i</span></div>
       <div class="v">${fmtMemN(c.v/GB)} <span style="font-size:11px;color:var(--muted);font-weight:500">${S.unit}</span></div>
-      <div class="p">${(c.v/tot*100).toFixed(1)}%</div></div>`;
+      <div class="p">${(c.v/tot*100).toFixed(1)}%</div>${c.extra ? `<div class="p">${c.extra}</div>` : ""}</div>`;
     leg.appendChild(d);
   });
 
@@ -1389,7 +1391,9 @@ function renderCards(deps, active, suggested, picked){
       <span class="pill ${pill}">${ptxt}</span>${suggested && suggested.g.n===b.n ? `<span class="pill sugg">${d.partial ? "Closest" : "Suggested"}</span>` : ""}
       ${!d.fits ? `<div class="why">One copy needs ${fmtMem(d.perGB*d.tp)}; ${d.tp} hold${d.tp===1 ? "s" : ""} ${fmtMem(b.cap*USABLE*d.tp)} usable (90%).</div>`
         : d.partial ? `<div class="why">the most one node ${d.meets ? "serves" : "holds"}${hasGoal && d.meets ? " at your speed goal" : hasGoal ? ", below your speed goal" : ""}</div>`
-        : forSpeed(d) ? `<div class="why">${d.memOnly.gpus} hold${d.memOnly.gpus===1 ? "s" : ""} it in memory; ${d.gpus} for your speed goal</div>`
+        : forSpeed(d) ? `<div class="why">${d.memOnly.gpus} hold${d.memOnly.gpus===1 ? "s" : ""} it in memory${
+            d.memOnly.t.perUser < GOALS[S.goal].tps ? ` at ${fmtTps(d.memOnly.t.perUser)} tok/s` : `, first reply ${fmtTime(d.memOnly.t.ttft).join(" ")}`
+          }; ${d.gpus} reach your speed goal</div>`
         : rounded ? `<div class="why">${d.need} needed; servers take ${popText(b)}</div>`
         : memWhy ? `<div class="why">${memWhy}</div>` : ""}
       <div class="util"><div style="width:${Math.min(100, d.perGB/b.cap*100).toFixed(0)}%;background:${utilColor}"></div></div>
@@ -2008,7 +2012,7 @@ if(!TOP && window.claude && typeof window.claude.use==="function")
 /* ---------------- tooltips ---------------- */
 const TIPS = {
   weights:"The parameters themselves, loaded once and held for the life of the process. Size = params × bytes per parameter. Fixed — it never grows with users or context.",
-  kv:"Cached keys and values for every token already processed, so the model never recomputes them. Grows with context length AND with concurrent users at the same time — usually the first thing to blow the budget. Newer models shrink it with sliding windows, compression, or linear-attention layers that keep a fixed-size state.",
+  kv:"Cached keys and values for every token already processed, so the model never recomputes them. Grows with context length AND with concurrent users at the same time — usually the first thing to blow the budget. Newer models shrink it with sliding windows, compression, or linear-attention layers that keep a fixed-size state. When one copy is split across more GPUs than a layer has KV heads, each GPU keeps its own copy of that layer's cache, so the total is larger on an 8-GPU split than on 4 or 2.",
   act:"Short-lived tensors inside one forward pass: hidden states and the MLP intermediates. Freed after each pass, so it scales with how many tokens run at once — not with context length.",
   tpov:"What splitting across GPUs adds. Every GPU carries its own CUDA context, plus NCCL buffers for the all-reduce that runs after each layer. It is added memory, not saved memory.",
   overhead:"CUDA/driver context, allocator fragmentation, framework workspaces and CUDA graphs. Real but hard to predict — the slider sets how conservative you want to be.",
