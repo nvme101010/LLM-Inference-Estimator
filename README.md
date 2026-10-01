@@ -10,7 +10,7 @@ A single-page tool for sizing LLM inference. Pick a model, the number of concurr
 
 It covers 40+ popular open models (Qwen, Gemma, Llama, DeepSeek, gpt-oss, GLM, Kimi, Mistral and others) on NVIDIA L4, L40S, H100, H200, B200, B300, RTX PRO 4500/6000 Blackwell, and AMD MI350P.
 
-The B200 and B300 are sold only as 8-GPU systems, so the tool counts them in whole systems.
+GPU counts round up to what can be bought. H100 and H200 servers take 1, 2, 4 or 8 GPUs, with NVLink across 2 or 4 cards or all 8 in an 8-GPU system; beyond 8 they are counted in whole 8-GPU systems. The B200 and B300 are sold only as 8-GPU systems, so the tool counts them in whole systems.
 
 Not sure how many concurrent users to plan for? **Estimate from daily traffic** turns people, requests per day and hours of use into a concurrent-user count.
 
