@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<meta name="description" content="How many GPUs your model and users need: memory, speed and capacity for serving open LLMs on NVIDIA and AMD boards.">
+<meta name="description" content="Single-node sizer: how many GPUs one server needs to serve an open LLM to your users, on NVIDIA and AMD boards.">
 <title>LLM Inference Sizer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -56,7 +56,7 @@
 
   /* ---- header ---- */
   header.top{display:flex; align-items:flex-end; justify-content:space-between; gap:18px; flex-wrap:wrap; margin-bottom:22px}
-  .brand{display:flex; align-items:center; gap:13px}
+  .brand{display:flex; align-items:center; gap:13px; flex:1 1 320px; min-width:0}   /* a long subtitle wraps instead of pushing the controls down */
   .glyph{width:40px; height:40px; border-radius:10px; background:linear-gradient(150deg,var(--w),var(--accent)); position:relative; flex:none; box-shadow:var(--shadow)}
   .glyph::before,.glyph::after{content:""; position:absolute; left:8px; right:8px; height:3px; border-radius:2px; background:rgba(255,255,255,.9)}
   .glyph::before{top:13px} .glyph::after{top:24px; right:16px}
@@ -338,7 +338,7 @@
       <div class="glyph" aria-hidden="true"></div>
       <div>
         <h1>LLM Inference Sizer</h1>
-        <div class="sub">How many GPUs your model and users need: memory, speed and capacity. Does not cover NVL rack-scale systems.</div>
+        <div class="sub">Single-node sizer: how many GPUs one server needs for your model and users. Does not cover multi-node or NVL rack-scale systems.</div>
       </div>
     </div>
     <div class="top-actions">
@@ -575,8 +575,9 @@
           <p><b>Thinking</b> — a model that reasons step by step writes thinking tokens before its answer. They're generated like any other token, so a user's cache peaks at prompt + thinking + reply, speed is judged halfway through thinking and reply together, and cost per output token counts them. First reply is when the first token appears, which for a thinking model is the start of its thinking; the stat also says how long the thinking runs before the answer begins. Earlier turns' thinking is normally dropped by the model's chat template, so it doesn't build up in the prompt. The switch starts at each model's own default, taken from its model card and chat template.</p>
           <p><b>Concurrent users from traffic</b> — requests in progress at once = requests per second × seconds each one takes. A request takes the wait before its first token plus its thinking and reply, streamed at your speed goal's rate; the goal is a minimum speed, so this errs on the high side. The busiest-hour multiple covers traffic that isn't spread evenly through the day; 2× suits a typical workday.</p>
           <p><b>Sharing</b> — on a hosted copy of this page, the address always holds the current settings, so Copy link sends the exact scenario. Download summary saves a one-page report of the recommendation, the inputs and every board, which prints to PDF.</p>
-          <p><b>Suggestion and capacity</b> — every board is tried at 1, 2, 4 and 8 GPUs per copy (splitting a copy only across NVLink boards), with as many copies as it takes to serve every user. The suggestion is the setup that reaches the speed goal with the least GPU memory in total (on any one board, the fewest GPUs); if none reaches it, the one that comes closest. GPU counts round up to what can be bought. H100 and H200 servers take 1, 2, 4 or 8 GPUs, with NVLink across 2 or 4 cards or all 8 in an 8-GPU system, so 3 rounds up to 4 and 5 to 7 round up to 8; beyond 8 they are counted in whole 8-GPU systems, so 12 rounds up to 16. The B200 and B300 ship only as 8-GPU systems, so they always show 8, 16 or more. Spare GPUs run extra copies of the model. NVL rack-scale systems are not covered. <b>Handles up to</b> is the most users the setup holds at the current prompt and reply lengths while fitting in memory and, with a goal, still reaching it.</p>
-          <p><b>Copies (replicas)</b> — for more users, the page runs more copies of the model instead of splitting one copy wider. Each copy has its own GPUs and an even share of the users, so memory, the bar and the breakdown describe one copy, while GPU count, output and capacity add up across all of them. Copies don't exchange data while generating, so they need no NVLink and can run on separate servers; that's why PCIe boards scale out well even though they split a single copy poorly, and why, when two layouts use the same number of GPUs, a PCIe board takes more copies over splitting one. When a board needs more GPUs than memory alone calls for, the extra ones are there to reach the speed goal, and the page says so. This assumes a load balancer spreads requests evenly.</p>
+          <p><b>Single node</b> — this sizes one server of up to 8 GPUs. Every result is a single node; multi-node deployments and NVL rack-scale systems are not covered. If one node of a board can't serve every user, its card says how many it does serve.</p>
+          <p><b>Suggestion and capacity</b> — every board is tried at 1, 2, 4 and 8 GPUs per copy (splitting a copy only across NVLink boards), with as many copies as the node's 8 GPUs allow. The suggestion is the node that serves every user within the speed goal with the least GPU memory in total (on any one board, the fewest GPUs). If no node serves everyone within the goal, it is the full node that serves the most users. GPU counts round up to what can be bought: H100 and H200 servers take 1, 2, 4 or 8 GPUs, with NVLink across 2 or 4 cards or all 8 in an 8-GPU system, so 3 rounds up to 4 and 5 to 7 round up to 8; the B200 and B300 ship only as 8-GPU systems. Spare GPUs run extra copies of the model. <b>Handles up to</b> is the most users the node holds at the current prompt and reply lengths while fitting in memory and, with a goal, still reaching it.</p>
+          <p><b>Copies (replicas)</b> — for more users, the page runs more copies of the model on the node's GPUs instead of splitting one copy wider. Each copy has its own GPUs and an even share of the users, so memory, the bar and the breakdown describe one copy, while GPU count, output and capacity add up across all of them. Copies don't exchange data while generating, so they need no NVLink between them; that's why PCIe boards run several copies well even though they split a single copy poorly, and why, when two layouts use the same number of GPUs, a PCIe board takes more copies over splitting one. When a board needs more GPUs than memory alone calls for, the extra ones are there to reach the speed goal, and the page says so. This assumes requests are spread evenly across the copies.</p>
           <p><b>Units</b> — every amount is computed in bytes and shown in the unit picked at the top: <b>GB</b> is 10⁹ bytes (spec sheets, download pages), <b>GiB</b> is 2³⁰ bytes (nvidia-smi, PyTorch and vLLM's logs). Switching changes the labels, never the answer. Board capacities are the size on the box, counted as GB, so an H100 is 80 GB or 74.5 GiB. Real boards expose that much or slightly more, so a fit here errs on the safe side.</p>
         </div>
           <div class="disc">Estimates for planning, not a guarantee. Real usage varies with the serving framework (vLLM, TensorRT-LLM, SGLang), paged-attention block sizing, speculative decoding, and MoE routing. MoE models load <i>all</i> expert weights even though only a few activate per token. The newest attention designs (DeepSeek V4's compressed sparse attention, sparse-attention index keys) are modeled from their configs, so treat those cache figures as ±25%. Model list and architectures checked against Hugging Face in September 2026.</div>
@@ -1021,11 +1022,14 @@ function throughput(g, tp, chunk = S.chunk, users = S.users){
 const fitsOn = (g, perGB) => perGB <= g.cap*USABLE;
 
 /* ---------------- deployment ----------------
-   A deployment is copies of the model × GPUs per copy, on one kind of board. Each copy (replica)
-   is an independent instance serving its share of the users; within a copy the model can be split
-   across up to 8 GPUs (TP). Copies never talk to each other, so they need no fast link and can sit
-   on separate servers. Every deployment is judged on fit, speed against the goal, and size. */
+   A deployment is one node: copies of the model × GPUs per copy, on one kind of board, NODE GPUs at
+   most. Each copy (replica) is an independent instance serving its share of the users; within a
+   copy the model can be split across up to 8 GPUs (TP). Copies never talk to each other, so they
+   need no fast link between them. Every deployment is judged on fit, speed against the goal, and
+   size. Multi-node deployments are out of scope: a workload one node can't serve is reported as
+   the share of users it does serve (partial), never as several nodes. */
 const TP_OPTIONS = [1,2,4,8];
+const NODE = 8;   // GPUs in one node
 function evaluate(g, tp, reps, upr = Math.ceil(S.users/reps)){      // upr = users on each copy
   const r = compute(tp, upr), perGB = r.perGPU/GB, fits = fitsOn(g, perGB);
   const t = fits ? throughput(g, tp, S.chunk, upr) : null, gpus = tp*reps;
@@ -1047,17 +1051,18 @@ const closest  = ds => ds.sort((a,b)=> goalGap(a.t)-goalGap(b.t) || a.memGB-b.me
    size a PCIe-only board prefers copies to splitting one (copies need no link between cards), and
    otherwise the faster layout wins. */
 const smallest = ds => ds.sort((a,b)=> a.memGB-b.memGB || (a.g.link ? 0 : a.tp-b.tp) || b.t.perUser-a.t.perUser)[0];
-/* On one board: at each size of copy, the fewest copies that serve everyone within the goal, then the
-   smallest of those. If the goal is out of reach, the fewest copies that fit, at the size that comes
-   closest. If even one user can't fit, the largest copy tried, to show how far off it is.
+/* On one board, within one node: at each size of copy, the fewest copies that serve everyone within
+   the goal, then the smallest of those. If one node can't do that, the full node at the layout that
+   serves the most users within the goal (partial). If no load reaches the goal, the layout that
+   holds everyone and comes closest, else the full node holding as many as it can. If even one user
+   can't fit, the largest copy tried, to show how far off it is.
    The size of a copy (TP) can be fixed in Advanced settings. memOnly is the leanest layout that
    merely holds everyone, so the page can say when extra GPUs are there for speed rather than memory. */
-/* A GPU count that can be bought: one server at a size the board comes in, or beyond that whole
-   systems of its largest size (customers don't order an 8-GPU server plus a 4). So H100/H200 counts
-   are 1, 2, 4, 8, 16, 24… (3 rounds up to 4, 6 to 8, 12 to 16), and B200/B300 counts are whole 8-GPU
-   systems. Copies are rounded up to reach it: the spare GPUs run extra copies, which spreads the
-   users thinner and only helps fit and speed. */
-const buyable = (g, n) => { const big = Math.max(...g.pop); return n<=big ? g.pop.includes(n) : n%big===0; };
+/* A GPU count that can be bought: a size the board's server comes in. So H100/H200 counts are 1, 2, 4
+   or 8 (3 rounds up to 4, 6 to 8) and B200/B300 are always a whole 8-GPU system; the other boards
+   take any count up to a node's 8. Copies are rounded up to reach it: the spare GPUs run extra
+   copies, which spreads the users thinner and only helps fit and speed. */
+const buyable = (g, n) => g.pop.includes(n) || n > NODE;   // past a node nothing is offered; the caller drops it
 function buyableCopies(g, tp, reps){
   if(!g.pop) return reps;
   let n = tp*reps;
@@ -1069,28 +1074,59 @@ function deploymentFor(g){
   const layouts = memOnly => tps.map(tp=>{
     const cap = copyCapacity(g, tp, S.users, memOnly);
     if(!cap) return null;
-    const reps = Math.ceil(S.users/cap), d = evaluate(g, tp, buyableCopies(g, tp, reps));
+    const reps = Math.ceil(S.users/cap), copies = buyableCopies(g, tp, reps);
+    if(tp*copies > NODE) return null;      // more than one node holds
+    const d = evaluate(g, tp, copies);
     d.need = tp*reps;                      // GPUs the workload needs, before rounding up to a buyable count
     return d;
   }).filter(Boolean);
+  /* the full node when it can't serve everyone: each copy loaded with what it can take, at the layout
+     that serves the most. memOnly counts users it merely holds, for when no load reaches the goal. */
+  const fullNode = memOnly => tps.map(tp=>{
+    const per = copyCapacity(g, tp, 1e6, memOnly);
+    if(!per) return null;
+    const d = evaluate(g, tp, NODE/tp, per);
+    d.partial = true; d.served = per * d.reps;
+    return d;
+  }).filter(Boolean).sort((a,b)=> b.served-a.served || (a.g.link ? 0 : a.tp-b.tp) || b.t.perUser-a.t.perUser)[0] || null;
   const fitting = layouts(true), meeting = layouts(false).filter(d=>d.meets);
   const leanest = smallest(fitting.slice()) || null;
   const pick = meeting.length ? smallest(meeting)
-             : fitting.length ? closest(fitting)
-             : evaluate(g, tps[tps.length-1], 1, 1);
+             : fullNode(false) || (fitting.length ? closest(fitting) : fullNode(true))
+             || evaluate(g, tps[tps.length-1], 1, 1);
   pick.memOnly = leanest;
   return pick;
 }
 /* extra GPUs beyond what memory needs, added to reach the speed goal */
 const forSpeed = d => d.fits && d.meets && d.memOnly && d.gpus > d.memOnly.gpus;
-/* The suggestion: the deployment that reaches the goal with the least GPU memory in total (fewer GPUs,
-   then faster, win a tie), splitting a copy only across NVLink boards. Memory is what's being sized,
-   and the smallest setup that does the job is the fairest proxy for the least hardware without
-   pricing. If nothing reaches the goal, the one that comes closest. deps: board → deployment. */
+/* 1 when a deployment is a full system of the board's largest size: always on a system-only board,
+   and on H100/H200 at 8 GPUs. Otherwise 0, and it's shown as a GPU count. */
+function systemsIn(d){
+  const big = d.g.pop ? Math.max(...d.g.pop) : 0;
+  return big>1 && d.fits && d.gpus>=big && d.gpus%big===0 ? d.gpus/big : 0;
+}
+/* how the node's GPUs are used, in words: the model can run once per GPU, as a few copies of several
+   GPUs each, or as one copy spread across them */
+function layoutText(d){
+  if(d.reps===1) return d.tp===1 ? "Fits on one GPU" : `1 copy across ${d.tp} GPUs`;
+  return d.tp===1 ? "1 copy per GPU" : `${d.reps} copies, ${d.tp} GPUs each`;
+}
+/* the deployment by name: "2 × H200", or "1 × 8-GPU H100 80GB system" once it's a whole system */
+function deployName(d){
+  const n = systemsIn(d);
+  return n ? `${n} × ${Math.max(...d.g.pop)}-GPU ${d.g.n} system${n===1 ? "" : "s"}` : `${d.gpus} × ${d.g.n}`;
+}
+/* The suggestion: the node that serves everyone within the goal with the least GPU memory in total
+   (fewer GPUs, then faster, win a tie), splitting a copy only across NVLink boards. Memory is what's
+   being sized, and the smallest setup that does the job is the fairest proxy for the least hardware
+   without pricing. If no node serves everyone within the goal: the one that serves the most users
+   within it, then one that holds everyone and comes closest to it, then the one that holds the most.
+   deps: board → deployment. */
 const suggestable = deps => [...deps.values()].filter(d=> d.fits && (d.tp===1 || d.g.link));
 function suggestDeployment(deps){
-  const ok = suggestable(deps);
-  return smallest(ok.filter(d=>d.meets)) || closest(ok) || null;
+  const ok = suggestable(deps), whole = ok.filter(d=> !d.partial), part = ok.filter(d=> d.partial);
+  const most = ds => ds.sort((a,b)=> b.served-a.served || a.memGB-b.memGB)[0];
+  return smallest(whole.filter(d=>d.meets)) || most(part.filter(d=>d.meets)) || closest(whole) || most(part) || null;
 }
 /* How many users the deployment could serve at these lengths: what one copy holds, times copies. */
 function capacityFor(d){
@@ -1207,23 +1243,26 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
   const autoTp = S.tpo!=="auto" ? `<button type="button" class="linkbtn" data-act="tpauto">Let TP choose automatically</button>` : "";
   let lbl, main, sub = who, acts = "", why = "";
   if(fits){
-    lbl = picked ? "Your pick" : "Suggested deployment";
-    main = `${active.gpus} × ${g.n}`;
+    lbl = picked ? "Your pick" : active.partial ? "Closest single node" : "Suggested deployment";
+    main = deployName(active);
     if(tp>1 && !g.link) sub += ` · <span class="warnx">Not recommended: PCIe only, so splitting a copy across GPUs is slow</span>`;
     const layout = reps>1
       ? `Runs as <b>${reps} copies</b> of the model <span class="i" data-tip="copies" tabindex="0">i</span> on ${tp} GPU${tp>1?"s":""} each, ~${commas(active.upr)} user${active.upr===1 ? "" : "s"} per copy. `
       : "";
-    if(systemOf(g)) why += `The ${g.n} is sold only as ${systemOf(g)}-GPU systems, so this is ${active.gpus/systemOf(g)} whole system${active.gpus/systemOf(g)===1 ? "" : "s"}. `;
-    else if(g.pop && active.need < active.gpus) why += (active.need > Math.max(...g.pop)
-      ? `Beyond ${Math.max(...g.pop)} GPUs, the ${g.n} is counted in whole ${Math.max(...g.pop)}-GPU systems`
-      : `${g.n} servers take ${popText(g)} GPUs`) + `, so the ${active.need} this needs rounds up to ${active.gpus}. `;
-    if(forSpeed(active)){
+    if(systemOf(g)) why += `The ${g.n} is sold only as ${systemOf(g)}-GPU systems, so this is a whole system. `;
+    else if(g.pop && active.need < active.gpus) why += `${g.n} servers take ${popText(g)} GPUs, so the ${active.need} this needs rounds up to ${active.gpus}. `;
+    if(forSpeed(active) && !active.partial){
       const lean = active.memOnly;
       why += `${lean.gpus} × ${g.n} would hold the model, but at ${fmtTps(lean.t.perUser)} tok/s per user`
            + (lean.t.ttft > goal.ttft ? ` and ${fmtTime(lean.t.ttft).join(" ")} to first reply` : "")
            + `, short of your speed goal, so this adds ${active.gpus - lean.gpus} more. `;
     }
-    if(picked){
+    if(active.partial){
+      acts = picked ? back : "";
+      why += layout + `<span class="warnx">One node can't serve all ${commas(S.users)} users${hasGoal && active.meets ? " within your speed goal" : ""}.</span> `
+           + `${picked ? "This one" : "This is the board that comes closest: it"} ${active.meets ? "serves" : "holds"} up to ${commas(active.served)}`
+           + `${hasGoal && !active.meets ? ", below your speed goal" : ""}.`;
+    } else if(picked){
       acts = back;
       why += layout + (hasGoal && !active.meets ? `<span class="warnx">Below your speed goal</span> — ${goalText}.` : "");
     } else {
@@ -1239,7 +1278,7 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
   } else {
     lbl = "No single node fits";
     main = S.tpo==="auto" ? "Too big for one 8-GPU node" : `No board holds a copy at TP ${tp}`;
-    sub += `<br>One copy of the model needs more than ${S.tpo==="auto" ? "8 GPUs" : `${tp} GPU${tp>1?"s":""}`}. Lower the precision or the prompt and reply lengths${S.tpo==="auto" ? ", or plan to split a copy across several servers" : ""}.`;
+    sub += `<br>One copy of the model needs more than ${S.tpo==="auto" ? "8 GPUs" : `${tp} GPU${tp>1?"s":""}`}. Lower the precision or the prompt and reply lengths.`;
     acts = autoTp;
   }
   $('vlbl').textContent = lbl;
@@ -1268,7 +1307,7 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
              : statCell("ttft", "First reply", "—", "", na))
     + (cap ? statCell("capacity", "Handles up to", commas(cap.users), cap.users===1 ? "user" : "users",
                cap.users===0 ? "none at these lengths"
-                 : reps>1 ? `${reps} copies × ${commas(cap.perCopy)} · ${limit}` : `at ${fmtCtx(r.ctx)} each · ${limit}`,
+                 : reps>1 ? `${reps} copies, ${commas(cap.perCopy)} users each · ${limit}` : `at ${fmtCtx(r.ctx)} each · ${limit}`,
                cap.users < S.users ? "warn" : "")
            : statCell("capacity", "Handles up to", "—", "", na));
 }
@@ -1294,23 +1333,23 @@ function renderBar(comps, totGB, capGB, g, tp, reps){
 function renderCards(deps, active, suggested, picked){
   const hasGoal = S.goal!=="any";
   $('fitcap').innerHTML = (S.tpo==="auto"
-      ? `How many of each board it takes to serve everyone${hasGoal ? " within your speed goal" : ""}: up to 8 GPUs per copy of the model, and more copies for more users (~90% of each board is usable).`
-      : `Every board at <b>${S.tpo} GPU${S.tpo>1?"s":""} per copy</b>, fixed in Advanced settings, with as many copies as your users need.`)
+      ? `What one node of each board takes to serve everyone${hasGoal ? " within your speed goal" : ""}: up to 8 GPUs, as one copy of the model or several (~90% of each board is usable).`
+      : `Every board at <b>${S.tpo} GPU${S.tpo>1?"s":""} per copy</b>, fixed in Advanced settings, with as many copies as one node holds.`)
     + ` Click a board to plan on it; click it again to go back to the suggestion.`;
   const cards=$('gpucards'); cards.innerHTML="";
   GPUS.forEach(b=>{
     const d = deps.get(b.n), slow = d.fits && d.tp>1 && !b.link;   // a copy split across cards with no NVLink
-    const systems = systemOf(b) ? d.gpus/systemOf(b) : 0;
-    const shape = systemOf(b) ? `${systems} system${systems===1 ? "" : "s"}`
-                : d.reps>1 ? `${d.reps} copies${d.tp>1 ? ` × ${d.tp}` : ""}` : d.tp===1 ? "Fits on one" : `Needs ${d.tp}`;
+    const systems = systemsIn(d);          // counted in whole systems, the pill then says how they're used
+    const shape = layoutText(d);
     let cls, pill, ptxt;
-    if(!d.fits){ cls="s-bad"; pill="bad"; ptxt = S.tpo==="auto" ? "Won't fit on 8" : `Not at TP ${d.tp}`; }
+    if(!d.fits){ cls="s-bad"; pill="bad"; ptxt = S.tpo==="auto" ? "Won't fit on a node" : `Not at TP ${d.tp}`; }
+    else if(d.partial){ cls="s-warn"; pill="warn"; ptxt = `${d.meets ? "Serves" : "Holds"} ${commas(d.served)} of ${commas(S.users)}`; }
     else if(!d.meets){ cls="s-warn"; pill="warn"; ptxt="Below goal"; }
     else { cls = slow ? "s-warn" : "s-good"; pill = slow ? "warn" : "good"; ptxt = shape; }
     const [lbCls, lbTxt] = b.link ? ["lb-nv", systemOf(b) ? "NVLink · all 8" : "NVLink · 2, 4 or 8"] : slow ? ["lb-warn","PCIe · Not recommended"] : ["lb-pcie","PCIe only"];
     const rounded = d.fits && b.pop && !systemOf(b) && d.need < d.gpus;
     const isActive = !!active && active.g.n===b.n, isPicked = !!picked && picked.n===b.n;
-    const utilColor = !d.fits ? "var(--bad)" : (!d.meets || slow) ? "var(--warn)" : "var(--good)";
+    const utilColor = !d.fits ? "var(--bad)" : (!d.meets || slow || d.partial) ? "var(--warn)" : "var(--good)";
     const el=document.createElement('div');
     el.className = `gpu ${cls}${isActive ? " sel" : ""}`;
     el.dataset.gpu=b.n; el.tabIndex=0; el.setAttribute('role','button'); el.setAttribute('aria-pressed', isPicked);
@@ -1318,10 +1357,12 @@ function renderCards(deps, active, suggested, picked){
       <div class="gname">${b.n}</div>
       <div class="gcap">${boxMem(b)} ${b.mem}${systemOf(b) ? ` · ${systemOf(b)}-GPU systems only` : ""}</div>
       <span class="lb ${lbCls}" data-tip="${b.link ? 'nvlink' : slow ? 'pcieSlow' : 'pcie'}" tabindex="0">${lbTxt}</span>
-      <div class="count">${d.fits ? d.gpus : "—"}<small> × GPU</small></div>
-      <span class="pill ${pill}">${ptxt}</span>${suggested && suggested.g.n===b.n ? `<span class="pill sugg">Suggested</span>` : ""}
-      ${forSpeed(d) ? `<div class="why">${d.memOnly.gpus} hold${d.memOnly.gpus===1 ? "s" : ""} it in memory; ${d.gpus} for your speed goal</div>`
-        : rounded ? `<div class="why">${d.need} needed; ${d.need > Math.max(...b.pop) ? `whole ${Math.max(...b.pop)}-GPU systems beyond ${Math.max(...b.pop)}` : `servers take ${popText(b)}`}</div>` : ""}
+      <div class="count">${!d.fits ? "—" : systems || d.gpus}<small> × ${systems ? `${Math.max(...b.pop)}-GPU system${systems===1 ? "" : "s"}` : "GPU"}</small></div>
+      <span class="pill ${pill}">${ptxt}</span>${suggested && suggested.g.n===b.n ? `<span class="pill sugg">${d.partial ? "Closest" : "Suggested"}</span>` : ""}
+      ${!d.fits ? `<div class="why">One copy needs ${fmtMem(d.perGB*d.tp)}; ${d.tp} hold${d.tp===1 ? "s" : ""} ${fmtMem(b.cap*USABLE*d.tp)}.</div>`
+        : d.partial ? `<div class="why">the most one node ${d.meets ? "serves" : "holds"}${hasGoal && d.meets ? " at your speed goal" : hasGoal ? ", below your speed goal" : ""}</div>`
+        : forSpeed(d) ? `<div class="why">${d.memOnly.gpus} hold${d.memOnly.gpus===1 ? "s" : ""} it in memory; ${d.gpus} for your speed goal</div>`
+        : rounded ? `<div class="why">${d.need} needed; servers take ${popText(b)}</div>` : ""}
       <div class="util"><div style="width:${Math.min(100, d.perGB/b.cap*100).toFixed(0)}%;background:${utilColor}"></div></div>
       <div class="tps">${d.t ? `≈ <b>${fmtTps(d.t.total*d.reps)}</b> tok/s · ${fmtTps(d.t.perUser)}/user` : "— tok/s"}</div>
       <div class="tps mem">${d.fits ? `<b>${boxTotal(d.memGB)}</b> of GPU memory` : "—"}</div>`;
@@ -1361,7 +1402,7 @@ function renderThroughput(d){
   }
   const t = d.t, board = d.g;
   const [bnCls, bnTxt] = BOTTLENECK[t.bottleneck];
-  cap.innerHTML = `${d.reps>1 ? `${d.reps} copies × ` : ""}${d.tp} × <b>${board.n}</b> · ${commas(board.bw)} GB/s ${board.mem} · ${board.lname}${board.link?"":" only"} · ${board.fp4?"native FP4 + FP8":board.fp8?"native FP8, no FP4":"no FP8 or FP4 cores"}`
+  cap.innerHTML = `${d.gpus} × <b>${board.n}</b>${d.gpus>1 ? ` (${layoutText(d)})` : ""} · ${commas(board.bw)} GB/s ${board.mem} · ${board.lname}${board.link?"":" only"} · ${board.fp4?"native FP4 + FP8":board.fp8?"native FP8, no FP4":"no FP8 or FP4 cores"}`
     + ` <span class="pill ${bnCls}" data-tip="bneck" tabindex="0">${bnTxt}</span>`;
 
   const [stN, stU] = fmtTime(t.tStep), [paN, paU] = fmtTime(t.pause);
@@ -1800,8 +1841,10 @@ function buildSummary(){
   const name = m.custom ? "Custom model" : m.n;
   const prec = S.wqLbl==="NATIVE" ? `${m.nat.f}, as released` : S.wqLbl;
   const date = new Date().toLocaleDateString('en-US', {year:'numeric', month:'long', day:'numeric'});
-  const head = fits ? `${a.gpus} × ${a.g.n}` : a ? `Doesn't fit on ${L.tp} × ${a.g.n}` : "Too big for one 8-GPU node";
-  const role = fits ? (L.picked ? "Selected deployment" : "Recommended deployment") : "No deployment fits";
+  const head = fits ? deployName(a) : a ? `Doesn't fit on ${L.tp} × ${a.g.n}` : "Too big for one 8-GPU node";
+  const role = fits ? (L.picked ? "Selected node" : a.partial ? "Closest single node" : "Recommended node") : "No single node fits";
+  const short = fits && a.partial
+    ? `One node ${a.meets ? "serves" : "holds"} up to ${commas(a.served)} of the ${commas(S.users)} users${hasGoal ? (a.meets ? " within the speed goal" : ", below the speed goal") : ""}.` : "";
   const layout = !fits ? "—" : a.reps>1 ? `${a.reps} copies of the model, ${a.tp} GPU${a.tp>1 ? "s" : ""} each, about ${commas(a.upr)} users per copy`
     : a.tp>1 ? `One copy split across ${a.tp} GPUs over ${a.g.lname}` : "One copy on one GPU";
   const tf = trafficInUse() ? S.trafficApplied : null;
@@ -1830,25 +1873,27 @@ function buildSummary(){
     + ` · <b>Total <span class="mono">${fmtMem(L.tot/GB)}</span></b>`;
   const boards = GPUS.map(g=>{
     const d = L.deps.get(g.n);
-    const status = !d.fits ? "Won't fit" : d.tp>1 && !g.link ? "Not recommended: split over PCIe"
+    const status = !d.fits ? "Won't fit on one node" : d.tp>1 && !g.link ? "Not recommended: split over PCIe"
+                 : d.partial ? `${d.meets ? "Serves" : "Holds"} ${commas(d.served)} of ${commas(S.users)} users`
                  : !d.meets ? "Below speed goal" : hasGoal ? "Meets goal" : "Fits";
-    const shape = !d.fits ? "—" : d.reps>1 ? `${d.reps} copies × ${d.tp}` : d.tp===1 ? "1 GPU" : `1 copy × ${d.tp}`;
-    return `<tr${a && a.g.n===g.n ? ' class="hl"' : ""}><td>${esc(g.n)}${L.suggested && L.suggested.g.n===g.n ? ' <span class="tag">suggested</span>' : ""}</td>`
-      + `<td class="n">${d.fits ? d.gpus : "—"}</td><td>${shape}</td><td>${status}</td>`
+    const shape = !d.fits ? "—" : d.gpus===1 ? "1 GPU" : layoutText(d);
+    return `<tr${a && a.g.n===g.n ? ' class="hl"' : ""}><td>${esc(g.n)}${L.suggested && L.suggested.g.n===g.n ? ` <span class="tag">${L.suggested.partial ? "closest" : "suggested"}</span>` : ""}</td>`
+      + `<td class="n">${d.fits ? d.gpus + (systemsIn(d) ? ` (${systemsIn(d)} system${systemsIn(d)===1 ? "" : "s"})` : "") : "—"}</td><td>${shape}</td><td>${status}</td>`
       + `<td class="n">${d.fits ? boxTotal(d.memGB) : "—"}</td><td class="n">${d.t ? fmtTps(d.t.perUser) : "—"}</td></tr>`;
   }).join("");
-  const notes = [
-    `Board memory is the size on the box; about 90% is treated as usable, the rest going to the driver and runtime. Amounts are in ${S.unit==="GiB" ? "GiB (2³⁰ bytes)" : "GB (10⁹ bytes)"}.`,
-    `Memory is sized for every concurrent user at full length: prompt + ${S.thinking ? "thinking + " : ""}reply.`,
-    `Speed and first-reply times are estimates from each board's memory bandwidth, compute and interconnect, not benchmarks. Real serving engines usually land within about ±30%.`,
-    `The recommendation is the setup that ${hasGoal ? "reaches the speed goal" : "holds every user"} with the least GPU memory in total; on any one board, that means the fewest GPUs.`,
-  ];
-  if(S.thinking) notes.push(`First reply is when the first token appears; for a thinking model that's the start of its thinking, and the answer follows once the thinking is done.`);
   const names = bs => bs.map(b=> b.n.replace(" 80GB", "")).join(" and ");
   const sysOnly = GPUS.filter(systemOf), sized = GPUS.filter(b=> b.pop && !systemOf(b));
-  if(sysOnly.length) notes.push(`${names(sysOnly)} are sold only as ${systemOf(sysOnly[0])}-GPU systems, so their GPU counts are whole systems. NVL rack-scale systems are not covered.`);
-  if(sized.length) notes.push(`${names(sized)} servers take ${popText(sized[0])} GPUs, with NVLink across 2 or 4 cards or all 8 in an 8-GPU system, so their counts round up to a size that can be populated, and beyond 8 to whole 8-GPU systems.`);
-  if(fits && a.reps>1) notes.push(`Copies run independently behind a load balancer, so they need no NVLink between them and can sit in separate servers.`);
+  const notes = [
+    `Single-node sizing: every result is one server of up to ${NODE} GPUs; multi-node and NVL rack-scale systems are not covered. `
+      + `${names(sized)} servers take ${popText(sized[0])} GPUs, and ${names(sysOnly)} come only as ${systemOf(sysOnly[0])}-GPU systems.`,
+    `Board memory is the size on the box, with about 90% treated as usable. Amounts are in ${S.unit==="GiB" ? "GiB (2³⁰ bytes)" : "GB (10⁹ bytes)"}, sized for every concurrent user at full prompt + ${S.thinking ? "thinking + " : ""}reply length.`,
+    `Speed and first-reply times are estimates, not benchmarks; real serving engines usually land within about ±30%.`,
+    fits && a.partial && !L.picked
+      ? `No single node serves every user${hasGoal ? " within the speed goal" : ""}, so this is the board whose node serves the most.`
+      : `The recommendation is the node that ${hasGoal ? "reaches the speed goal" : "holds every user"} with the least GPU memory in total; on any one board, that means the fewest GPUs.`,
+  ];
+  if(S.thinking) notes.push(`For a thinking model, first reply is when its thinking starts; the answer follows once the thinking is done.`);
+  if(fits && a.reps>1) notes.push(`Copies run independently on the node's GPUs with requests spread across them, so they need no NVLink between them.`);
   const link = CAN_LINK ? `<p class="foot">Open this scenario in LLM Inference Sizer: <a href="${esc(location.href.split("#")[0] + "#" + stateToHash())}">interactive version</a></p>` : "";
   const title = `GPU sizing: ${name}, ${commas(S.users)} user${S.users===1 ? "" : "s"}`;
   const html = `<!DOCTYPE html>
@@ -1872,6 +1917,7 @@ function buildSummary(){
   .stat small{display:block; color:var(--ink2); font-size:11px; line-height:1.35}
   table{width:100%; border-collapse:collapse}
   td,th{padding:4px 8px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top}
+  .short{margin:10px 0 0; font-weight:600; color:#9a5b00}
   .memline{margin:12px 0 0; color:var(--ink2); font-size:12px}
   .memline b{color:var(--ink)}
   th{font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); font-weight:500}
@@ -1897,6 +1943,7 @@ function buildSummary(){
   <h1>${esc(head)}</h1>
   <p class="sub">${esc(name)} · ${commas(S.users)} concurrent user${S.users===1 ? "" : "s"} · ${esc(WORKLOADS[S.workload].name)} · ${esc(prec)}</p>
   <div class="date">Prepared ${esc(date)}</div>
+  ${short ? `<p class="short">${esc(short)}</p>` : ""}
   ${stats.length ? `<div class="stats">${stats.map(([k, v, s])=> `<div class="stat"><span>${esc(k)}</span><b>${esc(v)}</b><small>${esc(s)}</small></div>`).join("")}</div>` : ""}
   <p class="memline"><b>Memory for ${esc(memScope)}:</b> ${mem}</p>
   <section><h2>What was sized</h2><table class="kv">${inputs.map(([k, v])=> `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join("")}</table></section>
@@ -1948,14 +1995,14 @@ const TIPS = {
   chunk:"When a new question arrives, the server reads the prompt in pieces while it keeps writing replies for everyone else. Small pieces keep other people's replies flowing smoothly, but a long prompt waits longer to start. Big pieces start long prompts sooner, but everyone else's text briefly freezes while each piece is read. The numbers on each choice show both effects on your setup.",
   pause:"While a new prompt is being read, everyone already mid-reply waits. This is the longest gap they would see between words. Under 0.1 s is unnoticeable; choose Smooth streaming to shorten it.",
   tp:"How many GPUs one copy of the model is split across (tensor parallelism). Every layer's weights are divided and the GPUs all-reduce after each layer, so splitting needs NVLink to be fast. Auto picks the smallest layout; a fixed number applies to every board.",
-  copies:"A copy (replica) is a full, independent instance of the model on its own GPUs, serving its share of the users. More copies serve more users without slowing each other down, and unlike splitting one copy across GPUs, they need no fast link between them.",
+  copies:"A copy (replica) is a full, independent instance of the model on its own GPUs within the node, serving its share of the users. More copies serve more users without slowing each other down, and unlike splitting one copy across GPUs, they need no fast link between them.",
   prefill:"How fast a new prompt is read, in tokens per second. Reading is limited by compute rather than memory speed, so faster chips and FP8 or FP4 help most. Optimize for, in Advanced settings, sets the piece size.",
   ovpct:"Headroom for allocator fragmentation and framework buffers, as a percentage of weights + cache + activations. 5–10% is typical; raise it if you have hit OOM under load.",
   goal:"How fast each user should see answers: at least this many tokens per second, and a first reply within the time limit. The suggestion is the setup that reaches it with the least GPU memory in total. Any speed just finds the smallest setup that fits.",
-  capacity:"The most users this setup holds at the current prompt and reply lengths, across all copies. Either memory runs out, or each user's speed drops below your goal, whichever comes first. The gap to your user count is your room to grow.",
+  capacity:"The most users this node holds at the current prompt and reply lengths, across all its copies. Either memory runs out, or each user's speed drops below your goal, whichever comes first. The gap to your user count is your room to grow.",
   units:"GB is 1,000,000,000 bytes, the unit on spec sheets and download pages. GiB is 1,073,741,824 bytes, the unit nvidia-smi, PyTorch and vLLM report. Switching only relabels memory; the recommendation doesn't change. Board capacities are the size on the box, counted as GB: 80 GB is 74.5 GiB.",
   perGPU:"What each individual board must hold. This is the number that determines fit — a model can need 300 GB total and still run fine on 4 × 80 GB.",
-  fit:"How many of each board it takes to serve everyone: up to 8 GPUs per copy of the model, plus more copies for more users, and how much GPU memory that adds up to. Assumes ~90% of board memory is usable; drivers and the CUDA context claim the rest.",
+  fit:"What one node of each board takes to serve everyone: up to 8 GPUs, as one copy of the model or several, and how much GPU memory that adds up to. If one node can't serve everyone, the card says how many users it does serve. Assumes ~90% of board memory is usable; drivers and the CUDA context claim the rest.",
   nvlink:"NVLink joins GPUs directly, which is what splitting one copy of a model across them needs to be fast. On H100 and H200, bridges link 2 or 4 cards, or an 8-GPU system links all 8. The B200 and B300 come only as 8-GPU systems with all 8 linked.",
   pcie:"PCIe-only — no NVLink. Fine for a single GPU, but tensor parallelism must all-reduce over a far slower link after every layer, so throughput suffers badly.",
   pcieSlow:"Not recommended. This board has no NVLink, and here one copy of the model has to be split across several of them, so the GPUs exchange data over PCIe after every layer. That is far slower, and the speed shown already reflects it. Prefer a board that holds a copy on one GPU, or an NVLink board.",
