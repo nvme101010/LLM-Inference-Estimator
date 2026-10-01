@@ -260,6 +260,10 @@
   .gpu{cursor:pointer; transition:border-color .15s, box-shadow .15s}
   .gpu:hover{border-color:var(--line-2)}
   .gpu.sel{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent)}
+  /* not recommended: dimmed and not pickable, but its badge stays readable and still explains why */
+  .gpu.off{cursor:default}
+  .gpu.off:hover{border-color:var(--line)}
+  .gpu.off > :not(.lb){opacity:.4}
   .gpu:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
   .gpu .tps{font-family:"IBM Plex Mono",monospace; font-size:10.5px; color:var(--ink-2); padding-left:6px; margin-top:9px}
   .gpu .tps b{color:var(--ink); font-weight:600}
@@ -1136,7 +1140,9 @@ function deployName(d){
    without pricing. If no node serves everyone within the goal: the one that serves the most users
    within it, then one that holds everyone and comes closest to it, then the one that holds the most.
    deps: board → deployment. */
-const suggestable = deps => [...deps.values()].filter(d=> d.fits && (d.tp===1 || d.g.link));
+/* one copy split across cards with no NVLink: it works, slowly, so it's shown but never suggested or pickable */
+const notRecommended = d => d.fits && d.tp>1 && !d.g.link;
+const suggestable = deps => [...deps.values()].filter(d=> d.fits && !notRecommended(d));
 function suggestDeployment(deps){
   const ok = suggestable(deps), whole = ok.filter(d=> !d.partial), part = ok.filter(d=> d.partial);
   const most = ds => ds.sort((a,b)=> b.served-a.served || a.memGB-b.memGB)[0];
@@ -1181,7 +1187,9 @@ const statCell = (tip, label, n, unit, sub, state) =>
 
 function render(){
   const deps = new Map(GPUS.map(g=>[g.n, deploymentFor(g)]));
-  const picked = S.board!=="auto" ? GPUS.find(g=>g.n===S.board) : null;
+  // a picked board is honoured only while it's pickable: one that has become not recommended falls back to the suggestion
+  const want = S.board!=="auto" ? GPUS.find(g=>g.n===S.board) : null;
+  const picked = want && !notRecommended(deps.get(want.n)) ? want : null;
   const suggested = suggestDeployment(deps);
   const active = picked ? deps.get(picked.n) : suggested;     // null only when nothing fits
   const tp = S.tp = active ? active.tp : (S.tpo==="auto" ? 8 : S.tpo);
@@ -1261,7 +1269,6 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
   if(fits){
     lbl = picked ? "Your pick" : active.partial ? "Closest single node" : "Suggested deployment";
     main = deployName(active);
-    if(tp>1 && !g.link) sub += ` · <span class="warnx">Not recommended: PCIe only, so splitting a copy across GPUs is slow</span>`;
     const layout = reps>1
       ? `Runs as <b>${reps} copies</b> of the model <span class="i" data-tip="copies" tabindex="0">i</span> on ${tp} GPU${tp>1?"s":""} each, ~${commas(active.upr)} user${active.upr===1 ? "" : "s"} per copy. `
       : "";
@@ -1358,10 +1365,10 @@ function renderCards(deps, active, suggested, picked){
   $('fitcap').innerHTML = (S.tpo==="auto"
       ? `What one node of each board takes to serve everyone${hasGoal ? " within your speed goal" : ""}: up to 8 GPUs, as one copy of the model or several (~90% of each board is usable).`
       : `Every board at <b>${S.tpo} GPU${S.tpo>1?"s":""} per copy</b>, fixed in Advanced settings, with as many copies as one node holds.`)
-    + ` Click a board to plan on it; click it again to go back to the suggestion.`;
+    + ` Click a board to plan on it; click it again to go back to the suggestion. Greyed-out boards are not recommended and can't be picked.`;
   const cards=$('gpucards'); cards.innerHTML="";
   GPUS.forEach(b=>{
-    const d = deps.get(b.n), slow = d.fits && d.tp>1 && !b.link;   // a copy split across cards with no NVLink
+    const d = deps.get(b.n), slow = notRecommended(d);
     const systems = systemsIn(d);          // counted in whole systems, the pill then says how they're used
     const shape = layoutText(d);
     let cls, pill, ptxt;
@@ -1381,8 +1388,9 @@ function renderCards(deps, active, suggested, picked){
     const isActive = !!active && active.g.n===b.n, isPicked = !!picked && picked.n===b.n;
     const utilColor = !d.fits ? "var(--bad)" : (!d.meets || slow || d.partial) ? "var(--warn)" : "var(--good)";
     const el=document.createElement('div');
-    el.className = `gpu ${cls}${isActive ? " sel" : ""}`;
-    el.dataset.gpu=b.n; el.tabIndex=0; el.setAttribute('role','button'); el.setAttribute('aria-pressed', isPicked);
+    el.className = `gpu ${cls}${isActive ? " sel" : ""}${slow ? " off" : ""}`;
+    el.dataset.gpu=b.n; el.tabIndex = slow ? -1 : 0; el.setAttribute('role','button'); el.setAttribute('aria-pressed', isPicked);
+    if(slow) el.setAttribute('aria-disabled', 'true');
     el.innerHTML=`<div class="stripe"></div>
       <div class="gname">${b.n}</div>
       <div class="gcap">${boxMem(b)} ${b.mem}${systemOf(b) ? ` · ${systemOf(b)}-GPU systems only` : ""}</div>
@@ -1652,6 +1660,7 @@ wqSel.addEventListener('change', ()=>{ syncWq(); render(); });
 /* boards: click, Enter or Space picks one; picking it again goes back to the suggestion */
 const gpuCards = $('gpucards');
 const pickCard = card => {
+  if(card.classList.contains('off')) return;     // not recommended: shown for reference only
   const n = card.dataset.gpu;
   S.board = S.board===n ? "auto" : n;
   render(); gpuCards.querySelector(`[data-gpu="${n}"]`)?.focus();
@@ -1910,7 +1919,7 @@ function buildSummary(){
                  : d.partial ? `${d.meets ? "Serves" : "Holds"} ${commas(d.served)} of ${commas(S.users)} users`
                  : !d.meets ? "Below speed goal" : hasGoal ? "Meets goal" : "Fits";
     const shape = !d.fits ? "—" : d.gpus===1 ? "1 GPU" : layoutText(d);
-    return `<tr${a && a.g.n===g.n ? ' class="hl"' : ""}><td>${esc(g.n)}${L.suggested && L.suggested.g.n===g.n ? ` <span class="tag">${L.suggested.partial ? "closest" : "suggested"}</span>` : ""}</td>`
+    return `<tr${a && a.g.n===g.n ? ' class="hl"' : notRecommended(d) ? ' class="dim"' : ""}><td>${esc(g.n)}${L.suggested && L.suggested.g.n===g.n ? ` <span class="tag">${L.suggested.partial ? "closest" : "suggested"}</span>` : ""}</td>`
       + `<td class="n">${d.fits ? d.gpus + (systemsIn(d) ? ` (${systemsIn(d)} system${systemsIn(d)===1 ? "" : "s"})` : "") : "—"}</td><td>${shape}</td><td>${status}</td>`
       + `<td class="n">${d.fits ? boxTotal(d.memGB) : "—"}</td><td class="n">${d.t ? fmtTps(d.t.perUser) : "—"}</td></tr>`;
   }).join("");
@@ -1957,6 +1966,7 @@ function buildSummary(){
   td.n,th.n{text-align:right; white-space:nowrap}
   .kv td:first-child{width:150px; color:var(--ink2)}
   tr.hl td{background:var(--hl); font-weight:600}
+  tr.dim td{color:var(--muted)}
   tr.tot td{font-weight:600; border-bottom:none}
   .tag{font:500 9.5px/1 "IBM Plex Mono",ui-monospace,Consolas,monospace; text-transform:uppercase; letter-spacing:.06em; color:var(--accent); border:1px solid var(--accent); border-radius:9px; padding:2px 6px; margin-left:4px; vertical-align:1px}
   ul{margin:0; padding-left:18px; color:var(--ink2)} li{margin:3px 0}
