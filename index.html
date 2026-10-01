@@ -1251,6 +1251,10 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
       : "";
     if(systemOf(g)) why += `The ${g.n} is sold only as ${systemOf(g)}-GPU systems, so this is a whole system. `;
     else if(g.pop && active.need < active.gpus) why += `${g.n} servers take ${popText(g)} GPUs, so the ${active.need} this needs rounds up to ${active.gpus}. `;
+    if(reps>1 && !active.partial && !forSpeed(active)){        // more than one copy because of memory, not speed
+      const holds = copyCapacity(g, tp, 1e6, true);
+      if(holds < S.users) why += `One ${tp===1 ? "GPU" : "copy"} holds ${commas(holds)} of your ${commas(S.users)} users in memory, so this runs ${reps}${tp===1 ? "" : " copies"}. `;
+    }
     if(forSpeed(active) && !active.partial){
       const lean = active.memOnly;
       why += `${lean.gpus} × ${g.n} would hold the model, but at ${fmtTps(lean.t.perUser)} tok/s per user`
@@ -1348,6 +1352,13 @@ function renderCards(deps, active, suggested, picked){
     else { cls = slow ? "s-warn" : "s-good"; pill = slow ? "warn" : "good"; ptxt = shape; }
     const [lbCls, lbTxt] = b.link ? ["lb-nv", systemOf(b) ? "NVLink · all 8" : "NVLink · 2, 4 or 8"] : slow ? ["lb-warn","PCIe · Not recommended"] : ["lb-pcie","PCIe only"];
     const rounded = d.fits && b.pop && !systemOf(b) && d.need < d.gpus;
+    /* why memory alone takes more than one GPU: too many users for one copy, or a copy too big for one card */
+    let memWhy = "";
+    if(d.fits && d.gpus>1 && !d.partial && !forSpeed(d) && !rounded && !systemOf(b)){
+      const holds = d.reps>1 ? copyCapacity(b, d.tp, 1e6, true) : 0;
+      memWhy = d.reps>1 ? (holds < S.users ? `one ${d.tp===1 ? "GPU" : "copy"} holds ${commas(holds)} of your ${commas(S.users)} users` : "")
+                        : `one copy needs ${fmtMem(d.perGB*d.tp)}; one GPU holds ${fmtMem(b.cap*USABLE)}`;
+    }
     const isActive = !!active && active.g.n===b.n, isPicked = !!picked && picked.n===b.n;
     const utilColor = !d.fits ? "var(--bad)" : (!d.meets || slow || d.partial) ? "var(--warn)" : "var(--good)";
     const el=document.createElement('div');
@@ -1362,7 +1373,8 @@ function renderCards(deps, active, suggested, picked){
       ${!d.fits ? `<div class="why">One copy needs ${fmtMem(d.perGB*d.tp)}; ${d.tp} hold${d.tp===1 ? "s" : ""} ${fmtMem(b.cap*USABLE*d.tp)}.</div>`
         : d.partial ? `<div class="why">the most one node ${d.meets ? "serves" : "holds"}${hasGoal && d.meets ? " at your speed goal" : hasGoal ? ", below your speed goal" : ""}</div>`
         : forSpeed(d) ? `<div class="why">${d.memOnly.gpus} hold${d.memOnly.gpus===1 ? "s" : ""} it in memory; ${d.gpus} for your speed goal</div>`
-        : rounded ? `<div class="why">${d.need} needed; servers take ${popText(b)}</div>` : ""}
+        : rounded ? `<div class="why">${d.need} needed; servers take ${popText(b)}</div>`
+        : memWhy ? `<div class="why">${memWhy}</div>` : ""}
       <div class="util"><div style="width:${Math.min(100, d.perGB/b.cap*100).toFixed(0)}%;background:${utilColor}"></div></div>
       <div class="tps">${d.t ? `≈ <b>${fmtTps(d.t.total*d.reps)}</b> tok/s · ${fmtTps(d.t.perUser)}/user` : "— tok/s"}</div>
       <div class="tps mem">${d.fits ? `<b>${boxTotal(d.memGB)}</b> of GPU memory` : "—"}</div>`;
