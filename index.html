@@ -1180,6 +1180,8 @@ function capacityFor(d){
 
 
 const fmtTps = x => x>=100 ? commas(Math.round(x)) : x>=10 ? x.toFixed(0) : x.toFixed(1);
+/* a speed that falls short of the goal, shown with a decimal when rounding would make it read as the goal itself */
+const fmtTpsShort = x => { const goal = GOALS[S.goal].tps; return x < goal && fmtTps(x)===fmtTps(goal) ? (Math.floor(x*10)/10).toFixed(1) : fmtTps(x); };
 const fmtTime = s => s>=1 ? [s.toFixed(2), "s"] : [s>=0.01 ? String(Math.round(s*1000)) : (s*1000).toFixed(1), "ms"];
 const fmtWait = s => s>=90 ? `${(s/60).toFixed(1)} min` : s>=1 ? `${Math.round(s)} s` : "under 1 s";
 
@@ -1310,7 +1312,7 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
     }
     if(forSpeed(active) && !active.partial){
       const lean = active.memOnly;
-      why += `${lean.gpus} × ${g.n} would hold the model, but at ${fmtTps(lean.t.perUser)} tok/s per user`
+      why += `${lean.gpus} × ${g.n} would hold the model, but at ${fmtTpsShort(lean.t.perUser)} tok/s per user`
            + (lean.t.ttft > goal.ttft ? ` and ${fmtTime(lean.t.ttft).join(" ")} to first reply` : "")
            + `, short of your speed goal, so this adds ${active.gpus - lean.gpus} more. `;
     }
@@ -1350,7 +1352,7 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
              fits ? `${Math.round(perGB/g.cap*100)}% full${active.gpus>1 ? ` · ${fmtMem(totGB*reps)} in all` : ""}`
                   : `${fmtMem(perGB - g.cap*USABLE)} over the usable ${fmtMem(g.cap*USABLE)}`, fits ? "" : "bad")
          : statCell("perGPU", "Per GPU", fmtMemN(perGB), S.unit, `split ${tp} ways — more than any board holds`, "bad"))
-    + (speed ? statCell("tpsUser", "Speed per user", fmtTps(speed.perUser), "tok/s",
+    + (speed ? statCell("tpsUser", "Speed per user", fmtTpsShort(speed.perUser), "tok/s",
                  hasGoal ? `${slowTps ? "below" : "meets"} the ${goal.tps}+ goal` : feelFor(speed.perUser), slowTps ? "warn" : "")
              : statCell("tpsUser", "Speed per user", "—", "", na))
     + (speed ? statCell("ttft", "First reply", ...fmtTime(speed.ttft),
@@ -1404,8 +1406,9 @@ function renderCards(deps, active, suggested, picked){
     let memWhy = "";
     if(d.fits && d.gpus>1 && !d.partial && !forSpeed(d) && !rounded && !systemOf(b)){
       const mr = memoryReason(d);
-      if(mr) memWhy = mr.over ? `too big for ${mr.on}: needs ${fmtMem(mr.over.need)}, ${fmtMem(mr.over.usable)} usable (90%)`
-                              : `${mr.on} ${mr.verb} ${commas(mr.holds)} of your ${commas(S.users)} users`;
+      const On = mr && mr.on[0].toUpperCase() + mr.on.slice(1);
+      if(mr) memWhy = mr.over ? `Too big for ${mr.on}: the model needs ${fmtMem(mr.over.need)}, and only ${fmtMem(mr.over.usable)} is usable (90% of capacity).`
+                              : `${On} ${mr.verb} only ${commas(mr.holds)} of your ${commas(S.users)} users.`;
     }
     const isActive = !!active && active.g.n===b.n, isPicked = !!picked && picked.n===b.n;
     const utilColor = !d.fits ? "var(--bad)" : (!d.meets || slow || d.partial) ? "var(--warn)" : "var(--good)";
@@ -1420,12 +1423,14 @@ function renderCards(deps, active, suggested, picked){
       <span class="lb ${lbCls}" data-tip="${b.link ? 'nvlink' : (slow ? 'pcieSlow' : 'pcie') + (b.fab ? 'Amd' : '')}" tabindex="0">${lbTxt}</span>
       <div class="count">${!d.fits ? "—" : systems || d.gpus}<small> × ${systems ? `${Math.max(...b.pop)}-GPU system${systems===1 ? "" : "s"}` : "GPU"}</small></div>
       <span class="pill ${pill}">${ptxt}</span>${suggested && suggested.g.n===b.n ? `<span class="pill sugg">${d.partial ? "Closest" : "Suggested"}</span>` : ""}
-      ${!d.fits ? `<div class="why">One copy needs ${fmtMem(d.perGB*d.tp)}; ${d.tp} hold${d.tp===1 ? "s" : ""} ${fmtMem(b.cap*USABLE*d.tp)} usable (90%).</div>`
-        : d.partial ? `<div class="why">the most one node ${d.meets ? "serves" : "holds"}${hasGoal && d.meets ? " at your speed goal" : hasGoal ? ", below your speed goal" : ""}</div>`
-        : forSpeed(d) ? `<div class="why">${d.memOnly.gpus} hold${d.memOnly.gpus===1 ? "s" : ""} it in memory${
-            d.memOnly.t.perUser < GOALS[S.goal].tps ? ` at ${fmtTps(d.memOnly.t.perUser)} tok/s` : `, first reply ${fmtTime(d.memOnly.t.ttft).join(" ")}`
-          }; ${d.gpus} reach your speed goal</div>`
-        : rounded ? `<div class="why">${d.need} needed; servers take ${popText(b)}</div>`
+      ${!d.fits ? `<div class="why">The model needs ${fmtMem(d.perGB*d.tp)}, but ${d.tp} GPU${d.tp===1 ? "" : "s"} can use only ${fmtMem(b.cap*USABLE*d.tp)} (90% of capacity).</div>`
+        : d.partial ? `<div class="why">This is the most one server can ${d.meets ? "serve" : "hold"}${hasGoal && d.meets ? " at your speed goal" : hasGoal ? ", and it is below your speed goal" : ""}.</div>`
+        : forSpeed(d) ? `<div class="why">Fits on ${d.memOnly.gpus} GPU${d.memOnly.gpus===1 ? "" : "s"}, but ${
+            d.memOnly.t.perUser < GOALS[S.goal].tps ? `only at ${fmtTpsShort(d.memOnly.t.perUser)} tok/s per user` : `the first reply takes ${fmtTime(d.memOnly.t.ttft).join(" ")}`
+          }. ${d.reps===1 ? `Splitting it across ${d.gpus} GPUs meets`
+               : d.tp===1 ? `${d.gpus} GPUs, each running its own copy, meet`
+               : `${d.reps} copies on ${d.tp} GPUs each meet`} your speed goal.</div>`
+        : rounded ? `<div class="why">Needs ${d.need} GPU${d.need===1 ? "" : "s"}. Servers take ${popText(b)}, so it rounds up to ${d.gpus}.</div>`
         : memWhy ? `<div class="why">${memWhy}</div>` : ""}
       <div class="util"><div style="width:${Math.min(100, d.perGB/b.cap*100).toFixed(0)}%;background:${utilColor}"></div></div>
       <div class="tps">${d.t ? `≈ <b>${fmtTps(d.t.total*d.reps)}</b> tok/s · ${fmtTps(d.t.perUser)}/user` : "— tok/s"}</div>
