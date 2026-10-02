@@ -16,6 +16,8 @@ Every result is one server of up to 8 GPUs. If one node of a board can't serve e
 
 GPU counts round up to what can be bought. H100 and H200 servers take 1, 2, 4 or 8 GPUs, with NVLink across 2 or 4 cards or all 8 in an 8-GPU system. The B200 and B300 are sold only as 8-GPU systems. RTX PRO 4500 servers hold up to 5 cards (the limit on HPE servers).
 
+Separately, one copy of a model is split across 1, 2, 4 or 8 GPUs. Serving engines need the split to divide the model's attention heads evenly, so this is a software rule that applies to every board. On a 5-card RTX PRO 4500 server, one copy uses at most 4 cards and the fifth can run another copy.
+
 Not sure how many concurrent users to plan for? **Estimate from daily traffic** turns people, requests per day and hours of use into a concurrent-user count.
 
 ## Use it
@@ -29,4 +31,4 @@ Open `index.html` in a browser. It is one self-contained file with no build step
 
 ## Accuracy
 
-These are planning estimates, not benchmarks. Memory figures follow each model's published architecture, and board memory is the size on the box, with about 90% treated as usable. Speed comes from a simple model of memory bandwidth, compute and interconnect; real serving engines usually land within about ±30%. Before committing to hardware, confirm with a real serving run (for example vLLM or SGLang).
+These are planning estimates, not benchmarks. Memory figures follow each model's published architecture, and board memory is the size on the box, with 90% treated as usable (vLLM's default limit). Speed comes from a simple model of memory bandwidth, compute and interconnect; real serving engines usually land within about ±30%. Before committing to hardware, confirm with a real serving run (for example vLLM or SGLang).
