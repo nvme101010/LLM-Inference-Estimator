@@ -14,7 +14,7 @@ It covers 40+ popular open models (Qwen, Gemma, Llama, DeepSeek, gpt-oss, GLM, K
 
 Every result is one server of up to 8 GPUs. If one node of a board can't serve every user, its card says how many it does serve.
 
-GPU counts round up to what can be bought. H100 and H200 servers take 1, 2, 4 or 8 GPUs, with NVLink across 2 or 4 cards or all 8 in an 8-GPU system. The B200 and B300 are sold only as 8-GPU systems.
+GPU counts round up to what can be bought. H100 and H200 servers take 1, 2, 4 or 8 GPUs, with NVLink across 2 or 4 cards or all 8 in an 8-GPU system. The B200 and B300 are sold only as 8-GPU systems. RTX PRO 4500 servers hold up to 5 cards (the limit on HPE servers).
 
 Not sure how many concurrent users to plan for? **Estimate from daily traffic** turns people, requests per day and hours of use into a concurrent-user count.
 

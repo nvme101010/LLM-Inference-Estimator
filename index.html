@@ -582,7 +582,7 @@
           <p><b>Concurrent users from traffic</b> — requests in progress at once = requests per second × seconds each one takes. A request takes the wait before its first token plus its thinking and reply, streamed at your speed goal's rate; the goal is a minimum speed, so this errs on the high side. The busiest-hour multiple covers traffic that isn't spread evenly through the day; 2× suits a typical workday.</p>
           <p><b>Sharing</b> — on a hosted copy of this page, the address always holds the current settings, so Copy link sends the exact scenario. Download summary saves a one-page report of the recommendation, the inputs and every board, which prints to PDF.</p>
           <p><b>Single node</b> — this estimates one server of up to 8 GPUs. Every result is a single node; multi-node deployments and NVL rack-scale systems are not covered. If one node of a board can't serve every user, its card says how many it does serve.</p>
-          <p><b>Suggestion and capacity</b> — every board is tried at 1, 2, 4 and 8 GPUs per copy (splitting a copy only across NVLink boards), with as many copies as the node's 8 GPUs allow. The suggestion is the node that serves every user within the speed goal with the least GPU memory in total (on any one board, the fewest GPUs). If no node serves everyone within the goal, it is the full node that serves the most users. GPU counts round up to what can be bought: H100 and H200 servers take 1, 2, 4 or 8 GPUs, with NVLink across 2 or 4 cards or all 8 in an 8-GPU system, so 3 rounds up to 4 and 5 to 7 round up to 8; the B200 and B300 ship only as 8-GPU systems. Spare GPUs run extra copies of the model. <b>Handles up to</b> is the most users the node holds at the current prompt and reply lengths while fitting in memory and, with a goal, still reaching it.</p>
+          <p><b>Suggestion and capacity</b> — every board is tried at 1, 2, 4 and 8 GPUs per copy (splitting a copy only across NVLink boards), with as many copies as the node's 8 GPUs allow. The suggestion is the node that serves every user within the speed goal with the least GPU memory in total (on any one board, the fewest GPUs). If no node serves everyone within the goal, it is the full node that serves the most users. GPU counts round up to what can be bought: H100 and H200 servers take 1, 2, 4 or 8 GPUs, with NVLink across 2 or 4 cards or all 8 in an 8-GPU system, so 3 rounds up to 4 and 5 to 7 round up to 8; the B200 and B300 ship only as 8-GPU systems. RTX PRO 4500 servers hold up to 5 cards (HPE's limit), so one copy can be split across at most 4 of them. Spare GPUs run extra copies of the model. <b>Handles up to</b> is the most users the node holds at the current prompt and reply lengths while fitting in memory and, with a goal, still reaching it.</p>
           <p><b>Copies (replicas)</b> — for more users, the page runs more copies of the model on the node's GPUs instead of splitting one copy wider. Each copy has its own GPUs and an even share of the users, so memory, the bar and the breakdown describe one copy, while GPU count, output and capacity add up across all of them. Copies don't exchange data while generating, so they need no direct GPU-to-GPU link between them; that's why PCIe boards run several copies well even though they split a single copy poorly, and why, when two layouts use the same number of GPUs, a PCIe board takes more copies over splitting one. When a board needs more GPUs than memory alone calls for, the extra ones are there to reach the speed goal, and the page says so. This assumes requests are spread evenly across the copies.</p>
           <p><b>Units</b> — every amount is computed in bytes and shown in the unit picked at the top: <b>GB</b> is 10⁹ bytes (spec sheets, download pages), <b>GiB</b> is 2³⁰ bytes (nvidia-smi, PyTorch and vLLM's logs). Switching changes the labels, never the answer. Board capacities are the size on the box, counted as GB, so an H100 is 80 GB or 74.5 GiB. Real boards expose that much or slightly more, so a fit here errs on the safe side.</p>
         </div>
@@ -761,10 +761,12 @@ const THINK_LABEL = {always:"always thinks before answering", default:"thinks be
    MI350P is a PCIe FHFL card with 144 GB HBM3E at 4 TB/s and no Infinity Fabric (AMD / Exxact, 2026).
    pop = how many GPUs a server of this board can be populated with. H100 and H200 servers take 1, 2, 4
    or 8; the B200 and B300 ship only as 8-GPU systems (NVL rack-scale systems are out of scope).
-   A deployment's GPU count rounds up to one that can be bought: see buyable(). */
+   A deployment's GPU count rounds up to one that can be bought: see buyable().
+   max = the most GPUs one server of this board holds, where that is fewer than a node's 8: HPE servers
+   take up to 5 RTX PRO 4500 Blackwell cards. */
 const GPUS = [
   {n:"L4",         cap:24, mem:"GDDR6",  bw:300,  flops:80,   fp8:true,  fp4:false, link:false, lbw:32,  lname:"PCIe Gen4"},
-  {n:"RTX PRO 4500 Blackwell", cap:32, mem:"GDDR7", bw:800, flops:135, fp8:true, fp4:true, link:false, lbw:64, lname:"PCIe Gen5"},
+  {n:"RTX PRO 4500 Blackwell", cap:32, mem:"GDDR7", bw:800, flops:135, fp8:true, fp4:true, link:false, lbw:64, lname:"PCIe Gen5", max:5},
   {n:"L40S",       cap:48, mem:"GDDR6",  bw:864,  flops:240,  fp8:true,  fp4:false, link:false, lbw:32,  lname:"PCIe Gen4"},
   {n:"H100 80GB",  cap:80, mem:"HBM3",   bw:3350, flops:720,  fp8:true,  fp4:false, link:true,  lbw:450, lname:"NVLink 4", pop:[1,2,4,8]},
   {n:"RTX PRO 6000 Blackwell", cap:96, mem:"GDDR7", bw:1792, flops:330, fp8:true, fp4:true, link:false, lbw:64, lname:"PCIe Gen5"},
@@ -1055,6 +1057,7 @@ const fitsOn = (g, perGB) => perGB <= g.cap*USABLE;
    the share of users it does serve (partial), never as several nodes. */
 const TP_OPTIONS = [1,2,4,8];
 const NODE = 8;   // GPUs in one node
+const nodeMax = g => g.max || NODE;   // fewer on a board whose servers hold fewer
 function evaluate(g, tp, reps, upr = Math.ceil(S.users/reps)){      // upr = users on each copy
   const r = compute(tp, upr), perGB = r.perGPU/GB, fits = fitsOn(g, perGB);
   const t = fits ? throughput(g, tp, S.chunk, upr) : null, gpus = tp*reps;
@@ -1095,12 +1098,17 @@ function buyableCopies(g, tp, reps){
   return n/tp;
 }
 function deploymentFor(g){
-  const tps = S.tpo==="auto" ? TP_OPTIONS : [S.tpo];
+  // a copy can only be as wide as the board's server: 5 RTX PRO 4500s leave room for a split of 4, not 8
+  const tps = (S.tpo==="auto" ? TP_OPTIONS : [S.tpo]).filter(tp=> tp <= nodeMax(g));
+  if(!tps.length){                         // a fixed split wider than this board's server holds
+    const d = evaluate(g, S.tpo, 1, 1);
+    return Object.assign(d, {fits:false, t:null, meets:false, tooWide:true, memOnly:null});
+  }
   const layouts = memOnly => tps.map(tp=>{
     const cap = copyCapacity(g, tp, S.users, memOnly);
     if(!cap) return null;
     const reps = Math.ceil(S.users/cap), copies = buyableCopies(g, tp, reps);
-    if(tp*copies > NODE) return null;      // more than one node holds
+    if(tp*copies > nodeMax(g)) return null;      // more than one node holds
     const d = evaluate(g, tp, copies);
     d.need = tp*reps;                      // GPUs the workload needs, before rounding up to a buyable count
     return d;
@@ -1110,7 +1118,7 @@ function deploymentFor(g){
   const fullNode = memOnly => tps.map(tp=>{
     const per = copyCapacity(g, tp, 1e6, memOnly);
     if(!per) return null;
-    const d = evaluate(g, tp, NODE/tp, per);
+    const d = evaluate(g, tp, Math.floor(nodeMax(g)/tp), per);
     d.partial = true; d.served = per * d.reps;
     return d;
   }).filter(Boolean).sort((a,b)=> b.served-a.served || (a.g.link ? 0 : a.tp-b.tp) || b.t.perUser-a.t.perUser)[0] || null;
@@ -1419,11 +1427,13 @@ function renderCards(deps, active, suggested, picked){
     if(off) el.setAttribute('aria-disabled', 'true');
     el.innerHTML=`<div class="stripe"></div>
       <div class="gname">${b.n}</div>
-      <div class="gcap">${boxMem(b)} ${b.mem}${systemOf(b) ? ` · ${systemOf(b)}-GPU systems only` : ""}</div>
+      <div class="gcap">${boxMem(b)} ${b.mem}${systemOf(b) ? ` · ${systemOf(b)}-GPU systems only` : b.max ? ` · up to ${b.max} per server` : ""}</div>
       <span class="lb ${lbCls}" data-tip="${b.link ? 'nvlink' : (slow ? 'pcieSlow' : 'pcie') + (b.fab ? 'Amd' : '')}" tabindex="0">${lbTxt}</span>
       <div class="count">${!d.fits ? "—" : systems || d.gpus}<small> × ${systems ? `${Math.max(...b.pop)}-GPU system${systems===1 ? "" : "s"}` : "GPU"}</small></div>
       <span class="pill ${pill}">${ptxt}</span>${suggested && suggested.g.n===b.n ? `<span class="pill sugg">${d.partial ? "Closest" : "Suggested"}</span>` : ""}
-      ${!d.fits ? `<div class="why">The model needs ${fmtMem(d.perGB*d.tp)}, but ${d.tp} GPU${d.tp===1 ? "" : "s"} can use only ${fmtMem(b.cap*USABLE*d.tp)} (90% of capacity).</div>`
+      ${d.tooWide ? `<div class="why">A copy split across ${d.tp} GPUs doesn't fit here: this board's servers hold up to ${nodeMax(b)}.</div>`
+        : !d.fits ? `<div class="why">The model needs ${fmtMem(d.perGB*d.tp)}, but ${d.tp} GPU${d.tp===1 ? "" : "s"} can use only ${fmtMem(b.cap*USABLE*d.tp)} (90% of capacity).${
+            b.max && S.tpo==="auto" ? ` A copy splits across 1, 2, 4 or 8 GPUs, and this board's servers hold up to ${b.max}.` : ""}</div>`
         : d.partial ? `<div class="why">This is the most one server can ${d.meets ? "serve" : "hold"}${hasGoal && d.meets ? " at your speed goal" : hasGoal ? ", and it is below your speed goal" : ""}.</div>`
         : forSpeed(d) ? `<div class="why">Fits on ${d.memOnly.gpus} GPU${d.memOnly.gpus===1 ? "" : "s"}, but ${
             d.memOnly.t.perUser < GOALS[S.goal].tps ? `only at ${fmtTpsShort(d.memOnly.t.perUser)} tok/s per user` : `the first reply takes ${fmtTime(d.memOnly.t.ttft).join(" ")}`
@@ -1958,7 +1968,8 @@ function buildSummary(){
   const sysOnly = GPUS.filter(systemOf), sized = GPUS.filter(b=> b.pop && !systemOf(b));
   const notes = [
     `Single-node estimate: every result is one server of up to ${NODE} GPUs; multi-node and NVL rack-scale systems are not covered. `
-      + `${names(sized)} servers take ${popText(sized[0])} GPUs, and ${names(sysOnly)} come only as ${systemOf(sysOnly[0])}-GPU systems.`,
+      + `${names(sized)} servers take ${popText(sized[0])} GPUs, ${names(sysOnly)} come only as ${systemOf(sysOnly[0])}-GPU systems`
+      + GPUS.filter(b=> b.max).map(b=> `, and ${b.n} servers hold up to ${b.max}`).join("") + `.`,
     `Board memory is the size on the box, with about 90% treated as usable. Amounts are in ${S.unit==="GiB" ? "GiB (2³⁰ bytes)" : "GB (10⁹ bytes)"}, sized for every concurrent user at full prompt + ${S.thinking ? "thinking + " : ""}reply length.`,
     `Speed and first-reply times are estimates, not benchmarks; real serving engines usually land within about ±30%.`,
     fits && a.partial && !L.picked
