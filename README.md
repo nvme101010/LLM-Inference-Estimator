@@ -1,8 +1,8 @@
-# LLM Inference Sizer
+# LLM Inference Estimator
 
-Single-node sizer: how many GPUs one server needs for your model and users. Does not cover multi-node or NVL rack-scale systems.
+Single-node sizing estimate: how many GPUs one server needs for your model and users. Does not cover multi-node or NVL rack-scale systems.
 
-A single-page tool for sizing LLM inference. Pick a model, the number of concurrent users, a workload and a speed goal, and it recommends the node that meets the goal with the least GPU memory in total:
+A single-page tool for estimating what LLM inference needs. Pick a model, the number of concurrent users, a workload and a speed goal, and it recommends the node that meets the goal with the least GPU memory in total:
 
 - **Memory:** model weights, KV cache, activations and overhead, per GPU and in total, in GB or GiB.
 - **Speed:** estimated tokens per second per user and time to first reply, including thinking time for models that reason before answering.
