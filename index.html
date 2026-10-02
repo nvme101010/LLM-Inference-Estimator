@@ -218,6 +218,7 @@
   .legend .k{font-size:12px; color:var(--ink-2); font-weight:500; letter-spacing:.01em}
   .legend .v{font-family:"IBM Plex Mono",monospace; font-size:16px; font-weight:600; line-height:1.15}
   .legend .p{font-family:"IBM Plex Mono",monospace; font-size:10.5px; color:var(--muted)}
+  .legend .p + .p{max-width:215px; line-height:1.4}   /* a longer note under the share wraps instead of spreading the row */
 
   .fit h2, .tput h2{font-size:14px; margin:0; padding:16px 18px 4px; font-weight:600; letter-spacing:-.01em}
 
@@ -260,7 +261,7 @@
   .gpu{cursor:pointer; transition:border-color .15s, box-shadow .15s}
   .gpu:hover{border-color:var(--line-2)}
   .gpu.sel{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent)}
-  /* won't fit or not recommended: dimmed and not pickable, but the label that says why stays readable */
+  /* won't fit: dimmed and not pickable, but the label that says why stays readable */
   .gpu.off{cursor:default}
   .gpu.off:hover{border-color:var(--line)}
   .gpu.off > *{opacity:.4}
@@ -575,8 +576,8 @@
           <p><b>KV cache</b> is added up per kind of layer, from each model's config.json. A standard attention layer stores <code>2 × kv_heads × head_dim × bytes</code> per token (the 2 is K and V). <b>Sliding-window</b> layers keep only their last N tokens. <b>Latent attention (MLA)</b> stores one compressed vector per token, and DeepSeek V4 keeps one entry per 4 or 128 tokens. <b>Linear-attention and Mamba</b> layers keep a fixed-size state per user (counted in fp32) that never grows with context, which is why hybrid models like Qwen 3.5+, Kimi K3 and Nemotron hold long contexts cheaply. Each user's cache is sized at <b>prompt + reply</b>, the most it holds, at the end of its reply; engines fill it as tokens arrive, so this is the peak. Total = one user's cache × users.</p>
           <p><b>Activations</b> = <code>T × (hidden × 4 + ffn × 2) × 2 B</code> plus <code>users × vocab × 4 B</code> of fp32 logits, where <code>T</code> is tokens per step — the prompt piece size set by <b>Optimize for</b>, or the number of users, whichever is larger. The <b>MLP intermediate</b> (<code>ffn</code>, 3.5–4× hidden for SwiGLU) dominates, which is why activations track the piece size rather than context length. Compute stays bf16 even when weights are quantized, and FlashAttention keeps the T² score matrix off HBM — so there is no quadratic term. Genuinely the smallest of the four on most configs; choose Fast first reply to see it grow.</p>
           <p><b>Overhead</b> = a fixed <code>~1.0 GB</code> CUDA/driver context plus a slider % of the three above, standing in for allocator fragmentation, framework buffers, and CUDA graphs.</p>
-          <p><b>Tensor-parallel overhead</b> — the page picks TP for you as part of the smallest layout, fixed in Advanced settings if you prefer. With TP &gt; 1 the model is sharded across GPUs: weights and activations divide by TP, and the KV cache divides by <code>min(TP, kv_heads)</code>. Sharding <i>adds</i> memory: every GPU carries its own <code>~1 GB</code> CUDA context, plus NCCL all-reduce workspace and comm buffers (<code>~0.3 GB + users × hidden × 8 B</code> per GPU). When <b>TP exceeds a layer's KV heads</b>, that part of the cache can't split further and copies to every GPU — watch it stop shrinking. Latent and compressed caches have a single head, so they always copy; linear-attention state splits cleanly.</p>
-          <p><b>Throughput</b> — generating a token means reading this GPU's weight shard plus every active request's KV cache, so a decode step takes <code>bytes read ÷ (memory bandwidth × 0.65)</code>. At very large batches the compute cost <code>users × 2 × active params ÷ (FLOPs × 0.5)</code> takes over, so the step uses whichever is slower. Tensor parallelism adds two all-reduces per layer, sized to the batch's activations and sent over NVLink or PCIe, and the engine adds ~1.5 ms per step. Output = <code>users ÷ step time</code>. Reading a prompt is compute-bound: <code>prompt × (2 × active params + layers × prompt × hidden) ÷ (FLOPs × 0.45)</code>. The prompt is read in pieces (512, 2,048 or 8,192 tokens, set by <b>Optimize for</b>), and each piece shares a step with everyone else's next token. So <b>time to first token</b> = prompt compute + pieces × step time, and the <b>pause</b> other users feel = one piece's compute + one step. Smaller pieces mean more steps before the first reply but shorter freezes. Requests are assumed to be halfway through their reply (prompt + half the reply in cache), and the first reply waits on the whole prompt. Quantized weights read fewer bytes but lose some of that gain to dequantization; FP8 also speeds up compute on boards with native FP8 cores. MoE models read more experts as the batch grows. Bandwidth and link speeds are published specs; FLOPs are rough estimates.</p>
+          <p><b>Tensor-parallel overhead</b> — the page picks TP for you as part of the smallest layout, fixed in Advanced settings if you prefer. With TP &gt; 1 the model is sharded across GPUs: weights and activations divide by TP, and the KV cache divides by <code>min(TP, kv_heads)</code>. Sharding <i>adds</i> memory: every GPU carries its own <code>~1 GB</code> CUDA context, plus NCCL all-reduce workspace and comm buffers (<code>~0.3 GB + users × hidden × 8 B</code> per GPU). When <b>TP exceeds a layer's KV heads</b>, that part of the cache can't split further and copies to every GPU — watch it stop shrinking. Models with latent or compressed attention (DeepSeek, GLM, Kimi, Mistral Small 4) have a single cache head, so a plain split would copy their whole cache to every GPU. SGLang and vLLM serve them with <b>data-parallel attention</b> instead, where each GPU keeps only its own users' cache, and the page sizes them that way. Linear-attention state splits cleanly.</p>
+          <p><b>Throughput</b> — generating a token means reading this GPU's weight shard plus every active request's KV cache, so a decode step takes <code>bytes read ÷ (memory bandwidth × 0.65)</code>. At very large batches the compute cost <code>users × 2 × active params ÷ (FLOPs × 0.5)</code> takes over, so the step uses whichever is slower. Tensor parallelism adds two all-reduces per layer, sized to the batch's activations and sent over NVLink or PCIe, and the engine adds ~1.5 ms per step. Output = <code>users ÷ step time</code>. Reading a prompt is compute-bound: <code>prompt × (2 × active params + 2 × layers × prompt × hidden) ÷ (FLOPs × 0.45)</code>. The prompt is read in pieces (512, 2,048 or 8,192 tokens, set by <b>Optimize for</b>), and each piece shares a step with everyone else's next token. So <b>time to first token</b> = prompt compute + pieces × step time, and the <b>pause</b> other users feel = one piece's compute + one step. Smaller pieces mean more steps before the first reply but shorter freezes. Requests are assumed to be halfway through their reply (prompt + half the reply in cache), and the first reply waits on the whole prompt. Quantized weights read fewer bytes but lose some of that gain to dequantization; FP8 also speeds up compute on boards with native FP8 cores. MoE models read more experts as the batch grows; this assumes tokens are routed evenly across experts, and real routing is skewed, so fewer distinct experts are read and real speed can be somewhat higher. Bandwidth and link speeds are published specs; FLOPs are rough estimates.</p>
           <p><b>Thinking</b> — a model that reasons step by step writes thinking tokens before its answer. They're generated like any other token, so a user's cache peaks at prompt + thinking + reply, speed is judged halfway through thinking and reply together, and cost per output token counts them. First reply is when the first token appears, which for a thinking model is the start of its thinking; the stat also says how long the thinking runs before the answer begins. Earlier turns' thinking is normally dropped by the model's chat template, so it doesn't build up in the prompt. The switch starts at each model's own default, taken from its model card and chat template.</p>
           <p><b>Concurrent users from traffic</b> — requests in progress at once = requests per second × seconds each one takes. A request takes the wait before its first token plus its thinking and reply, streamed at your speed goal's rate; the goal is a minimum speed, so this errs on the high side. The busiest-hour multiple covers traffic that isn't spread evenly through the day; 2× suits a typical workday.</p>
           <p><b>Sharing</b> — on a hosted copy of this page, the address always holds the current settings, so Copy link sends the exact scenario. Download summary saves a one-page report of the recommendation, the inputs and every board, which prints to PDF.</p>
@@ -607,7 +608,8 @@
      n layers · per values stored per cache entry per layer (K and V together) · r tokens per entry
      win keeps only the most recent win tokens · loc/locPer an extra uncompressed local window
      read cap on entries read per generated token (sparse attention)
-     heads KV heads — tensor parallelism splits by these; 1 means every GPU keeps a copy
+     heads KV heads — tensor parallelism splits by these; 1 means every GPU keeps a copy, unless the
+           model is served with data-parallel attention (see usesDpAttention)
      state fixed bytes per user per layer (linear attention / Mamba); does not grow with context */
 const full       = (n, kv, hd, o) => ({t:"full", n, kv, hd, per:2*kv*hd, heads:kv, ...o});
 const sliding    = (n, kv, hd, win) => ({t:"window", n, kv, hd, per:2*kv*hd, heads:kv, win});
@@ -754,6 +756,9 @@ const THINK_LABEL = {always:"always thinks before answering", default:"thinks be
    cap = memory on the box, GB (10⁹ bytes) · mem = memory type · bw = memory bandwidth, GB/s (sets decode speed)
    flops = effective BF16 compute, TFLOPS — rough estimate, sets prefill speed
    fp8 / fp4 = native FP8 / FP4 tensor cores · lbw = GPU-to-GPU link, GB/s per direction · lname = link label
+   Sources checked for the two entries most often questioned: the RTX PRO 4500 Blackwell here is the
+   Server Edition, 800 GB/s on NVIDIA's data-center page (the workstation card is 896 GB/s); the AMD
+   MI350P is a PCIe FHFL card with 144 GB HBM3E at 4 TB/s and no Infinity Fabric (AMD / Exxact, 2026).
    pop = how many GPUs a server of this board can be populated with. H100 and H200 servers take 1, 2, 4
    or 8; the B200 and B300 ship only as 8-GPU systems (NVL rack-scale systems are out of scope).
    A deployment's GPU count rounds up to one that can be bought: see buyable(). */
@@ -898,7 +903,15 @@ function activeModel(){
 /* Cache for one user holding `tokens` of context, summed over each kind of layer.
    Returns bytes for the whole model (req), on one GPU (pg), the part read per generated token
    (readPg — sparse layers read a subset), and the attention span used for FLOPs. */
+/* Models whose attention keeps a latent or compressed cache (MLA and its successors: DeepSeek, GLM,
+   Kimi, Mistral Small 4) have one cache head, so a plain tensor-parallel split would copy the whole
+   cache to every GPU. SGLang and vLLM serve them with data-parallel attention instead: each GPU runs
+   attention for its own share of the requests and holds only their cache, while the experts are
+   spread across the GPUs. The page sizes those models that way. An ordinary model that happens to
+   have a single KV head (Gemma 4 12B) is still split the plain way, where copying is what happens. */
+const usesDpAttention = m => m.kv.some(g=> g.t==="latent" || g.t==="compressed");
 function cacheFor(m, tokens, tp){
+  const dp = tp>1 && usesDpAttention(m);
   let req=0, pg=0, readPg=0, span=0, replicated=false;
   const parts = m.kv.map(g=>{
     let bytes, readBytes;
@@ -912,12 +925,14 @@ function cacheFor(m, tokens, tp){
       readBytes = g.n*(readN*g.per + local)*S.kq;
       if(g.t!=="index") span += g.n*(readN + Math.min(tokens, g.loc||0));
     }
-    const shard = g.state ? tp : Math.min(tp, g.heads);        // too few heads → copies instead of splitting
+    const shard = g.state || dp ? tp : Math.min(tp, g.heads);   // too few heads → copies instead of splitting
     if(shard<tp) replicated = true;
     req += bytes; pg += bytes/shard; readPg += readBytes/shard;
     return {g, bytes};
   });
-  return {req, pg, readPg, span, parts, replicated};
+  /* dp: a user's whole cache sits on one GPU, so pg and readPg are averages across the GPUs (right
+     for speed); compute() sizes memory by the most users one GPU carries */
+  return {req, pg, readPg, span, parts, replicated, dp};
 }
 const precClass = m => S.wqLbl==="NATIVE" ? m.nat.cls : S.wqLbl;
 
@@ -944,14 +959,15 @@ function compute(tpOverride, usersOverride){
 
   // tensor-parallel sharding
   const w_pg       = weights / tp;
-  const kv_pg      = cache.pg * users;
+  const kv_pg      = cache.dp ? cache.req * Math.ceil(users/tp)     // data-parallel: this GPU's own users, whole caches
+                              : cache.pg * users;
   const act_pg     = act / tp;
   const frag_pg    = (w_pg + kv_pg + act_pg) * (S.ovpct/100);
   const tpcomm_pg  = tp>1 ? (0.3*GB + users*m.h*2*4) : 0;           // NCCL workspace + comm buffers
   const perGPU     = w_pg + kv_pg + act_pg + cuda + frag_pg + tpcomm_pg;
 
   // aggregate components for the bar/table (sum across all GPUs)
-  const kv_agg       = kv_pg * tp;                                  // inflates when tp > kv_heads (replication)
+  const kv_agg       = cache.dp ? cache.req * users : kv_pg * tp;   // inflates when tp > kv_heads (replication)
   const act_agg      = act_pg * tp;
   const overhead_agg = cuda + frag_pg*tp;                           // one base context + fragmentation on every GPU
   const tp_agg       = tp>1 ? (tp-1)*cuda + tpcomm_pg*tp : 0;       // extra contexts + all comm buffers
@@ -1002,7 +1018,8 @@ function throughput(g, tp, chunk = S.chunk, users = S.users){
   const live      = cacheFor(m, fill, tp);       // what each request's cache costs to read per step
   const readBytes = paramsRead*S.wq/tp + live.readPg * users;
   const tMem      = readBytes / (g.bw*GB * MBU * d);
-  const tCompute  = users * (2*paramsActive + 2*live.span*m.h) / (g.flops*1e12 * MFU_DECODE * p * tp);
+  // attention is two matmuls (scores, then values) over the span, 2 FLOPs per multiply-add
+  const tCompute  = users * (2*paramsActive + 4*live.span*m.h) / (g.flops*1e12 * MFU_DECODE * p * tp);
   const tComm     = 2*m.L * allReduce(users*m.h*2);
   const tStep     = Math.max(tMem, tCompute) + tComm + STEP_OVERHEAD;
 
@@ -1012,7 +1029,8 @@ function throughput(g, tp, chunk = S.chunk, users = S.users){
        · bigger chunks → each shared step is longer, so running replies freeze for longer */
   const P = Math.max(1, S.prompt), piece = Math.min(chunk, P), chunks = Math.ceil(P / chunk);
   const attnSpan = cacheFor(m, P, tp).span;      // tokens each prompt token attends to, summed over layers
-  const promptCompute = n => n*(2*paramsActive + attnSpan*m.h) / (g.flops*1e12 * MFU_PREFILL * p * tp);
+  // causal prefill: each token attends to half the span on average, so 4 × span/2 = 2 × span × hidden
+  const promptCompute = n => n*(2*paramsActive + 2*attnSpan*m.h) / (g.flops*1e12 * MFU_PREFILL * p * tp);
   const chunkComm = 2*m.L * allReduce(piece*m.h*2);
   const ttft  = promptCompute(P) + chunks*(tStep + chunkComm);
   const pause = promptCompute(piece) + chunkComm + tStep;   // longest gap between tokens for running replies
@@ -1141,10 +1159,11 @@ function deployName(d){
    without pricing. If no node serves everyone within the goal: the one that serves the most users
    within it, then one that holds everyone and comes closest to it, then the one that holds the most.
    deps: board → deployment. */
-/* one copy split across cards with no NVLink: it works, slowly, so it's shown but never suggested or pickable */
+/* one copy split across cards with no NVLink: it works, and is a common setup, but each step pays
+   for all-reduces over PCIe. It's flagged and never suggested, but it can be picked. */
 const notRecommended = d => d.fits && d.tp>1 && !d.g.link;
-const pickable = d => d.fits && !notRecommended(d);      // anything else is shown greyed out, for reference
-const suggestable = deps => [...deps.values()].filter(pickable);
+const pickable = d => d.fits;                             // a board that can't hold the model is greyed out
+const suggestable = deps => [...deps.values()].filter(d=> pickable(d) && !notRecommended(d));
 function suggestDeployment(deps){
   const ok = suggestable(deps), whole = ok.filter(d=> !d.partial), part = ok.filter(d=> d.partial);
   const most = ds => ds.sort((a,b)=> b.served-a.served || a.memGB-b.memGB)[0];
@@ -1178,7 +1197,9 @@ function kvFormula(r){
     ? `${LAYER_LABEL.linear(g)}: fixed ${fmtBytes(g.state)} state each = ${fmtBytes(bytes)}`
     : `${LAYER_LABEL[g.t](g)}: ${fmtBytes(g.n*g.per*S.kq/(g.r||1))}/tok × ${commas(Math.min(ctx, g.win ?? Infinity))} tok = ${fmtBytes(bytes)}`);
   lines.push(`= ${fmtBytes(cache.req)} per user at ${commas(ctx)} tokens (prompt + ${S.thinking ? "thinking + " : ""}reply) × ${commas(users)} user${users>1?"s":""} (${kqLabel()} cache)`);
-  if(tp>1) lines.push(`split across ${tp} GPUs${cache.replicated ? " — layers with fewer KV heads than GPUs copy to every GPU" : ""} = <b>${fmtMem(r.kv_pg/GB)}/GPU</b>`);
+  if(tp>1) lines.push(cache.dp
+    ? `data-parallel attention across ${tp} GPUs: each holds its own users' cache, up to ${commas(Math.ceil(users/tp))} user${Math.ceil(users/tp)===1 ? "" : "s"} = <b>${fmtMem(r.kv_pg/GB)}/GPU</b>`
+    : `split across ${tp} GPUs${cache.replicated ? " — layers with fewer KV heads than GPUs copy to every GPU" : ""} = <b>${fmtMem(r.kv_pg/GB)}/GPU</b>`);
   return lines.join("<br>");
 }
 const feelFor = tps => tps>=20 ? "smooth for chat" : tps>=10 ? "readable" : "slow for chat";
@@ -1189,8 +1210,7 @@ const statCell = (tip, label, n, unit, sub, state) =>
 
 function render(){
   const deps = new Map(GPUS.map(g=>[g.n, deploymentFor(g)]));
-  // a picked board is honoured only while it's pickable: one that no longer fits, or has become not
-  // recommended, falls back to the suggestion
+  // a picked board is honoured only while it's pickable: one that no longer fits falls back to the suggestion
   const want = S.board!=="auto" ? GPUS.find(g=>g.n===S.board) : null;
   const picked = want && pickable(deps.get(want.n)) ? want : null;
   const suggested = suggestDeployment(deps);
@@ -1209,7 +1229,8 @@ function render(){
        + (tp>1?`<br>÷ TP ${tp} = <b>${fmtMem(r.w_pg/GB)}/GPU</b>`:``)},
     {k:"KV cache", v:r.kv, c:"var(--kv)", bar:"bkv", tip:"kv", f:kvFormula(r),
      // split across more GPUs than a layer has KV heads, each GPU keeps that layer's cache: say how much that adds
-     extra: r.cache.replicated ? `incl. ${fmtMem((r.kv - r.users*r.cache.req)/GB)} repeated across ${tp} GPUs` : ""},
+     extra: r.cache.dp ? `data-parallel attention: each GPU holds its own users' cache`
+          : r.cache.replicated ? `incl. ${fmtMem((r.kv - r.users*r.cache.req)/GB)} repeated across ${tp} GPUs` : ""},
     {k:"Activations", v:r.act, c:"var(--act)", bar:"bact", tip:"act",
      f:`${commas(r.T)} tokens per step × (${commas(m.h)}h × 4 + ${commas(r.ffn)}ffn × 2) × 2 B = ${fmtMem(r.actBuf/GB)}`
        + `<br>+ ${commas(r.users)} × ${commas(r.vocab)} vocab × 4 B fp32 logits = ${fmtMem(r.actLogit/GB)}`
@@ -1270,8 +1291,9 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
   const autoTp = S.tpo!=="auto" ? `<button type="button" class="linkbtn" data-act="tpauto">Let TP choose automatically</button>` : "";
   let lbl, main, sub = who, acts = "", why = "";
   if(fits){
-    lbl = picked ? "Your pick" : active.partial ? "Closest single node" : "Suggested deployment";
+    lbl = picked ? (notRecommended(active) ? "Your pick · split over PCIe" : "Your pick") : active.partial ? "Closest single node" : "Suggested deployment";
     main = deployName(active);
+    if(notRecommended(active)) why += `<span class="warnx">Not recommended:</span> this splits one copy of the model across cards with no NVLink, so they coordinate over PCIe after every layer. Expect it to be slower than the same number of NVLink cards; the speed shown already reflects that. `;
     const layout = reps>1
       ? `Runs as <b>${reps} copies</b> of the model <span class="i" data-tip="copies" tabindex="0">i</span> on ${tp} GPU${tp>1?"s":""} each, ~${commas(active.upr)} user${active.upr===1 ? "" : "s"} per copy. `
       : "";
@@ -1363,7 +1385,7 @@ function renderCards(deps, active, suggested, picked){
   $('fitcap').innerHTML = (S.tpo==="auto"
       ? `What one node of each board takes to serve everyone${hasGoal ? " within your speed goal" : ""}: up to 8 GPUs, as one copy of the model or several (~90% of each board is usable).`
       : `Every board at <b>${S.tpo} GPU${S.tpo>1?"s":""} per copy</b>, fixed in Advanced settings, with as many copies as one node holds.`)
-    + ` Click a board to plan on it; click it again to go back to the suggestion. Greyed-out boards don't fit or aren't recommended, and can't be picked.`;
+    + ` Click a board to plan on it; click it again to go back to the suggestion. Greyed-out boards don't fit and can't be picked. Boards marked Not recommended can be picked but are never suggested.`;
   const cards=$('gpucards'); cards.innerHTML="";
   GPUS.forEach(b=>{
     const d = deps.get(b.n), slow = notRecommended(d);
@@ -1422,6 +1444,8 @@ function renderChunkOptions(d){
   $('chunkfoot').innerHTML =
     (d ? `Timings for a ${commas(S.prompt)}-token prompt on ${d.tp} × ${d.g.n}${d.reps>1 ? `, ${commas(d.upr)} users per copy` : ""}.`
        : `Timings appear once a board fits.`)
+    + (S.prompt<=512 ? `<br>All three are the same here: a prompt of 512 tokens or fewer is read in one piece either way.`
+       : S.prompt<=2048 ? `<br>Balanced and Fast first reply are the same here: a prompt of 2K tokens or fewer is read in one piece either way.` : "")
     + `<br>Engine setting: <code>max_num_batched_tokens = ${commas(S.chunk)}</code>`;
 }
 
@@ -1479,7 +1503,8 @@ function renderTpNote(m, tp, active){
         : `<b>Auto</b> — one copy doesn't fit, even split 8 ways.`;
   if(tp>1){
     const minHeads = Math.min(...m.kv.filter(g=>!g.state).map(g=>g.heads));
-    if(minHeads===1) t += `<br>Part of this model's cache has a single head, so <b>every GPU keeps a full copy</b> of it. Engines often switch to data-parallel attention to avoid this.`;
+    if(usesDpAttention(m)) t += `<br>This model's attention is served <b>data-parallel</b>, as SGLang and vLLM run it: each GPU keeps only its own users' cache, so nothing is copied.`;
+    else if(minHeads===1) t += `<br>Part of this model's cache has a single head, so <b>every GPU keeps a full copy</b> of it.`;
     else if(tp>minHeads) t += `<br><b>TP &gt; ${minHeads} KV heads</b> — part of the cache copies instead of splitting, so it stops shrinking.`;
     else t += ` The cache splits ÷ ${tp} across KV heads.`;
   }
@@ -1659,7 +1684,7 @@ wqSel.addEventListener('change', ()=>{ syncWq(); render(); });
 /* boards: click, Enter or Space picks one; picking it again goes back to the suggestion */
 const gpuCards = $('gpucards');
 const pickCard = card => {
-  if(card.classList.contains('off')) return;     // won't fit or not recommended: shown for reference only
+  if(card.classList.contains('off')) return;     // won't fit: shown for reference only
   const n = card.dataset.gpu;
   S.board = S.board===n ? "auto" : n;
   render(); gpuCards.querySelector(`[data-gpu="${n}"]`)?.focus();
@@ -1883,7 +1908,7 @@ function buildSummary(){
   const prec = S.wqLbl==="NATIVE" ? `${m.nat.f}, as released` : S.wqLbl;
   const date = new Date().toLocaleDateString('en-US', {year:'numeric', month:'long', day:'numeric'});
   const head = fits ? deployName(a) : "Too big for one 8-GPU node";
-  const role = fits ? (L.picked ? "Selected node" : a.partial ? "Closest single node" : "Recommended node") : "No single node fits";
+  const role = fits ? (L.picked ? (notRecommended(a) ? "Selected node · split over PCIe" : "Selected node") : a.partial ? "Closest single node" : "Recommended node") : "No single node fits";
   const short = fits && a.partial
     ? `One node ${a.meets ? "serves" : "holds"} up to ${commas(a.served)} of the ${commas(S.users)} users${hasGoal ? (a.meets ? " within the speed goal" : ", below the speed goal") : ""}.` : "";
   const layout = !fits ? "—" : a.reps>1 ? `${a.reps} copies of the model, ${a.tp} GPU${a.tp>1 ? "s" : ""} each, about ${commas(a.upr)} users per copy`
@@ -1914,7 +1939,7 @@ function buildSummary(){
     + ` · <b>Total <span class="mono">${fmtMem(L.tot/GB)}</span></b>`;
   const boards = GPUS.map(g=>{
     const d = L.deps.get(g.n);
-    const status = !d.fits ? "Won't fit on one node" : d.tp>1 && !g.link ? "Not recommended: split over PCIe"
+    const status = !d.fits ? "Won't fit on one node" : d.tp>1 && !g.link ? "Not recommended: PCIe split"
                  : d.partial ? `${d.meets ? "Serves" : "Holds"} ${commas(d.served)} of ${commas(S.users)} users`
                  : !d.meets ? "Below speed goal" : hasGoal ? "Meets goal" : "Fits";
     const shape = !d.fits ? "—" : d.gpus===1 ? "1 GPU" : layoutText(d);
@@ -1934,6 +1959,7 @@ function buildSummary(){
       : `The recommendation is the node that ${hasGoal ? "reaches the speed goal" : "holds every user"} with the least GPU memory in total; on any one board, that means the fewest GPUs.`,
   ];
   if(S.thinking) notes.push(`For a thinking model, first reply is when its thinking starts; the answer follows once the thinking is done.`);
+  if(fits && notRecommended(a)) notes.push(`This layout splits one copy of the model across cards with no NVLink, which coordinate over PCIe after every layer. It is slower than the same number of NVLink cards and is not the recommended setup.`);
   if(fits && a.reps>1) notes.push(`Copies run independently on the node's GPUs with requests spread across them, so they need no NVLink between them.`);
   const link = CAN_LINK ? `<p class="foot">Open this scenario in LLM Inference Sizer: <a href="${esc(location.href.split("#")[0] + "#" + stateToHash())}">interactive version</a></p>` : "";
   const title = `GPU sizing: ${name}, ${commas(S.users)} user${S.users===1 ? "" : "s"}`;
@@ -1966,6 +1992,8 @@ function buildSummary(){
   .kv td:first-child{width:150px; color:var(--ink2)}
   tr.hl td{background:var(--hl); font-weight:600}
   tr.dim td{color:var(--muted)}
+  .boards td, .boards th{white-space:nowrap}
+  .boards td:nth-child(n+5), .boards th:nth-child(n+5){width:1%}
   tr.tot td{font-weight:600; border-bottom:none}
   .tag{font:500 9.5px/1 "IBM Plex Mono",ui-monospace,Consolas,monospace; text-transform:uppercase; letter-spacing:.06em; color:var(--accent); border:1px solid var(--accent); border-radius:9px; padding:2px 6px; margin-left:4px; vertical-align:1px}
   ul{margin:0; padding-left:18px; color:var(--ink2)} li{margin:3px 0}
@@ -1976,7 +2004,8 @@ function buildSummary(){
   @media (max-width:640px){ .stats{grid-template-columns:repeat(2,minmax(0,1fr))} }
   @media print{
     .print{display:none} main{padding:0; max-width:none} body{font-size:11.5px} @page{margin:12mm}
-    h1{font-size:22px} h2{margin:13px 0 4px} td,th{padding:3px 8px} .stats{margin-top:12px} .stat{padding:7px 9px} li{margin:2px 0}
+    h1{font-size:22px} h2{margin:11px 0 4px} td,th{padding:3px 8px} .stats{margin-top:10px} .stat{padding:6px 9px} li{margin:1px 0}
+    ul{line-height:1.4} .foot{margin-top:8px} .memline{margin-top:9px} .short{margin-top:8px}
   }
 </style>
 <main>
@@ -1989,7 +2018,7 @@ function buildSummary(){
   ${stats.length ? `<div class="stats">${stats.map(([k, v, s])=> `<div class="stat"><span>${esc(k)}</span><b>${esc(v)}</b><small>${esc(s)}</small></div>`).join("")}</div>` : ""}
   <p class="memline"><b>Memory for ${esc(memScope)}:</b> ${mem}</p>
   <section><h2>What was sized</h2><table class="kv">${inputs.map(([k, v])=> `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join("")}</table></section>
-  <section><h2>Every board</h2><table><tr><th>Board</th><th class="n">GPUs</th><th>Layout</th><th>Status</th><th class="n">GPU memory</th><th class="n">tok/s per user</th></tr>${boards}</table></section>
+  <section><h2>Every board</h2><table class="boards"><tr><th>Board</th><th class="n">GPUs</th><th>Layout</th><th>Status</th><th class="n">GPU memory</th><th class="n">tok/s per user</th></tr>${boards}</table></section>
   <section class="notes"><h2>Assumptions</h2><ul>${notes.map(n=> `<li>${esc(n)}</li>`).join("")}</ul></section>
   ${link}
 </main>
@@ -2021,7 +2050,7 @@ if(!TOP && window.claude && typeof window.claude.use==="function")
 /* ---------------- tooltips ---------------- */
 const TIPS = {
   weights:"The parameters themselves, loaded once and held for the life of the process. Size = params × bytes per parameter. Fixed — it never grows with users or context.",
-  kv:"Cached keys and values for every token already processed, so the model never recomputes them. Grows with context length AND with concurrent users at the same time — usually the first thing to blow the budget. Newer models shrink it with sliding windows, compression, or linear-attention layers that keep a fixed-size state. When one copy is split across more GPUs than a layer has KV heads, each GPU keeps its own copy of that layer's cache, so the total is larger on an 8-GPU split than on 4 or 2.",
+  kv:"Cached keys and values for every token already processed, so the model never recomputes them. Grows with context length AND with concurrent users at the same time — usually the first thing to blow the budget. Newer models shrink it with sliding windows, compression, or linear-attention layers that keep a fixed-size state. When one copy is split across more GPUs than a layer has KV heads, each GPU keeps its own copy of that layer's cache, so the total is larger on an 8-GPU split than on 4 or 2. Models with latent attention (DeepSeek, GLM, Kimi) are served data-parallel instead, so their cache isn't copied.",
   act:"Short-lived tensors inside one forward pass: hidden states and the MLP intermediates. Freed after each pass, so it scales with how many tokens run at once — not with context length.",
   tpov:"What splitting across GPUs adds. Every GPU carries its own CUDA context, plus NCCL buffers for the all-reduce that runs after each layer. It is added memory, not saved memory.",
   overhead:"CUDA/driver context, allocator fragmentation, framework workspaces and CUDA graphs. Real but hard to predict — the slider sets how conservative you want to be.",
@@ -2047,7 +2076,7 @@ const TIPS = {
   fit:"What one node of each board takes to serve everyone: up to 8 GPUs, as one copy of the model or several, and how much GPU memory that adds up to. If one node can't serve everyone, the card says how many users it does serve. Assumes ~90% of board memory is usable; drivers and the CUDA context claim the rest.",
   nvlink:"NVLink joins GPUs directly, which is what splitting one copy of a model across them needs to be fast. On H100 and H200, bridges link 2 or 4 cards, or an 8-GPU system links all 8. The B200 and B300 come only as 8-GPU systems with all 8 linked.",
   pcie:"PCIe-only — no NVLink. Fine for a single GPU, but tensor parallelism must all-reduce over a far slower link after every layer, so throughput suffers badly.",
-  pcieSlow:"Not recommended. This board has no NVLink, and here one copy of the model has to be split across several of them, so the GPUs exchange data over PCIe after every layer. That is far slower, and the speed shown already reflects it. Prefer a board that holds a copy on one GPU, or an NVLink board.",
+  pcieSlow:"Not recommended. This board has no NVLink, and here one copy of the model has to be split across several of them, so the GPUs exchange data over PCIe after every layer. That is slower than the same number of NVLink cards, and the speed shown already reflects it. It works and can be picked, but it is never the suggestion; prefer a board that holds a copy on one GPU, or an NVLink board.",
   tput:"A first-order estimate from the board's memory bandwidth, compute and interconnect, not a benchmark. Real engines usually land within about ±30%, depending on kernels, CUDA graphs and traffic shape. Use it to compare setups, not to promise an SLA.",
   tpsTotal:"Output tokens per second summed across every concurrent user — what the deployment produces. Adding users usually raises it, because the weights are read once per step no matter how many requests share that step.",
   tpsUser:"How fast one person sees text stream in. More users slow each one down, since every step must also read their KV caches. Around 20 tok/s or more feels smooth in chat; under 10 feels sluggish.",
