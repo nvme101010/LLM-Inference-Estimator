@@ -18,6 +18,8 @@ GPU counts round up to what can be bought. H100 and H200 servers take 1, 2, 4 or
 
 Separately, one copy of a model is split across 1, 2, 4 or 8 GPUs. Serving engines need the split to divide the model's attention heads evenly, so this is a software rule that applies to every board. On a 5-card RTX PRO 4500 server, one copy uses at most 4 cards and the fifth can run another copy.
 
+**Prompt caching** is modelled the way vLLM and SGLang run by default: the repeated part of each prompt (a shared system prompt, earlier turns) is reused, so only the new part is read before the first reply, and the shared part is stored once per GPU. It can be turned off in Advanced settings.
+
 Not sure how many concurrent users to plan for? **Estimate from daily traffic** turns people, requests per day and hours of use into a concurrent-user count.
 
 ## Use it
@@ -31,4 +33,4 @@ Open `index.html` in a browser. It is one self-contained file with no build step
 
 ## Accuracy
 
-These are planning estimates, not benchmarks. Memory figures follow each model's published architecture, and board memory is the size on the box, with 90% treated as usable (vLLM's default limit). Speed comes from a simple model of memory bandwidth, compute and interconnect; real serving engines usually land within about ±30%. Before committing to hardware, confirm with a real serving run (for example vLLM or SGLang).
+Model and board data as of October 2026. These are planning estimates, not benchmarks. Memory figures follow each model's published architecture, and board memory is the size on the box, with 90% treated as usable (vLLM's default limit). Speed and first-reply times are rough planning estimates from a simple model of each board; real results vary with the serving engine and its settings. Before committing to hardware, confirm with a real serving run (for example vLLM or SGLang).

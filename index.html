@@ -555,6 +555,14 @@
           <div class="ticks"><span>0%</span><span>25%</span></div>
           <div class="hint">Allocator fragmentation and framework buffers, on top of a fixed ~1 GB CUDA context per GPU.</div>
         </div>
+        <div>
+          <p class="eyebrow">Prompt caching <span class="i" data-tip="pcache" tabindex="0">i</span></p>
+          <div class="seg" id="pcache" role="group" aria-label="Prompt caching">
+            <button data-v="1" aria-pressed="true">On</button>
+            <button data-v="0" aria-pressed="false">Off</button>
+          </div>
+          <div class="hint">Reuses the repeated part of each prompt, as vLLM and SGLang do by default. Turn it off to size for prompts that never repeat.</div>
+        </div>
       </div>
     </details>
 
@@ -580,6 +588,7 @@
           <p><b>Overhead</b> = a fixed <code>~1.0 GB</code> CUDA/driver context plus a slider % of the three above, standing in for allocator fragmentation, framework buffers, and CUDA graphs.</p>
           <p><b>Tensor-parallel overhead</b> — the page picks TP for you as part of the smallest layout, fixed in Advanced settings if you prefer. One copy of a model is split 1, 2, 4 or 8 ways: serving engines need the split to divide the model's attention heads and layer sizes evenly, and these are the splits production deployments run. This is a software rule that applies to every board, and it is separate from how many cards a server can hold. With TP &gt; 1 the model is sharded across GPUs: weights and activations divide by TP, and the KV cache divides by <code>min(TP, kv_heads)</code>. Sharding <i>adds</i> memory: every GPU carries its own <code>~1 GB</code> CUDA context, plus NCCL all-reduce workspace and comm buffers (<code>~0.3 GB + users × hidden × 8 B</code> per GPU). When <b>TP exceeds a layer's KV heads</b>, that part of the cache can't split further and copies to every GPU — watch it stop shrinking. Models with latent or compressed attention (DeepSeek, GLM, Kimi, Mistral Small 4) have a single cache head, so a plain split would copy their whole cache to every GPU. SGLang and vLLM serve them with <b>data-parallel attention</b> instead, where each GPU keeps only its own users' cache, and the page sizes them that way. Linear-attention state splits cleanly.</p>
           <p><b>Throughput</b> — generating a token means reading this GPU's weight shard plus every active request's KV cache, so a decode step takes <code>bytes read ÷ (memory bandwidth × 0.65)</code>. At very large batches the compute cost <code>users × 2 × active params ÷ (FLOPs × 0.5)</code> takes over, so the step uses whichever is slower. Tensor parallelism adds two all-reduces per layer, sized to the batch's activations and sent over NVLink or PCIe, and the engine adds ~1.5 ms per step. Output = <code>users ÷ step time</code>. Reading a prompt is compute-bound: <code>prompt × (2 × active params + 2 × layers × prompt × hidden) ÷ (FLOPs × 0.45)</code>. The prompt is read in pieces (512, 2,048 or 8,192 tokens, set by <b>Optimize for</b>), and each piece shares a step with everyone else's next token. So <b>time to first token</b> = prompt compute + pieces × step time, and the <b>pause</b> other users feel = one piece's compute + one step. Smaller pieces mean more steps before the first reply but shorter freezes. Requests are assumed to be halfway through their reply (prompt + half the reply in cache), and the first reply waits on the whole prompt. Quantized weights read fewer bytes but lose some of that gain to dequantization; FP8 also speeds up compute on boards with native FP8 cores. MoE models read more experts as the batch grows; this assumes tokens are routed evenly across experts, and real routing is skewed, so fewer distinct experts are read and real speed can be somewhat higher. Bandwidth and link speeds are published specs; FLOPs are rough estimates.</p>
+          <p><b>Prompt caching</b> — chat and agent prompts mostly repeat: the same system prompt for every user, and each user's earlier turns. vLLM and SGLang cache that by default, so before the first reply only the new part of the prompt is read (it still attends to the cached part), and the shared system prompt's cache is stored once per GPU instead of once per user. Each preset sets the shape: Chat has a 512-token shared system prompt and about 512 new tokens a turn; RAG and Long-document summary read their documents fresh every time; Coding agent shares 4K tokens of system prompt and tool definitions and adds about 4K new tokens a step. Everything else in the prompt still sits in each user's cache, so memory changes only by the shared part. It can be turned off in Advanced settings.</p>
           <p><b>Thinking</b> — a model that reasons step by step writes thinking tokens before its answer. They're generated like any other token, so a user's cache peaks at prompt + thinking + reply, speed is judged halfway through thinking and reply together, and cost per output token counts them. First reply is when the first token appears, which for a thinking model is the start of its thinking; the stat also says how long the thinking runs before the answer begins. Earlier turns' thinking is normally dropped by the model's chat template, so it doesn't build up in the prompt. The switch starts at each model's own default, taken from its model card and chat template.</p>
           <p><b>Concurrent users from traffic</b> — requests in progress at once = requests per second × seconds each one takes. A request takes the wait before its first token plus its thinking and reply, streamed at your speed goal's rate; the goal is a minimum speed, so this errs on the high side. The busiest-hour multiple covers traffic that isn't spread evenly through the day; 2× suits a typical workday.</p>
           <p><b>Sharing</b> — on a hosted copy of this page, the address always holds the current settings, so Copy link sends the exact scenario. Download summary saves a one-page report of the recommendation, the inputs and every board, which prints to PDF.</p>
@@ -594,7 +603,7 @@
     </details>
   </main>
 
-  <footer class="foot">Change the four inputs at the top — everything recomputes live.</footer>
+  <footer class="foot" id="asof"></footer>
 </div>
 
 <script>
@@ -804,13 +813,28 @@ const goalGap = t => Math.max(GOALS[S.goal].tps / t.perUser, t.ttft / GOALS[S.go
    A user's cache peaks at prompt + thinking + reply; speed is judged halfway through generating
    thinking + reply; the first reply waits on the whole prompt. Each preset also picks how prompts
    are read (Optimize for). */
+/* Prompt caching (vLLM and SGLang reuse repeated prompt text by default): of each prompt, `shared`
+   tokens are the same for every user (system prompt, tool definitions) and `fresh` tokens are new
+   to this request; the rest repeats the user's own previous turns. fresh:null = everything but the
+   shared part, for workloads whose content is new each time. */
 const WORKLOADS = {
-  chat:    {name:"Chat",                  prompt:2048,  reply:512,  chunk:512,  desc:"Multi-turn chat with a system prompt: 2K-token prompts, 512-token replies."},
-  rag:     {name:"RAG",                   prompt:8192,  reply:512,  chunk:2048, desc:"Retrieved documents plus a question: 8K in, 512 out."},
-  agent:   {name:"Coding agent",          prompt:32768, reply:2048, chunk:8192, desc:"Files, diffs and tool output sent on every step: 32K in, 2K out."},
-  summary: {name:"Long-document summary", prompt:65536, reply:1024, chunk:8192, desc:"A long report or transcript condensed to a page: 64K in, 1K out."},
+  chat:    {name:"Chat",                  prompt:2048,  reply:512,  chunk:512,  shared:512,  fresh:512,  desc:"Multi-turn chat with a system prompt: 2K-token prompts, 512-token replies."},
+  rag:     {name:"RAG",                   prompt:8192,  reply:512,  chunk:2048, shared:512,  fresh:null, desc:"Retrieved documents plus a question: 8K in, 512 out."},
+  agent:   {name:"Coding agent",          prompt:32768, reply:2048, chunk:8192, shared:4096, fresh:4096, desc:"Files, diffs and tool output sent on every step: 32K in, 2K out."},
+  summary: {name:"Long-document summary", prompt:65536, reply:1024, chunk:8192, shared:256,  fresh:null, desc:"A long report or transcript condensed to a page: 64K in, 1K out."},
   custom:  {name:"Custom",                                                      desc:"Your own prompt and reply lengths."},
 };
+
+const DATA_AS_OF = "October 2026";   // when the model and board figures were last checked
+/* how a prompt splits under prompt caching: the part new to this request is the only part read
+   before the first reply; the shared part is stored once per GPU, not once per user */
+function promptParts(){
+  const P = S.prompt;
+  if(!S.cache) return {P, shared:0, fresh:P};
+  if(S.fresh==null){ const shared = Math.min(S.shared, Math.floor(P/2)); return {P, shared, fresh:P-shared}; }
+  const fresh = Math.min(S.fresh, P);
+  return {P, shared:Math.min(S.shared, P-fresh), fresh};
+}
 
 /* memory units are display only; the viewer's choice is remembered in this browser */
 const UNIT_KEY = "vram-sizer-unit";   // kept from the tool's old name so saved choices carry over
@@ -827,6 +851,7 @@ const S = { wq:2, wqLbl:"NATIVE", kq:2, tp:1, tpo:"auto", chunk:512, ovpct:7, us
             goal:"smooth",
             workload:"chat", prompt:2048, reply:512, wantPrompt:2048, wantReply:512, ctxTok:2560,
             think:false, thinkTok:4096, thinking:0,
+            cache:1, shared:512, fresh:512,                    // prompt caching on, and the last preset's shape of a prompt
             traffic:{people:1000, req:20, hours:8, peak:2},   // the traffic estimator's inputs
             trafficApplied:null,                               // those inputs and the users they gave, once used
             chunkBase:512,     // the Optimize-for choice the last preset made, so Advanced can flag your own change
@@ -916,6 +941,20 @@ function activeModel(){
    spread across the GPUs. The page sizes those models that way. An ordinary model that happens to
    have a single KV head (Gemma 4 12B) is still split the plain way, where copying is what happens. */
 const usesDpAttention = m => m.kv.some(g=> g.t==="latent" || g.t==="compressed");
+/* The cache for the shared start of every prompt. With prompt caching the engine keeps one copy of it
+   on each GPU instead of one per user. Layers that keep only a recent window drop it once the
+   conversation outgrows the window, and fixed-size states share nothing. Split per GPU as cacheFor. */
+function sharedCacheFor(m, shared, ctx, tp){
+  if(!shared) return {req:0, pg:0};
+  const dp = tp>1 && usesDpAttention(m);
+  let req = 0, pg = 0;
+  for(const g of m.kv){
+    if(g.state || (g.win && ctx > g.win)) continue;
+    const bytes = g.n * Math.ceil(shared/(g.r||1)) * g.per * S.kq;
+    req += bytes; pg += bytes / (dp ? tp : Math.min(tp, g.heads));
+  }
+  return {req, pg};
+}
 function cacheFor(m, tokens, tp){
   const dp = tp>1 && usesDpAttention(m);
   let req=0, pg=0, readPg=0, span=0, replicated=false;
@@ -965,15 +1004,19 @@ function compute(tpOverride, usersOverride){
 
   // tensor-parallel sharding
   const w_pg       = weights / tp;
-  const kv_pg      = cache.dp ? cache.req * Math.ceil(users/tp)     // data-parallel: this GPU's own users, whole caches
-                              : cache.pg * users;
+  const sh = sharedCacheFor(m, promptParts().shared, ctx, tp);     // the shared prompt start, kept once per GPU
+  const onGpu = cache.dp ? Math.ceil(users/tp) : users;            // users whose cache sits on each GPU
+  const kv_pg      = cache.dp ? cache.req*onGpu - sh.req*Math.max(0, onGpu-1)   // data-parallel: this GPU's own users, whole caches
+                              : cache.pg*users - sh.pg*Math.max(0, users-1);
   const act_pg     = act / tp;
   const frag_pg    = (w_pg + kv_pg + act_pg) * (S.ovpct/100);
   const tpcomm_pg  = tp>1 ? (0.3*GB + users*m.h*2*4) : 0;           // NCCL workspace + comm buffers
   const perGPU     = w_pg + kv_pg + act_pg + cuda + frag_pg + tpcomm_pg;
 
   // aggregate components for the bar/table (sum across all GPUs)
-  const kv_agg       = cache.dp ? cache.req * users : kv_pg * tp;   // inflates when tp > kv_heads (replication)
+  const kv_agg       = cache.dp ? cache.req*users - sh.req*Math.max(0, users - Math.min(users, tp))
+                                : kv_pg * tp;                       // inflates when tp > kv_heads (replication)
+  const kv_saved     = (cache.dp ? cache.req*users : cache.pg*users*tp) - kv_agg;   // what sharing the prompt start saves
   const act_agg      = act_pg * tp;
   const overhead_agg = cuda + frag_pg*tp;                           // one base context + fragmentation on every GPU
   const tp_agg       = tp>1 ? (tp-1)*cuda + tpcomm_pg*tp : 0;       // extra contexts + all comm buffers
@@ -981,7 +1024,7 @@ function compute(tpOverride, usersOverride){
 
   return {m, ctx, users, tp, cache, T, ffn, vocab, actBuf, actLogit,
           weights, kv:kv_agg, act:act_agg, overhead:overhead_agg, tpov:tp_agg,
-          w_pg, kv_pg, act_pg, tpcomm_pg, perGPU, total};
+          w_pg, kv_pg, act_pg, tpcomm_pg, perGPU, total, kv_saved};
 }
 
 /* ---------------- throughput model ----------------
@@ -1033,10 +1076,14 @@ function throughput(g, tp, chunk = S.chunk, users = S.users){
      decode of everyone already replying, so:
        · more, smaller chunks → the new prompt waits through more steps (slower first reply)
        · bigger chunks → each shared step is longer, so running replies freeze for longer */
-  const P = Math.max(1, S.prompt), piece = Math.min(chunk, P), chunks = Math.ceil(P / chunk);
-  const attnSpan = cacheFor(m, P, tp).span;      // tokens each prompt token attends to, summed over layers
-  // causal prefill: each token attends to half the span on average, so 4 × span/2 = 2 × span × hidden
-  const promptCompute = n => n*(2*paramsActive + 2*attnSpan*m.h) / (g.flops*1e12 * MFU_PREFILL * p * tp);
+  // with prompt caching only the new part of the prompt is read; it still attends to the cached part
+  const pp = promptParts(), P = Math.max(1, pp.fresh), piece = Math.min(chunk, P), chunks = Math.ceil(P / chunk);
+  const spanAll = cacheFor(m, Math.max(1, pp.P), tp).span, spanNew = cacheFor(m, P, tp).span;
+  /* each new token attends to everything before it: the cached part plus, on average, half the new
+     part. Two matmuls at 2 FLOPs per multiply-add: 4 × (span − new/2) × hidden, which is
+     2 × span × hidden when nothing is cached. */
+  const attnPerTok = 4 * Math.max(0, spanAll - spanNew/2) * m.h;
+  const promptCompute = n => n*(2*paramsActive + attnPerTok) / (g.flops*1e12 * MFU_PREFILL * p * tp);
   const chunkComm = 2*m.L * allReduce(piece*m.h*2);
   const ttft  = promptCompute(P) + chunks*(tStep + chunkComm);
   const pause = promptCompute(piece) + chunkComm + tStep;   // longest gap between tokens for running replies
@@ -1214,6 +1261,7 @@ function kvFormula(r){
     ? `${LAYER_LABEL.linear(g)}: fixed ${fmtBytes(g.state)} state each = ${fmtBytes(bytes)}`
     : `${LAYER_LABEL[g.t](g)}: ${fmtBytes(g.n*g.per*S.kq/(g.r||1))}/tok × ${commas(Math.min(ctx, g.win ?? Infinity))} tok = ${fmtBytes(bytes)}`);
   lines.push(`= ${fmtBytes(cache.req)} per user at ${commas(ctx)} tokens (prompt + ${S.thinking ? "thinking + " : ""}reply) × ${commas(users)} user${users>1?"s":""} (${kqLabel()} cache)`);
+  if(r.kv_saved > 0) lines.push(`− ${fmtMem(r.kv_saved/GB)}: the ${commas(promptParts().shared)}-token shared system prompt is stored once per GPU, not once per user (prompt caching)`);
   if(tp>1) lines.push(cache.dp
     ? `data-parallel attention across ${tp} GPUs: each holds its own users' cache, up to ${commas(Math.ceil(users/tp))} user${Math.ceil(users/tp)===1 ? "" : "s"} = <b>${fmtMem(r.kv_pg/GB)}/GPU</b>`
     : `split across ${tp} GPUs${cache.replicated ? " — layers with fewer KV heads than GPUs copy to every GPU" : ""} = <b>${fmtMem(r.kv_pg/GB)}/GPU</b>`);
@@ -1247,7 +1295,7 @@ function render(){
     {k:"KV cache", v:r.kv, c:"var(--kv)", bar:"bkv", tip:"kv", f:kvFormula(r),
      // split across more GPUs than a layer has KV heads, each GPU keeps that layer's cache: say how much that adds
      extra: r.cache.dp ? `data-parallel attention: each GPU holds its own users' cache`
-          : r.cache.replicated ? `incl. ${fmtMem((r.kv - r.users*r.cache.req)/GB)} repeated across ${tp} GPUs` : ""},
+          : r.cache.replicated ? `incl. ${fmtMem((r.kv + r.kv_saved - r.users*r.cache.req)/GB)} repeated across ${tp} GPUs` : ""},
     {k:"Activations", v:r.act, c:"var(--act)", bar:"bact", tip:"act",
      f:`${commas(r.T)} tokens per step × (${commas(m.h)}h × 4 + ${commas(r.ffn)}ffn × 2) × 2 B = ${fmtMem(r.actBuf/GB)}`
        + `<br>+ ${commas(r.users)} × ${commas(r.vocab)} vocab × 4 B fp32 logits = ${fmtMem(r.actLogit/GB)}`
@@ -1369,7 +1417,7 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
                  hasGoal ? `${slowTps ? "below" : "meets"} the ${goal.tps}+ goal` : feelFor(speed.perUser), slowTps ? "warn" : "")
              : statCell("tpsUser", "Speed per user", "—", "", na))
     + (speed ? statCell("ttft", "First reply", ...fmtTime(speed.ttft),
-                 (hasGoal ? `${slowTtft ? "over" : "within"} the ${goal.ttft} s goal` : `${commas(speed.prompt)}-token prompt`)
+                 (hasGoal ? `${slowTtft ? "over" : "within"} the ${goal.ttft} s goal` : `${commas(speed.prompt)} new prompt tokens`)
                  + (S.thinking ? ` · then ${fmtWait(S.thinking / speed.perUser)} of thinking` : ""), slowTtft ? "warn" : "")
              : statCell("ttft", "First reply", "—", "", na))
     + (cap ? statCell("capacity", "Handles up to", commas(cap.users), cap.users===1 ? "user" : "users",
@@ -1465,10 +1513,10 @@ function renderChunkOptions(d){
     num.textContent = `${fmtTime(t.ttft).join(" ")} · ${fmtTime(t.pause).join(" ")}`;
   });
   $('chunkfoot').innerHTML =
-    (d ? `Timings for a ${commas(S.prompt)}-token prompt on ${d.tp} × ${d.g.n}${d.reps>1 ? `, ${commas(d.upr)} users per copy` : ""}.`
+    (d ? `Timings for a ${commas(S.prompt)}-token prompt${promptParts().fresh < S.prompt ? ` (${commas(promptParts().fresh)} new tokens; the rest is cached)` : ""} on ${d.tp} × ${d.g.n}${d.reps>1 ? `, ${commas(d.upr)} users per copy` : ""}.`
        : `Timings appear once a board fits.`)
-    + (S.prompt<=512 ? `<br>All three are the same here: a prompt of 512 tokens or fewer is read in one piece either way.`
-       : S.prompt<=2048 ? `<br>Balanced and Fast first reply are the same here: a prompt of 2K tokens or fewer is read in one piece either way.` : "")
+    + (promptParts().fresh<=512 ? `<br>All three are the same here: 512 new tokens or fewer are read in one piece either way.`
+       : promptParts().fresh<=2048 ? `<br>Balanced and Fast first reply are the same here: 2K new tokens or fewer are read in one piece either way.` : "")
     + `<br>Engine setting: <code>max_num_batched_tokens = ${commas(S.chunk)}</code>`;
 }
 
@@ -1537,9 +1585,9 @@ function renderTpNote(m, tp, active){
 
 /* the collapsed Advanced header still says what's set, and how much differs from the defaults */
 function renderAdvState(){
-  const changed = [S.kq!==2, S.tpo!=="auto", S.chunk!==S.chunkBase, S.ovpct!==7].filter(Boolean).length;
+  const changed = [S.kq!==2, S.tpo!=="auto", S.chunk!==S.chunkBase, S.ovpct!==7, !S.cache].filter(Boolean).length;
   $('advState').innerHTML = (changed ? `<b>${changed} changed</b> · ` : "")
-    + `KV ${kqLabel()} · TP ${S.tpo==="auto" ? "auto" : S.tpo} · ${CHUNK_NAME[S.chunk]} · ${S.ovpct}% overhead`;
+    + `KV ${kqLabel()} · TP ${S.tpo==="auto" ? "auto" : S.tpo} · ${CHUNK_NAME[S.chunk]} · ${S.ovpct}% overhead · prompt caching ${S.cache ? "on" : "off"}`;
 }
 
 
@@ -1604,8 +1652,10 @@ function syncPrompt(){                   // slider → state, then everything th
   if(document.activeElement!==replyNum) replyNum.value = S.reply;   // don't fight someone typing
   if(document.activeElement!==thinkNum) thinkNum.value = S.think ? S.thinking : S.thinkTok;
   const trimmed = S.wantPrompt > stops[stops.length-1] || S.wantReply > S.reply || S.thinking < (S.think ? S.thinkTok : 0);
+  const pp = promptParts();
   $('workloadHint').textContent = WORKLOADS[S.workload].desc
-    + (trimmed ? ` Trimmed to fit this model's ${fmtCtx(activeModel().ctx)} context.` : "");
+    + (trimmed ? ` Trimmed to fit this model's ${fmtCtx(activeModel().ctx)} context.` : "")
+    + (pp.fresh < pp.P ? ` With prompt caching, about ${commas(pp.fresh)} tokens of each prompt are new${pp.shared ? `, and ${commas(pp.shared)} are a system prompt shared by everyone` : ""}.` : "");
 }
 /* the Thinking row: hidden for models that never think, locked on for ones that always do */
 function syncThink(){
@@ -1629,7 +1679,7 @@ function applyWorkload(key){             // a preset sets both lengths and how p
   S.workload = key;
   workloadSel.value = key;
   const w = WORKLOADS[key];
-  if(key!=="custom"){ S.wantPrompt = w.prompt; S.wantReply = w.reply; setChunk(w.chunk); S.chunkBase = w.chunk; }
+  if(key!=="custom"){ S.wantPrompt = w.prompt; S.wantReply = w.reply; setChunk(w.chunk); S.chunkBase = w.chunk; S.shared = w.shared; S.fresh = w.fresh; }
   setLengths();
 }
 function markCustom(){ S.workload = "custom"; workloadSel.value = "custom"; }
@@ -1841,6 +1891,8 @@ function stateToHash(){
   if(S.tpo!=="auto") q.set("tp", S.tpo);
   if(S.chunk!==S.chunkBase) q.set("ck", S.chunk);
   if(S.ovpct!==7) q.set("ov", S.ovpct);
+  if(!S.cache) q.set("pc", "off");
+  if(S.workload==="custom"){ q.set("sh", S.shared); q.set("fr", S.fresh==null ? "rest" : S.fresh); }
   if(S.board!=="auto") q.set("b", S.board);
   if(trafficInUse()){ const t = S.trafficApplied; q.set("tf", [t.people, t.req, t.hours, t.peak].join("_")); }
   return q.toString();
@@ -1882,6 +1934,9 @@ function applyHash(){
     pressSeg('tp', 'tpo', q.get("tp") || "auto");
     const ov = Math.round(+q.get("ov"));
     ovSlider.value = q.has("ov") && ov>=0 && ov<=25 ? ov : 7; syncOv();
+    pressSeg('pcache', 'cache', q.get("pc")==="off" ? "0" : "1");
+    if(w==="custom" && q.has("sh")){ S.shared = Math.max(0, Math.round(+q.get("sh")) || 0); S.fresh = q.get("fr")==="rest" || !q.has("fr") ? null : Math.max(1, Math.round(+q.get("fr")) || 1); }
+    setLengths();
     S.board = GPUS.some(g=> g.n===q.get("b")) ? q.get("b") : "auto";
     const tf = (q.get("tf") || "").split("_").map(Number);
     if(tf.length===4 && tf.every(x=> x>0)){
@@ -1952,7 +2007,8 @@ function buildSummary(){
     ["Weight precision", prec],
     ["Concurrent users", commas(S.users) + (tf ? ` · estimated from ${commas(tf.people)} people × ${tf.req} requests a day over ${tf.hours} hours, busiest hour ${tf.peak}× the average` : "")],
     ["Workload", `${WORKLOADS[S.workload].name}: ${commas(S.prompt)}-token prompts, ${commas(S.reply)}-token replies`
-                 + (S.thinking ? `, ${commas(S.thinking)} thinking tokens per reply` : "")],
+                 + (S.thinking ? `, ${commas(S.thinking)} thinking tokens per reply` : "")
+                 + (promptParts().fresh < S.prompt ? ` (${commas(promptParts().fresh)} new per request, the rest cached)` : "")],
     ["Speed goal", hasGoal ? goal.desc.replace(/\.$/, "") : "None: the smallest setup that fits"],
     ["Layout", layout],
     ["Advanced", `KV cache ${kqLabel()} · GPUs per copy ${S.tpo==="auto" ? "chosen automatically" : S.tpo} · ${CHUNK_NAME[S.chunk]} · ${S.ovpct}% overhead`],
@@ -1977,15 +2033,16 @@ function buildSummary(){
       + `${names(sized)} servers take ${popText(sized[0])} GPUs, ${names(sysOnly)} come only as ${systemOf(sysOnly[0])}-GPU systems`
       + GPUS.filter(b=> b.max).map(b=> `, and ${b.n} servers hold up to ${b.max}`).join("") + `.`,
     `Board memory is the size on the box, with 90% treated as usable (vLLM's default limit). Amounts are in ${S.unit==="GiB" ? "GiB (2³⁰ bytes)" : "GB (10⁹ bytes)"}, sized for every concurrent user at full prompt + ${S.thinking ? "thinking + " : ""}reply length.`,
-    `Speed and first-reply times are estimates, not benchmarks; real serving engines usually land within about ±30%.`,
+    `Speed and first-reply times are rough planning estimates from a simple model of each board; real results vary with the serving engine and its settings.`,
     fits && a.partial && !L.picked
       ? `No single node serves every user${hasGoal ? " within the speed goal" : ""}, so this is the board whose node serves the most.`
       : `The recommendation is the node that ${hasGoal ? "reaches the speed goal" : "holds every user"} with the least GPU memory in total; on any one board, that means the fewest GPUs.`,
   ];
   if(S.thinking) notes.push(`For a thinking model, first reply is when its thinking starts; the answer follows once the thinking is done.`);
-  if(fits && notRecommended(a)) notes.push(`This layout splits one copy of the model across cards with no ${fabric(a.g)}, which coordinate over PCIe after every layer. It is slower than the same number of directly linked cards and is not the recommended setup.`);
-  if(fits && a.reps>1) notes.push(`Copies run independently on the node's GPUs with requests spread across them, so they need no direct GPU-to-GPU link between them.`);
-  const link = CAN_LINK ? `<p class="foot">Open this scenario in LLM Inference Estimator: <a href="${esc(location.href.split("#")[0] + "#" + stateToHash())}">interactive version</a></p>` : "";
+  if(fits && notRecommended(a)) notes.push(`Not recommended: this splits one copy across cards with no ${fabric(a.g)}, so they coordinate over PCIe after every layer, slower than directly linked cards.`);
+  if(fits && a.reps>1) notes.push(`Copies run independently on the node's GPUs, with requests spread across them.`);
+  // the link back sits beside the date, so it can never be the line that pushes the page onto a second sheet
+  const link = CAN_LINK ? ` · <a href="${esc(location.href.split("#")[0] + "#" + stateToHash())}">open this scenario</a>` : "";
   const title = `GPU sizing estimate: ${name}, ${commas(S.users)} user${S.users===1 ? "" : "s"}`;
   const html = `<!DOCTYPE html>
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -2037,14 +2094,13 @@ function buildSummary(){
   <div class="eyebrow">LLM Inference Estimator · ${esc(role)}</div>
   <h1>${esc(head)}</h1>
   <p class="sub">${esc(name)} · ${commas(S.users)} concurrent user${S.users===1 ? "" : "s"} · ${esc(WORKLOADS[S.workload].name)} · ${esc(prec)}</p>
-  <div class="date">Prepared ${esc(date)}</div>
+  <div class="date">Prepared ${esc(date)} · model and board data as of ${esc(DATA_AS_OF)}${link}</div>
   ${short ? `<p class="short">${esc(short)}</p>` : ""}
   ${stats.length ? `<div class="stats">${stats.map(([k, v, s])=> `<div class="stat"><span>${esc(k)}</span><b>${esc(v)}</b><small>${esc(s)}</small></div>`).join("")}</div>` : ""}
   <p class="memline"><b>Memory for ${esc(memScope)}:</b> ${mem}</p>
   <section><h2>What was sized</h2><table class="kv">${inputs.map(([k, v])=> `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join("")}</table></section>
   <section><h2>Every board</h2><table class="boards"><tr><th>Board</th><th class="n">GPUs</th><th>Layout</th><th>Status</th><th class="n">GPU memory</th><th class="n">tok/s per user</th></tr>${boards}</table></section>
   <section class="notes"><h2>Assumptions</h2><ul>${notes.map(n=> `<li>${esc(n)}</li>`).join("")}</ul></section>
-  ${link}
 </main>
 </html>`;
   return {filename: `llm-inference-estimate-${slug(name)}-${S.users}-users.html`, html};
@@ -2081,7 +2137,7 @@ const TIPS = {
   wq:"Bytes per weight. As released uses the checkpoint exactly as published; many new models ship in FP8 or FP4. BF16 is 2 bytes; FP8 and INT8 halve it; FP4 and INT4 cut it about 4×. FP8 runs natively on H100, MI350P and newer; FP4 on Blackwell and MI350P.",
   model:"The most-used open models on Hugging Face as of September 2026, grouped by lab. Layer counts, attention types and cache sizes come from each model's published config.json.",
   kq:"Precision of the cached keys and values. FP8 KV roughly halves cache size with little quality loss — often a better first move than quantizing the weights themselves.",
-  ctx:"Tokens each request sends in: system prompt, conversation history, documents, code. The whole prompt is read before the first reply, and it stays in the user's cache while the reply is written.",
+  ctx:"Tokens each request sends in: system prompt, conversation history, documents, code. Before the first reply the engine reads the new part of the prompt (all of it if prompt caching is off in Advanced settings), and the whole prompt stays in the user's cache while the reply is written.",
   reply:"Tokens in each answer the user reads. Thinking, if the model does it, is set separately below. Prompt + thinking + reply is the most cache one user holds.",
   traffic:"Concurrent users are the requests being answered at the same moment, not everyone who has access. This turns daily traffic into that number: requests per second × how long each takes. It assumes replies stream at your speed goal's rate, the slowest the goal allows, so it errs on the high side.",
   think:"Many newer models reason step by step before they answer. Those thinking tokens are generated like any others, so they take cache memory and time even though users usually don't see them. The switch starts at the model's own default. About 4K tokens is typical; hard math or code can run past 10K. Earlier turns' thinking is normally dropped from the conversation, so it doesn't pile up in the prompt.",
@@ -2092,6 +2148,7 @@ const TIPS = {
   tp:"How many GPUs one copy of the model is split across (tensor parallelism). Every layer's weights are divided and the GPUs all-reduce after each layer, so splitting needs NVLink to be fast. A copy is split 1, 2, 4 or 8 ways because serving engines need the split to divide the model's attention heads evenly; that is a software rule and applies to every board. Auto picks the smallest layout; a fixed number applies to every board.",
   copies:"A copy (replica) is a full, independent instance of the model on its own GPUs within the node, serving its share of the users. More copies serve more users without slowing each other down, and unlike splitting one copy across GPUs, they need no direct GPU-to-GPU link between them.",
   prefill:"How fast a new prompt is read, in tokens per second. Reading is limited by compute rather than memory speed, so faster chips and FP8 or FP4 help most. Optimize for, in Advanced settings, sets the piece size.",
+  pcache:"Chat and agent prompts mostly repeat: the same system prompt for everyone, and each user's earlier turns. vLLM and SGLang keep that part cached by default, so only the new text is read before the first reply, and the shared system prompt is stored once per GPU rather than once per user. Each workload preset sets how much of its prompt is new and how much is shared; the workload hint says. Turn it off to size for prompts that never repeat.",
   ovpct:"Headroom for allocator fragmentation and framework buffers, as a percentage of weights + cache + activations. 5–10% is typical; raise it if you have hit OOM under load.",
   goal:"How fast each user should see answers: at least this many tokens per second, and a first reply within the time limit. The suggestion is the setup that reaches it with the least GPU memory in total. Any speed just finds the smallest setup that fits.",
   capacity:"The most users this node holds at the current prompt and reply lengths, across all its copies. Either memory runs out, or each user's speed drops below your goal, whichever comes first. The gap to your user count is your room to grow.",
@@ -2104,10 +2161,10 @@ const TIPS = {
   pcieSlow:"Not recommended. This board has no NVLink, and here one copy of the model has to be split across several of them, so the GPUs exchange data over PCIe after every layer. That is slower than the same number of NVLink cards, and the speed shown already reflects it. It works and can be picked, but it is never the suggestion; prefer a board that holds a copy on one GPU, or an NVLink board.",
   pcieAmd:"PCIe-only — no Infinity Fabric, AMD's direct GPU-to-GPU link. Fine for a single GPU, but tensor parallelism must all-reduce over a far slower link after every layer, so throughput suffers badly.",
   pcieSlowAmd:"Not recommended. This board has no Infinity Fabric, AMD's direct GPU-to-GPU link, and here one copy of the model has to be split across several of them, so the GPUs exchange data over PCIe after every layer. That is slower than the same number of directly linked cards, and the speed shown already reflects it. It works and can be picked, but it is never the suggestion; prefer a board that holds a copy on one GPU, or one with a direct GPU link.",
-  tput:"A first-order estimate from the board's memory bandwidth, compute and interconnect, not a benchmark. Real engines usually land within about ±30%, depending on kernels, CUDA graphs and traffic shape. Use it to compare setups, not to promise an SLA.",
+  tput:"A first-order estimate from the board's memory bandwidth, compute and interconnect, not a benchmark. Real results vary with the serving engine, its settings and the traffic. Use it to compare setups, not to promise an SLA.",
   tpsTotal:"Output tokens per second summed across every concurrent user — what the deployment produces. Adding users usually raises it, because the weights are read once per step no matter how many requests share that step.",
   tpsUser:"How fast one person sees text stream in. More users slow each one down, since every step must also read their KV caches. Around 20 tok/s or more feels smooth in chat; under 10 feels sluggish.",
-  ttft:"Time to first token: how long someone waits before the answer starts appearing. Uses the full prompt length, read in pieces while the other users keep being served. Faster chips, FP8 and Fast first reply all shorten it. For a thinking model this is when the thinking starts; the answer follows once it's done.",
+  ttft:"Time to first token: how long someone waits before the answer starts appearing. Uses the new part of the prompt (all of it with prompt caching off), read in pieces while the other users keep being served. Faster chips, FP8 and Fast first reply all shorten it. For a thinking model this is when the thinking starts; the answer follows once it's done.",
   step:"Everything needed to produce one token for every active user. The largest segment is the bottleneck. A big blue interconnect segment means tensor parallelism is costing you real speed.",
   bneck:"What limits token generation right now. Memory-bound is normal for decode: the GPU waits on reading weights and cache. Compute-bound appears at very large batches. Interconnect-bound means the GPUs spend more time talking than working.",
 };
@@ -2154,6 +2211,11 @@ function labelTips(){
 /* init */
 usersSlider.max = USER_STOPS.length-1;
 usersSlider.value = stopIndex(USER_STOPS, S.users);
+$('asof').textContent = `Model and board data as of ${DATA_AS_OF}. Estimates for planning, not a guarantee.`;
+$('pcache').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if(!b) return;
+  pressSeg('pcache', 'cache', b.dataset.v); setLengths(); render();
+});
 updateCfgNote(); syncWq(); resetThink(); updateGoalHint(); applyWorkload(S.workload); syncUsers(); syncOv();
 applyHash();   // a shared link's settings, if the address has any
 render();
