@@ -12,7 +12,7 @@ It covers 40+ popular open models (Qwen, Gemma, Llama, DeepSeek, gpt-oss, GLM, K
 
 ## Single node
 
-Every result is one server of up to 8 GPUs. If one node of a board can't serve every user, its card says how many it does serve.
+Every result is one server of up to 8 GPUs. If one node of a board can't serve every user, its card says how many it does serve. For production, plan at least one more node (or replica) than this, so the service keeps running if one fails or is being updated.
 
 GPU counts round up to what can be bought. H100 and H200 servers take 1, 2, 4 or 8 GPUs, with NVLink across 2 or 4 cards or all 8 in an 8-GPU system. The B200 and B300 are sold only as 8-GPU systems. RTX PRO 4500 servers hold up to 5 cards (the limit on HPE servers).
 
