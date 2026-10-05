@@ -51,7 +51,7 @@
     font-family:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
     font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased;
   }
-  .mono{font-family:"IBM Plex Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums}
+  .mono{font-variant-numeric:tabular-nums; font-weight:600}
   .wrap{max-width:1120px; margin:0 auto; padding:28px 22px 64px}
 
   /* ---- header ---- */
@@ -88,10 +88,10 @@
 
   .sliderhead{display:flex; justify-content:space-between; align-items:center; gap:8px; min-height:30px; margin-bottom:7px}
   .sliderhead label.fld{margin:0; white-space:nowrap}
-  .sliderhead .val{font-family:"IBM Plex Mono",monospace; font-size:14px; font-weight:600; color:var(--ink)}
+  .sliderhead .val{font-family:"IBM Plex Sans",system-ui,sans-serif; font-variant-numeric:tabular-nums; font-size:14px; font-weight:600; color:var(--ink)}
   .sliderhead .val small{color:var(--muted); font-weight:400; font-size:11px}
   .sliderhead .valinput{width:80px; padding:3px 6px; border-radius:6px; text-align:right;
-    font-family:"IBM Plex Mono",monospace; font-size:14px; font-weight:600; font-variant-numeric:tabular-nums}
+    font-family:"IBM Plex Sans",system-ui,sans-serif; font-variant-numeric:tabular-nums; font-size:14px; font-weight:600}
   input[type=range]{-webkit-appearance:none; appearance:none; width:100%; height:5px; border-radius:5px; background:var(--line-2); cursor:pointer; margin:4px 0}
   input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:17px; height:17px; border-radius:50%; background:var(--accent); border:3px solid var(--panel); box-shadow:0 1px 4px rgba(0,0,0,.25); cursor:pointer}
   input[type=range]::-moz-range-thumb{width:14px; height:14px; border-radius:50%; background:var(--accent); border:3px solid var(--panel); cursor:pointer}
@@ -110,13 +110,13 @@
   .opt-name{display:inline-flex; align-items:center; gap:8px; font-size:13px; font-weight:600}
   .opt-name::before{content:""; width:11px; height:11px; border-radius:50%; border:1.5px solid var(--line-2); box-sizing:border-box; flex:none}
   .opts button[aria-pressed=true] .opt-name::before{border:3.5px solid var(--accent)}
-  .opt-num{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-2); white-space:nowrap; font-variant-numeric:tabular-nums}
+  .opt-num{font-size:11.5px; color:var(--ink-2); white-space:nowrap; font-variant-numeric:tabular-nums}
   .opt-desc{font-size:11.5px; color:var(--muted); padding-left:19px}
   .opt-colhead{font-family:"IBM Plex Mono",monospace; font-size:10px; color:var(--muted)}
-  .opt-foot{font-family:"IBM Plex Mono",monospace; font-size:10.5px; color:var(--muted); margin-top:8px; line-height:1.6}
-  .opt-foot code{font-family:inherit; color:var(--ink-2)}
+  .opt-foot{font-size:11.5px; color:var(--muted); margin-top:8px; line-height:1.55}
+  .opt-foot code{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-2)}
 
-  .cfgnote{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--muted); line-height:1.7; margin-top:12px; padding-top:12px; border-top:1px dashed var(--line-2)}
+  .cfgnote{font-size:12.5px; color:var(--muted); line-height:1.65; margin-top:12px; padding-top:12px; border-top:1px dashed var(--line-2)}
   .cfgnote b{color:var(--ink-2); font-weight:600}
   .customfields{display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-top:12px}
   .customfields label.fld{margin-bottom:3px; font-size:11px}
@@ -145,8 +145,8 @@
     .ask-grid > .field{grid-column:span 1}
     .ask-grid > .field:first-child, .ask-grid > .field:last-child{grid-column:span 2}
   }
-  @media (max-width:480px){ .ask-grid{grid-template-columns:1fr} .ask-grid > .field:first-child{grid-column:span 1} }
-  .hint{font-family:"IBM Plex Mono",monospace; font-size:10.5px; color:var(--muted); line-height:1.55; margin-top:7px}
+  @media (max-width:480px){ .ask-grid{grid-template-columns:1fr} .ask-grid > .field:first-child, .ask-grid > .field:last-child{grid-column:span 1} }
+  .hint{font-size:12px; color:var(--muted); line-height:1.5; margin-top:7px}
   .hint b{color:var(--ink-2); font-weight:600}
   .hint .warnx{color:var(--warn); font-weight:500}
   .hint .wl-note{margin-top:5px}
@@ -179,7 +179,7 @@
   .traffic-grid label.fld{margin-bottom:3px; font-size:11px}
   @media (max-width:760px){ .traffic-grid{grid-template-columns:repeat(2,minmax(0,1fr))} }
   .traffic-out{display:flex; align-items:center; flex-wrap:wrap; gap:6px 12px; margin-top:12px; font-size:13px; color:var(--ink-2)}
-  .traffic-out .tf-num{font-family:"IBM Plex Mono",monospace; font-size:19px; font-weight:600; color:var(--ink)}
+  .traffic-out .tf-num{font-family:"IBM Plex Sans",system-ui,sans-serif; font-variant-numeric:tabular-nums; font-size:19px; font-weight:600; color:var(--ink)}
   .traffic-out .hint{flex-basis:100%; margin-top:2px}
   .btn-sm{border:1px solid var(--accent); background:var(--accent); color:#06110f; border-radius:8px; padding:5px 12px; font:inherit; font-size:12.5px; font-weight:600; cursor:pointer}
   .btn-sm:disabled{background:none; color:var(--muted); border-color:var(--line-2); cursor:default; font-weight:500}
@@ -188,9 +188,9 @@
   .statstrip{display:flex; gap:12px; margin-top:16px; flex-wrap:wrap}
   .statstrip .cell{flex:1 1 140px; min-width:112px; border:1px solid var(--line); background:var(--panel-2); border-radius:9px; padding:10px 13px}
   .statstrip .cell .l{font-family:"IBM Plex Mono",monospace; font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted)}
-  .statstrip .cell .n{font-family:"IBM Plex Mono",monospace; font-size:20px; font-weight:600; margin-top:3px; line-height:1.1}
+  .statstrip .cell .n{font-family:"IBM Plex Sans",system-ui,sans-serif; font-variant-numeric:tabular-nums; font-size:21px; font-weight:600; margin-top:3px; line-height:1.1}
   .statstrip .cell .n small{font-size:11px; color:var(--muted); font-weight:500}
-  .statstrip .cell .sub{font-family:"IBM Plex Mono",monospace; font-size:10px; color:var(--muted); margin-top:5px}
+  .statstrip .cell .sub{font-size:11.5px; color:var(--muted); margin-top:5px}
   .statstrip .cell.warn{border-color:var(--warn)} .statstrip .cell.warn .sub{color:var(--warn)}
   .statstrip .cell.bad{border-color:var(--bad)}  .statstrip .cell.bad .sub{color:var(--bad)}
 
@@ -209,21 +209,21 @@
   .gpuline.picked > span{color:var(--ink); font-weight:600}
   .bar .seg-w{background:var(--w)} .bar .seg-kv{background:var(--kv)} .bar .seg-act{background:var(--act)} .bar .seg-tp{background:var(--tp)} .bar .seg-ov{background:var(--ov)}
   .bar div{transition:width .35s cubic-bezier(.2,.7,.2,1); min-width:0}
-  .barscale{position:relative; height:34px; margin-top:5px}
+  .barscale{position:relative; height:22px; margin-top:5px}
   .gpuline{position:absolute; top:0; bottom:0; width:0; border-left:2px dotted var(--ink-2); opacity:.65}
-  .gpuline > span{position:absolute; top:2px; left:4px; font-family:"IBM Plex Mono",monospace; font-size:9.5px; color:var(--ink-2); white-space:nowrap; line-height:1.5}
+  .gpuline > span{position:absolute; top:2px; left:5px; font-size:11px; color:var(--ink-2); white-space:nowrap; line-height:1.4}
   .gpuline > span em{font-style:normal; font-weight:400; color:var(--muted)}
   .gpuline > span .i{vertical-align:middle; margin-left:3px}
 
-  .legend{display:flex; flex-wrap:wrap; gap:16px 22px; margin-top:20px}
-  .legend .item{display:flex; gap:9px; align-items:flex-start}
-  .legend .dot{width:11px; height:11px; border-radius:3px; margin-top:4px; flex:none}
-  .legend .k{font-size:12px; color:var(--ink-2); font-weight:500; letter-spacing:.01em}
-  .legend .v{font-family:"IBM Plex Mono",monospace; font-size:16px; font-weight:600; line-height:1.15}
-  .legend .p{font-family:"IBM Plex Mono",monospace; font-size:10.5px; color:var(--muted)}
+  .legend{display:flex; flex-wrap:wrap; gap:12px 26px; margin-top:16px}
+  .legend .item{display:flex; gap:8px; align-items:baseline}
+  .legend .dot{width:10px; height:10px; border-radius:3px; flex:none; align-self:center}
+  .legend .k{font-size:12.5px; color:var(--ink-2); font-weight:500; margin-right:6px}
+  .legend .v{font-family:"IBM Plex Sans",system-ui,sans-serif; font-variant-numeric:tabular-nums; font-size:15px; font-weight:600; line-height:1.15}
+  .legend .p{font-size:11.5px; color:var(--muted)}
   .legend .p + .p{max-width:215px; line-height:1.4}   /* a longer note under the share wraps instead of spreading the row */
 
-  .fit h2, .tput h2{font-size:14px; margin:0; padding:16px 18px 4px; font-weight:600; letter-spacing:-.01em}
+  .fit h2{font-size:14px; margin:0; padding:16px 18px 4px; font-weight:600; letter-spacing:-.01em}
 
   /* breakdown table */
   table{width:100%; border-collapse:collapse; font-size:13px}
@@ -239,53 +239,72 @@
   tfoot td{padding:13px 18px; font-weight:700; border-top:2px solid var(--line-2)}
   tfoot td.gb{font-family:"IBM Plex Mono",monospace}
 
-  /* gpu fit */
-  .fit .cap{padding:0 18px 4px; color:var(--muted); font-size:12px}
-  .fit .cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(185px,1fr)); gap:11px; padding:8px 18px 18px}
-  .gpu{border:1px solid var(--line); border-radius:10px; padding:12px 13px; background:var(--panel-2); position:relative; overflow:hidden}
-  .gpu .stripe{position:absolute; left:0; top:0; bottom:0; width:4px}
-  .gpu.s-good .stripe{background:var(--good)} .gpu.s-warn .stripe{background:var(--warn)} .gpu.s-bad .stripe{background:var(--bad)}
-  .gpu .gname{font-weight:600; font-size:13px; padding-left:6px}
-  .gpu .gcap{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--muted); padding-left:6px; margin-bottom:7px}
-  .lb{display:inline-flex; align-items:center; gap:5px; margin:0 0 9px 6px; font-family:"IBM Plex Mono",monospace; font-size:9.5px; font-weight:600; letter-spacing:.03em; padding:2px 7px; border-radius:20px; border:1px solid transparent}
-  .lb::before{content:""; width:6px; height:6px; border-radius:50%}
-  .lb.lb-nv{color:var(--good); background:var(--good-bg)} .lb.lb-nv::before{background:var(--good)}
-  .lb.lb-pcie{color:var(--muted); background:var(--panel); border-color:var(--line-2)} .lb.lb-pcie::before{background:var(--muted)}
-  .lb.lb-warn{color:var(--bad); background:var(--bad-bg)} .lb.lb-warn::before{background:var(--bad)}
-  .gpu .count{font-family:"IBM Plex Mono",monospace; font-size:26px; font-weight:600; padding-left:6px; line-height:1}
-  .gpu .count small{font-size:12px; color:var(--muted); font-weight:500}
-  .pill{display:inline-flex; align-items:center; gap:5px; font-family:"IBM Plex Mono",monospace; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; padding:3px 8px; border-radius:20px; margin-left:6px; margin-top:9px}
+  /* gpu fit: one row per board */
+  .fit .cap{padding:0 18px 10px; color:var(--muted); font-size:12.5px}
+  .fit .cap b{color:var(--ink-2); font-weight:600}
+  .boards{overflow-x:auto; padding:0 0 6px}
+  .boards table{min-width:620px}
+  .boards thead th{padding:6px 12px; white-space:nowrap}
+  .boards thead th:first-child, .boards tbody td:first-child{padding-left:18px}
+  .boards thead th:last-child, .boards tbody td:last-child{padding-right:18px}
+  .boards tbody td{padding:10px 12px; border-bottom:none; font-size:13px; font-variant-numeric:tabular-nums}
+  .boards tbody tr.brow{border-top:1px solid var(--line); cursor:pointer; transition:background .12s}
+  .boards tbody tr.brow:hover{background:var(--panel-2)}
+  .boards tbody tr.brow:focus-visible{outline:2px solid var(--accent); outline-offset:-2px}
+  .boards tbody tr.brow.sel{background:var(--panel-2)}
+  .boards tbody tr.brow.sel td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+  .boards tbody tr.brow.off{cursor:default}
+  .boards tbody tr.brow.off:hover{background:none}
+  .boards tbody tr.brow.off td > *:not(.pill){opacity:.45}
+  .boards tbody tr.brow.off td .pill{opacity:1}
+  .boards td.board{min-width:190px}
+  .boards .gname{font-weight:600; white-space:nowrap}
+  .boards .gcap{font-size:11.5px; color:var(--muted); margin-top:1px; white-space:nowrap}
+  .boards .gcap .nr{color:var(--warn)}
+  .boards td.num{text-align:right; white-space:nowrap}
+  .boards td.num b{font-weight:600}
+  .boards td.num small{color:var(--muted); font-size:11px}
+  .boards td.link{color:var(--ink-2); white-space:nowrap}
+  .boards td.layout{color:var(--ink-2); white-space:nowrap}
+  .boards td.ctl{width:34px; text-align:right}
+  .whybtn{width:26px; height:26px; border:1px solid var(--line-2); background:var(--panel); color:var(--ink-2); border-radius:7px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; padding:0}
+  .whybtn::before{content:""; width:6px; height:6px; border-right:1.5px solid currentColor; border-bottom:1.5px solid currentColor; transform:rotate(45deg) translate(-1px,-1px); transition:transform .15s}
+  .whybtn[aria-expanded=true]::before{transform:rotate(-135deg) translate(-1px,-1px)}
+  .whybtn:hover{border-color:var(--accent); color:var(--accent)}
+  .whybtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  .boards tr.bwhy td{padding:0 18px 12px 30px; font-size:12.5px; color:var(--ink-2); line-height:1.5}
+  .boards tr.bwhy.sel td{background:var(--panel-2); box-shadow:inset 3px 0 0 var(--accent)}
+  @media (max-width:640px){ .boards tr.bwhy td{position:sticky; left:0; max-width:calc(100vw - 44px); padding-left:18px} }
+  .pill{display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600; letter-spacing:.01em; padding:2px 8px; border-radius:20px; white-space:nowrap}
   .pill.good{background:var(--good-bg); color:var(--good)}
   .pill.warn{background:var(--warn-bg); color:var(--warn)}
   .pill.bad{background:var(--bad-bg); color:var(--bad)}
-  .pill.sugg{background:var(--accent); color:#06110f}
-  .util{height:5px; border-radius:4px; background:var(--line-2); margin:10px 0 0 6px; overflow:hidden}
-  .util > div{height:100%; border-radius:4px}
-  .gpu{cursor:pointer; transition:border-color .15s, box-shadow .15s}
-  .gpu:hover{border-color:var(--line-2)}
-  .gpu.sel{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent)}
-  /* won't fit: dimmed and not pickable, but the label that says why stays readable */
-  .gpu.off{cursor:default}
-  .gpu.off:hover{border-color:var(--line)}
-  .gpu.off > *{opacity:.4}
-  .gpu.off > .lb-warn, .gpu.off > .pill.bad{opacity:1}
-  .gpu:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
-  .gpu .tps{font-family:"IBM Plex Mono",monospace; font-size:10.5px; color:var(--ink-2); padding-left:6px; margin-top:9px}
-  .gpu .tps b{color:var(--ink); font-weight:600}
+  .pill.sugg{background:var(--accent); color:#06110f; margin-left:8px; vertical-align:1px}
+  .boards .pill.warn, .boards .pill.bad{margin-left:0}
+  @media (prefers-reduced-motion:reduce){ .whybtn::before{transition:none} }
+  @media (max-width:640px){
+    .boards .col-opt, .boards .col-mem{display:none}
+    .boards table{min-width:0}
+    .boards td.board{min-width:0; max-width:150px}
+    .boards .gcap{white-space:normal}
+    /* the board name stays put while the rest scrolls sideways */
+    .boards thead th:first-child, .boards tbody td:first-child{position:sticky; left:0; background:var(--panel); z-index:1}
+    .boards tbody tr.brow.sel td:first-child, .boards tbody tr.brow:hover td:first-child{background:var(--panel-2)}
+  }
 
   /* throughput */
-  .tput{padding:6px 4px 18px}
-  .tput .cap{padding:0 18px; color:var(--muted); font-size:12px}
+  .tput{padding:0 0 12px}
+  .tput .cap{padding:0 18px; color:var(--muted); font-size:12.5px}
   .tput .cap b{color:var(--ink-2); font-weight:600}
   .tput .statstrip{padding:0 18px}
-  .pill.neutral{background:var(--panel-2); color:var(--ink-2); border:1px solid var(--line-2)}
+  .pill.neutral{background:var(--panel-2); color:var(--ink-2); border:1px solid var(--line-2); font-size:10.5px}
   .tput .cap .pill{margin:0 0 0 8px; vertical-align:middle; cursor:help}
   .stepwrap{padding:18px 18px 0}
-  .stephead{display:flex; justify-content:space-between; align-items:baseline; gap:10px; font-size:12px; color:var(--ink-2); margin-bottom:7px}
+  .stephead{display:flex; justify-content:space-between; align-items:baseline; gap:10px; font-size:12.5px; color:var(--ink-2); margin-bottom:7px}
   .stephead .mono{font-weight:600; color:var(--ink)}
   .stepbar{display:flex; height:14px; border-radius:6px; overflow:hidden; background:var(--panel-2); border:1px solid var(--line)}
   .stepbar div{min-width:0; transition:width .35s cubic-bezier(.2,.7,.2,1)}
-  .steplegend{display:flex; flex-wrap:wrap; gap:6px 18px; margin-top:8px; font-family:"IBM Plex Mono",monospace; font-size:10.5px; color:var(--ink-2)}
+  .steplegend{display:flex; flex-wrap:wrap; gap:6px 18px; margin-top:8px; font-size:12px; color:var(--ink-2)}
   .steplegend span{display:inline-flex; align-items:center; gap:6px}
   .steplegend i{width:9px; height:9px; border-radius:2px; display:inline-block}
   .tput .empty{margin:14px 18px 0; padding:12px 14px; border:1px dashed var(--line-2); border-radius:9px; font-size:12.5px; color:var(--ink-2)}
@@ -300,7 +319,7 @@
   .meth b{color:var(--ink); font-weight:600}
   .disc{font-size:11.5px; color:var(--muted); padding:0 18px 16px; border-top:1px dashed var(--line-2); margin-top:4px; padding-top:13px}
 
-  footer.foot{margin-top:26px; text-align:center; color:var(--muted); font-size:11.5px; font-family:"IBM Plex Mono",monospace}
+  footer.foot{margin-top:26px; text-align:center; color:var(--muted); font-size:12px}
 
   /* ---- info icons + tooltip ---- */
   .i{display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px;
@@ -309,6 +328,9 @@
      line-height:1; letter-spacing:0; text-transform:none; cursor:help; vertical-align:middle;
      margin-left:5px; transition:border-color .15s, color .15s}
   .i:hover,.i:focus-visible{border-color:var(--accent); color:var(--accent)}
+  /* a label that explains itself on hover, without an icon */
+  .tipl{cursor:help}
+  .v-why .tipl, .hint .tipl{text-decoration:underline dotted; text-underline-offset:3px; text-decoration-color:var(--muted)}
   .i:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
   .lb[data-tip]{cursor:help}
   #tip{position:fixed; z-index:9999; max-width:290px; background:var(--ink); color:var(--bg);
@@ -327,13 +349,11 @@
   details.more > summary:hover .sum-title{color:var(--accent-ink)}
   details.more > summary:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
   .sum-title{font-size:14px; font-weight:600}
-  .sum-state{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--muted)}
+  .sum-state{font-size:12px; color:var(--muted)}
   .sum-state b{color:var(--accent-ink); font-weight:600}
   .adv-grid{display:grid; grid-template-columns:1fr 1fr; gap:24px 34px; padding:18px 20px 22px; border-top:1px solid var(--line)}
   @media (max-width:720px){ .adv-grid{grid-template-columns:1fr} }
   .adv-grid .eyebrow{margin-bottom:10px}
-  .gpu .mem{margin-top:3px}
-  .gpu .why{font-family:"IBM Plex Mono",monospace; font-size:10px; color:var(--ink-2); padding-left:6px; margin-top:8px}
   .math-body{border-top:1px solid var(--line); padding-bottom:6px}
   .math-body h3{font-size:13px; font-weight:600; margin:0; padding:18px 18px 8px}
   .math-body .cfgnote{margin:0 18px; padding-top:0; border-top:none}
@@ -347,7 +367,7 @@
       <div class="glyph" aria-hidden="true"></div>
       <div>
         <h1>LLM Inference Estimator</h1>
-        <div class="sub">Single-node sizing estimate: how many GPUs one server needs for your model and users. Does not cover multi-node or NVL rack-scale systems.</div>
+        <div class="sub">How many GPUs one server needs for your model and users. Single node only.</div>
       </div>
     </div>
     <div class="top-actions">
@@ -366,13 +386,13 @@
       <h2 class="eyebrow" id="askTitle">What do you want to run?</h2>
       <div class="ask-grid">
         <div class="field">
-          <div class="sliderhead"><label class="fld" for="model">Model <span class="i" data-tip="model" tabindex="0">i</span></label></div>
+          <div class="sliderhead"><label class="fld" for="model">Model</label></div>
           <select id="model"></select>
           <div class="hint" id="modelHint"></div>
         </div>
         <div class="field">
           <div class="sliderhead">
-            <label class="fld" for="usersNum">Concurrent users <span class="i" data-tip="users" tabindex="0">i</span></label>
+            <label class="fld" for="usersNum">Concurrent users</label>
             <input type="number" id="usersNum" class="valinput" min="1" max="100000" step="1" value="16" inputmode="numeric">
           </div>
           <input type="range" id="users" min="0" max="39" step="1" value="15" aria-label="Concurrent users">
@@ -380,7 +400,7 @@
           <button type="button" class="linkbtn" id="trafficBtn" aria-expanded="false" aria-controls="trafficWrap">Estimate from daily traffic</button>
         </div>
         <div class="field">
-          <div class="sliderhead"><label class="fld" for="workload">Workload <span class="i" data-tip="workload" tabindex="0">i</span></label></div>
+          <div class="sliderhead"><label class="fld" for="workload">Workload</label></div>
           <select id="workload">
             <option value="chat" selected>Chat</option>
             <option value="rag">RAG / document Q&amp;A</option>
@@ -406,7 +426,7 @@
           <div class="hint" id="wqnote"></div>
         </div>
         <div class="field">
-          <div class="sliderhead"><label class="fld" for="goal">Speed goal <span class="i" data-tip="goal" tabindex="0">i</span></label></div>
+          <div class="sliderhead"><label class="fld" for="goal">Speed goal</label></div>
           <select id="goal">
             <option value="any">Any speed — smallest that fits</option>
             <option value="read">Readable</option>
@@ -417,17 +437,17 @@
         </div>
         <div class="field">
           <div class="sliderhead">
-            <label class="fld" for="ctx">Prompt length <span class="i" data-tip="ctx" tabindex="0">i</span></label>
+            <label class="fld" for="ctx">Prompt length</label>
             <div class="val"><span id="ctxVal">2,048</span> <small>tok</small></div>
           </div>
           <input type="range" id="ctx" min="0" max="18" step="1" value="3">
           <div class="ticks"><span>512</span><span id="ctxMaxTick">128K</span></div>
           <div class="sliderhead reply-row">
-            <label class="fld" for="replyNum">Reply length <span class="i" data-tip="reply" tabindex="0">i</span></label>
+            <label class="fld" for="replyNum">Reply length</label>
             <div class="val"><input type="number" id="replyNum" class="valinput" min="1" max="1048576" step="1" value="512" inputmode="numeric"> <small>tok</small></div>
           </div>
           <div class="sliderhead think-row" id="thinkRow" hidden>
-            <label class="fld" id="thinkLbl">Thinking <span class="i" data-tip="think" tabindex="0">i</span></label>
+            <label class="fld" id="thinkLbl">Thinking</label>
             <div class="val">
               <input type="checkbox" id="thinkOn" class="switch" role="switch" aria-labelledby="thinkLbl">
               <input type="number" id="thinkNum" class="valinput" min="0" max="131072" step="1" value="4096" inputmode="numeric" aria-label="Thinking tokens per reply"> <small>tok</small>
@@ -500,15 +520,9 @@
     </section>
 
     <section class="panel fit">
-      <h2>Every board <span class="i" data-tip="fit" tabindex="0">i</span></h2>
+      <h2>Every board</h2>
       <div class="cap" id="fitcap"></div>
-      <div class="cards" id="gpucards"></div>
-    </section>
-
-    <section class="panel tput">
-      <h2>Speed on this setup <span class="i" data-tip="tput" tabindex="0">i</span></h2>
-      <div class="cap" id="tputcap"></div>
-      <div id="tputbody"></div>
+      <div class="boards" id="gpucards"></div>
     </section>
 
     <!-- ============ TUCKED AWAY ============ -->
@@ -568,8 +582,13 @@
     </details>
 
     <details class="panel more" id="math">
-      <summary><span class="sum-title">Show the math</span><span class="sum-state">Model architecture · memory breakdown · how it's calculated</span></summary>
+      <summary><span class="sum-title">Show the math</span><span class="sum-state">Speed on this setup · model architecture · memory breakdown · how it's calculated</span></summary>
       <div class="math-body">
+        <div class="tput">
+          <h3>Speed on this setup <span class="i" data-tip="tput" tabindex="0">i</span></h3>
+          <div class="cap" id="tputcap"></div>
+          <div id="tputbody"></div>
+        </div>
         <h3>Model architecture</h3>
         <div class="cfgnote" id="cfgnote"></div>
         <h3>Memory breakdown <span class="h3sub" id="bkScope"></span></h3>
@@ -594,7 +613,7 @@
           <p><b>Thinking</b> — a model that reasons step by step writes thinking tokens before its answer. They're generated like any other token, so a user's cache peaks at prompt + thinking + reply, speed is judged halfway through thinking and reply together, and cost per output token counts them. First reply is when the first token appears, which for a thinking model is the start of its thinking; the stat also says how long the thinking runs before the answer begins. Earlier turns' thinking is normally dropped by the model's chat template, so it doesn't build up in the prompt. The switch starts at each model's own default, taken from its model card and chat template.</p>
           <p><b>Concurrent users from traffic</b> — requests in progress at once = requests per second × seconds each one takes. A request takes the wait before its first token plus its thinking and reply, streamed at your speed goal's rate; the goal is a minimum speed, so this errs on the high side. The busiest-hour multiple covers traffic that isn't spread evenly through the day; 2× suits a typical workday.</p>
           <p><b>Sharing</b> — on a hosted copy of this page, the address always holds the current settings, so Copy link sends the exact scenario. Download summary saves a one-page report of the recommendation, the inputs and every board, which prints to PDF.</p>
-          <p><b>Single node</b> — this estimates one server of up to 8 GPUs. Every result is a single node; multi-node deployments and NVL rack-scale systems are not covered. If one node of a board can't serve every user, its card says how many it does serve. For production, plan at least one more node (or replica) than this, so the service keeps running if one fails or is being updated.</p>
+          <p><b>Single node</b> — this estimates one server of up to 8 GPUs. Every result is a single node; multi-node deployments and NVL rack-scale systems are not covered. If one node of a board can't serve every user, its row says how many it does serve. For production, plan at least one more node (or replica) than this, so the service keeps running if one fails or is being updated.</p>
           <p><b>Suggestion and capacity</b> — every board is tried at 1, 2, 4 and 8 GPUs per copy (splitting a copy only across NVLink boards), with as many copies as the node's 8 GPUs allow. The suggestion is the node that serves every user within the speed goal with the least GPU memory in total (on any one board, the fewest GPUs). If no node serves everyone within the goal, it is the full node that serves the most users. GPU counts round up to what can be bought: H100 and H200 servers take 1, 2, 4 or 8 GPUs, with NVLink across 2 or 4 cards or all 8 in an 8-GPU system, so 3 rounds up to 4 and 5 to 7 round up to 8; the B200 and B300 ship only as 8-GPU systems. RTX PRO 4500 servers hold any number of cards up to 5 (HPE's limit); because of the split rule above, one copy of a model uses at most 4 of them, and the fifth can run another copy. Spare GPUs run extra copies of the model. <b>Handles up to</b> is the most users the node holds at the current prompt and reply lengths while fitting in memory and, with a goal, still reaching it.</p>
           <p><b>Copies (replicas)</b> — for more users, the page runs more copies of the model on the node's GPUs instead of splitting one copy wider. Each copy has its own GPUs and an even share of the users, so memory, the bar and the breakdown describe one copy, while GPU count, output and capacity add up across all of them. Copies don't exchange data while generating, so they need no direct GPU-to-GPU link between them; that's why PCIe boards run several copies well even though they split a single copy poorly, and why, when two layouts use the same number of GPUs, a PCIe board takes more copies over splitting one. When a board needs more GPUs than memory alone calls for, the extra ones are there to reach the speed goal, and the page says so. This assumes requests are spread evenly across the copies.</p>
           <p><b>Units</b> — every amount is computed in bytes and shown in the unit picked at the top: <b>GB</b> is 10⁹ bytes (spec sheets, download pages), <b>GiB</b> is 2³⁰ bytes (nvidia-smi, PyTorch and vLLM's logs). Switching changes the labels, never the answer. Board capacities are the size on the box, counted as GB, so an H100 is 80 GB or 74.5 GiB. Real boards expose that much or slightly more, so a fit here errs on the safe side.</p>
@@ -822,6 +841,7 @@ const goalGap = t => Math.max(GOALS[S.goal].tps / t.perUser, t.ttft / GOALS[S.go
 const WORKLOADS = {
   chat:    {name:"Chat",                  prompt:2048,  reply:512,  chunk:512,  shared:512,  fresh:512,  desc:"Multi-turn chat with a system prompt: 2K-token prompts, 512-token replies."},
   rag:     {name:"RAG",                   prompt:8192,  reply:512,  chunk:2048, shared:512,  fresh:null, desc:"Retrieved documents plus a question: 8K in, 512 out.",
+            brief:"Embedding model and reranker not included; see Show the math.",
             short:"Not sized: the RAG embedding model and reranker. Small ones share a GPU or run on CPU at low traffic; a 4–8B reranker or heavy traffic needs its own GPU.",
             note:"RAG also needs an embedding model and usually a reranker, which this doesn't size. Small ones (under ~1B parameters) add a few GB and can share a GPU or run on CPU at low traffic. A 4–8B reranker, or heavy traffic, needs its own GPU."},
   agent:   {name:"Coding agent",          prompt:32768, reply:2048, chunk:8192, shared:4096, fresh:4096, desc:"Files, diffs and tool output sent on every step: 32K in, 2K out."},
@@ -1274,7 +1294,7 @@ function kvFormula(r){
 const feelFor = tps => tps>=20 ? "smooth for chat" : tps>=10 ? "readable" : "slow for chat";
 const CHUNK_NAME = {512:"Smooth streaming", 2048:"Balanced", 8192:"Fast first reply"};
 const statCell = (tip, label, n, unit, sub, state) =>
-  `<div class="cell${state ? " "+state : ""}"><div class="l">${label} <span class="i" data-tip="${tip}" tabindex="0">i</span></div>`
+  `<div class="cell${state ? " "+state : ""}"><div class="l tipl" data-tip="${tip}">${label}</div>`
   + `<div class="n">${n}${unit ? ` <small>${unit}</small>` : ""}</div><div class="sub">${sub}</div></div>`;
 
 function render(){
@@ -1319,9 +1339,8 @@ function render(){
   shown.forEach(c=>{
     const d=document.createElement('div'); d.className="item";
     d.innerHTML=`<span class="dot" style="background:${c.c}"></span>
-      <div><div class="k">${c.k} <span class="i" data-tip="${c.tip}" tabindex="0">i</span></div>
-      <div class="v">${fmtMemN(c.v/GB)} <span style="font-size:11px;color:var(--muted);font-weight:500">${S.unit}</span></div>
-      <div class="p">${(c.v/tot*100).toFixed(1)}%</div>${c.extra ? `<div class="p">${c.extra}</div>` : ""}</div>`;
+      <span class="k">${c.k}${c.tip==="weights" || c.tip==="act" ? "" : ` <span class="i" data-tip="${c.tip}" tabindex="0">i</span>`}</span>
+      <span class="v">${fmtMemN(c.v/GB)} <span style="font-size:11px;color:var(--muted);font-weight:500">${S.unit}</span></span>${c.extra ? `<div class="p">${c.extra}</div>` : ""}`;
     leg.appendChild(d);
   });
 
@@ -1364,7 +1383,7 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
     main = deployName(active);
     if(notRecommended(active)) why += `<span class="warnx">Not recommended:</span> this splits one copy of the model across cards with no ${fabric(g)}, so they coordinate over PCIe after every layer. Expect it to be slower than the same number of directly linked cards; the speed shown already reflects that. `;
     const layout = reps>1
-      ? `Runs as <b>${reps} copies</b> of the model <span class="i" data-tip="copies" tabindex="0">i</span> on ${tp} GPU${tp>1?"s":""} each, ~${commas(active.upr)} user${active.upr===1 ? "" : "s"} per copy. `
+      ? `Runs as <b>${reps} <span class="tipl" data-tip="copies">copies</span></b> of the model on ${tp} GPU${tp>1?"s":""} each, ~${commas(active.upr)} user${active.upr===1 ? "" : "s"} per copy. `
       : "";
     if(systemOf(g)) why += `The ${g.n} is sold only as ${systemOf(g)}-GPU systems, so this is a whole system. `;
     else if(g.pop && active.need < active.gpus) why += `${g.n} servers take ${popText(g)} GPUs, so the ${active.need} this needs rounds up to ${active.gpus}. `;
@@ -1394,6 +1413,9 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
         ? `${hasGoal ? "Serves everyone within your speed goal" : "Holds everyone"} with the least GPU memory in total (${boxTotal(active.memGB)}).`
         : `<span class="warnx">Nothing reaches your speed goal</span> (${goalText}), so this is the setup that comes closest. Try FP8 or shorter prompts.`);
     }
+    // how far it stretches, in a sentence rather than a fourth tile
+    if(!active.partial && cap && cap.users >= S.users && cap.users > 0)
+      why += ` <span class="tipl" data-tip="capacity">Room for up to <b>${commas(cap.users)}</b> users</span> at these lengths${reps>1 ? ` across ${reps} copies` : ""}, then ${cap.limit==="speed" ? "speed drops below the goal" : "memory runs out"}.`;
   } else {
     lbl = "No single node fits";
     main = S.tpo==="auto" ? "Too big for one 8-GPU node" : `No board holds a copy at TP ${tp}`;
@@ -1411,7 +1433,6 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
   const na = "needs a board that fits";
   const slowTps  = hasGoal && speed && speed.perUser < goal.tps;
   const slowTtft = hasGoal && speed && speed.ttft > goal.ttft;
-  const limit = cap && (cap.limit==="speed" ? "speed goal hits first" : "memory runs out first");
   $('vstats').innerHTML =
       (g ? statCell("perGPU", "Per GPU", fmtMemN(perGB), `of ${boxMem(g)}`,
              fits ? `${Math.round(perGB/g.cap*100)}% full${active.gpus>1 ? ` · ${fmtMem(totGB*reps)} in all` : ""}`
@@ -1423,12 +1444,7 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
     + (speed ? statCell("ttft", "First reply", ...fmtTime(speed.ttft),
                  (hasGoal ? `${slowTtft ? "over" : "within"} the ${goal.ttft} s goal` : `${commas(speed.prompt)} new prompt tokens`)
                  + (S.thinking ? ` · then ${fmtWait(S.thinking / speed.perUser)} of thinking` : ""), slowTtft ? "warn" : "")
-             : statCell("ttft", "First reply", "—", "", na))
-    + (cap ? statCell("capacity", "Handles up to", commas(cap.users), cap.users===1 ? "user" : "users",
-               cap.users===0 ? "none at these lengths"
-                 : reps>1 ? `${reps} copies, ${commas(cap.perCopy)} users each · ${limit}` : `at ${fmtCtx(r.ctx)} each · ${limit}`,
-               cap.users < S.users ? "warn" : "")
-           : statCell("capacity", "Handles up to", "—", "", na));
+             : statCell("ttft", "First reply", "—", "", na));
 }
 
 
@@ -1444,29 +1460,29 @@ function renderBar(comps, totGB, capGB, g, tp, reps){
   over.hidden = totGB <= usableGB;
   over.style.left = at+"%"; over.style.width = Math.max(0, (totGB-usableGB)/span*100)+"%";
   $('barscale').innerHTML = `<div class="gpuline picked${at>55 ? " flip" : ""}" style="left:${at}%"><span>`
-    + `${reps>1 ? "one copy: " : ""}${tp>1 ? tp+" × " : ""}${g.n} · ${fmtMem(usableGB)} usable`
-    + `<br><em>${Math.round(USABLE*100)}% of capacity, vLLM's default limit</em><span class="i" data-tip="usable" tabindex="0">i</span></span></div>`;
+    + `${reps>1 ? "one copy: " : ""}${tp>1 ? tp+" × " : ""}${g.n} · <em>${fmtMem(usableGB)} usable</em><span class="i" data-tip="usable" tabindex="0">i</span></span></div>`;
 }
 
 
-/* every board in its smallest layout that serves everyone within the goal */
+/* every board in its smallest layout that serves everyone within the goal: one row each, with the
+   reasoning behind a row's GPU count behind a chevron (open by default on the active board) */
+const OPEN_WHY = new Set();
 function renderCards(deps, active, suggested, picked){
   const hasGoal = S.goal!=="any";
   $('fitcap').innerHTML = (S.tpo==="auto"
-      ? `What one node of each board takes to serve everyone${hasGoal ? " within your speed goal" : ""}: up to 8 GPUs, as one copy of the model or several (~90% of each board is usable).`
-      : `Every board at <b>${S.tpo} GPU${S.tpo>1?"s":""} per copy</b>, fixed in Advanced settings, with as many copies as one node holds.`)
-    + ` Click a board to plan on it; click it again to go back to the suggestion. Greyed-out boards don't fit and can't be picked. Boards marked Not recommended can be picked but are never suggested.`;
-  const cards=$('gpucards'); cards.innerHTML="";
-  GPUS.forEach(b=>{
+      ? `One node of each board, up to 8 GPUs, sized to serve everyone${hasGoal ? " within your speed goal" : ""}.`
+      : `Every board at <b>${S.tpo} GPU${S.tpo>1?"s":""} per copy</b>, fixed in Advanced settings.`)
+    + ` Click a row to plan on that board.`;
+  const rows = GPUS.map(b=>{
     const d = deps.get(b.n), slow = notRecommended(d);
-    const systems = systemsIn(d);          // counted in whole systems, the pill then says how they're used
-    const shape = layoutText(d);
-    let cls, pill, ptxt;
-    if(!d.fits){ cls="s-bad"; pill="bad"; ptxt = S.tpo==="auto" ? "Won't fit on a node" : `Not at TP ${d.tp}`; }
-    else if(d.partial){ cls="s-warn"; pill="warn"; ptxt = `${d.meets ? "Serves" : "Holds"} ${commas(d.served)} of ${commas(S.users)}`; }
-    else if(!d.meets){ cls="s-warn"; pill="warn"; ptxt="Below goal"; }
-    else { cls = slow ? "s-warn" : "s-good"; pill = slow ? "warn" : "good"; ptxt = shape; }
-    const [lbCls, lbTxt] = b.link ? ["lb-nv", systemOf(b) ? "NVLink · all 8" : "NVLink · 2, 4 or 8"] : slow ? ["lb-warn","PCIe · Not recommended"] : ["lb-pcie","PCIe only"];
+    const systems = systemsIn(d);          // counted in whole systems, the layout then says how they're used
+    let status = "";                        // a pill only when something is wrong; a good fit is quiet
+    if(!d.fits) status = `<span class="pill bad">${S.tpo==="auto" ? "Won't fit on a node" : `Not at TP ${d.tp}`}</span>`;
+    else if(d.partial) status = `<span class="pill warn">${d.meets ? "Serves" : "Holds"} ${commas(d.served)} of ${commas(S.users)}</span>`;
+    else if(!d.meets) status = `<span class="pill warn">Below goal</span>`;
+    const layout = d.fits ? layoutText(d) : "—";
+    const linkTxt = b.link ? (systemOf(b) ? "NVLink · all 8" : "NVLink · 2, 4 or 8") : `PCIe${slow ? "" : " only"}`;
+    const linkTip = b.link ? "nvlink" : (slow ? "pcieSlow" : "pcie") + (b.fab ? "Amd" : "");
     const rounded = d.fits && b.pop && !systemOf(b) && d.need < d.gpus;
     /* why memory alone takes more than one GPU: too many users for fewer, or a model too big for fewer */
     let memWhy = "";
@@ -1476,35 +1492,36 @@ function renderCards(deps, active, suggested, picked){
       if(mr) memWhy = mr.over ? `Too big for ${mr.on}: the model needs ${fmtMem(mr.over.need)}, and only ${fmtMem(mr.over.usable)} is usable (90% of capacity).`
                               : `${On} ${mr.verb} only ${commas(mr.holds)} of your ${commas(S.users)} users.`;
     }
-    const isActive = !!active && active.g.n===b.n, isPicked = !!picked && picked.n===b.n;
-    const utilColor = !d.fits ? "var(--bad)" : (!d.meets || slow || d.partial) ? "var(--warn)" : "var(--good)";
-    const el=document.createElement('div');
-    const off = !pickable(d);
-    el.className = `gpu ${cls}${isActive ? " sel" : ""}${off ? " off" : ""}`;
-    el.dataset.gpu=b.n; el.tabIndex = off ? -1 : 0; el.setAttribute('role','button'); el.setAttribute('aria-pressed', isPicked);
-    if(off) el.setAttribute('aria-disabled', 'true');
-    el.innerHTML=`<div class="stripe"></div>
-      <div class="gname">${b.n}</div>
-      <div class="gcap">${boxMem(b)} ${b.mem}${systemOf(b) ? ` · ${systemOf(b)}-GPU systems only` : b.max ? ` · up to ${b.max} per server` : ""}</div>
-      <span class="lb ${lbCls}" data-tip="${b.link ? 'nvlink' : (slow ? 'pcieSlow' : 'pcie') + (b.fab ? 'Amd' : '')}" tabindex="0">${lbTxt}</span>
-      <div class="count">${!d.fits ? "—" : systems || d.gpus}<small> × ${systems ? `${Math.max(...b.pop)}-GPU system${systems===1 ? "" : "s"}` : "GPU"}</small></div>
-      <span class="pill ${pill}">${ptxt}</span>${suggested && suggested.g.n===b.n ? `<span class="pill sugg">${d.partial ? "Closest" : "Suggested"}</span>` : ""}
-      ${d.tooWide ? `<div class="why">A copy split across ${d.tp} GPUs doesn't fit here: this board's servers hold up to ${nodeMax(b)}.</div>`
-        : !d.fits ? `<div class="why">The model needs ${fmtMem(d.perGB*d.tp)}, but ${d.tp} GPU${d.tp===1 ? "" : "s"} can use only ${fmtMem(b.cap*USABLE*d.tp)} (90% of capacity).${
-            b.max && S.tpo==="auto" ? ` Its servers hold up to ${b.max} cards, and one copy of a model can be split across at most ${Math.max(...TP_OPTIONS.filter(t=> t<=b.max))} of them.` : ""}</div>`
-        : d.partial ? `<div class="why">This is the most one server can ${d.meets ? "serve" : "hold"}${hasGoal && d.meets ? " at your speed goal" : hasGoal ? ", and it is below your speed goal" : ""}.</div>`
-        : forSpeed(d) ? `<div class="why">Fits on ${d.memOnly.gpus} GPU${d.memOnly.gpus===1 ? "" : "s"}, but ${
+    const why = d.tooWide ? `A copy split across ${d.tp} GPUs doesn't fit here: this board's servers hold up to ${nodeMax(b)}.`
+        : !d.fits ? `The model needs ${fmtMem(d.perGB*d.tp)}, but ${d.tp} GPU${d.tp===1 ? "" : "s"} can use only ${fmtMem(b.cap*USABLE*d.tp)} (90% of capacity).${
+            b.max && S.tpo==="auto" ? ` Its servers hold up to ${b.max} cards, and one copy of a model can be split across at most ${Math.max(...TP_OPTIONS.filter(t=> t<=b.max))} of them.` : ""}`
+        : d.partial ? `This is the most one server can ${d.meets ? "serve" : "hold"}${hasGoal && d.meets ? " at your speed goal" : hasGoal ? ", and it is below your speed goal" : ""}.`
+        : forSpeed(d) ? `Fits on ${d.memOnly.gpus} GPU${d.memOnly.gpus===1 ? "" : "s"}, but ${
             d.memOnly.t.perUser < GOALS[S.goal].tps ? `only at ${fmtTpsShort(d.memOnly.t.perUser)} tok/s per user` : `the first reply takes ${fmtTime(d.memOnly.t.ttft).join(" ")}`
           }. ${d.reps===1 ? `Splitting it across ${d.gpus} GPUs meets`
                : d.tp===1 ? `${d.gpus} GPUs, each running its own copy, meet`
-               : `${d.reps} copies on ${d.tp} GPUs each meet`} your speed goal.</div>`
-        : rounded ? `<div class="why">Needs ${d.need} GPU${d.need===1 ? "" : "s"}. Servers take ${popText(b)}, so it rounds up to ${d.gpus}.</div>`
-        : memWhy ? `<div class="why">${memWhy}</div>` : ""}
-      <div class="util"><div style="width:${Math.min(100, d.perGB/b.cap*100).toFixed(0)}%;background:${utilColor}"></div></div>
-      <div class="tps">${d.t ? `≈ <b>${fmtTps(d.t.total*d.reps)}</b> tok/s · ${fmtTps(d.t.perUser)}/user` : "— tok/s"}</div>
-      <div class="tps mem">${d.fits ? `<b>${boxTotal(d.memGB)}</b> of GPU memory` : "—"}</div>`;
-    cards.appendChild(el);
+               : `${d.reps} copies on ${d.tp} GPUs each meet`} your speed goal.`
+        : rounded ? `Needs ${d.need} GPU${d.need===1 ? "" : "s"}. Servers take ${popText(b)}, so it rounds up to ${d.gpus}.`
+        : memWhy;
+    const slowWhy = slow ? ` Not recommended: one copy is split across cards with no ${fabric(b)}, so they coordinate over PCIe after every layer; the speed shown reflects that.` : "";
+    const isActive = !!active && active.g.n===b.n, isPicked = !!picked && picked.n===b.n, isSugg = !!suggested && suggested.g.n===b.n;
+    const off = !pickable(d), open = isActive || OPEN_WHY.has(b.n), hasWhy = !!(why || slowWhy);
+    const cls = `brow${isActive ? " sel" : ""}${off ? " off" : ""}`;
+    return `<tr class="${cls}" data-gpu="${b.n}" role="button" tabindex="${off ? -1 : 0}" aria-pressed="${isPicked}"${off ? ' aria-disabled="true"' : ""}>
+      <td class="board"><div class="gname">${b.n}${isSugg ? `<span class="pill sugg">${d.partial ? "Closest" : "Suggested"}</span>` : ""}</div>
+        <div class="gcap">${boxMem(b)} ${b.mem}${systemOf(b) ? ` · ${systemOf(b)}-GPU systems only` : b.max ? ` · up to ${b.max} per server` : ""}${slow ? ` · <span class="nr">not recommended</span>` : ""}</div></td>
+      <td class="link col-opt tipl" data-tip="${linkTip}">${linkTxt}</td>
+      <td class="num"><b>${!d.fits ? "—" : systems || d.gpus}</b> <small>× ${systems ? `${Math.max(...b.pop)}-GPU system${systems===1 ? "" : "s"}` : "GPU"}</small></td>
+      <td class="layout">${status || layout}</td>
+      <td class="num">${d.t ? `<b>${fmtTps(d.t.perUser)}</b> <small>tok/s</small>` : "—"}</td>
+      <td class="num col-opt">${d.t ? `${fmtTps(d.t.total*d.reps)} <small>tok/s</small>` : "—"}</td>
+      <td class="num col-mem">${d.fits ? boxTotal(d.memGB) : "—"}</td>
+      <td class="ctl">${hasWhy ? `<button type="button" class="whybtn" data-why="${b.n}" aria-expanded="${open}" aria-label="Why ${b.n} needs this many GPUs"></button>` : ""}</td>
+    </tr>${hasWhy ? `<tr class="bwhy${isActive ? " sel" : ""}"${open ? "" : " hidden"}><td colspan="8">${why}${slowWhy}</td></tr>` : ""}`;
   });
+  $('gpucards').innerHTML = `<table>
+    <thead><tr><th>Board</th><th class="col-opt">Link</th><th class="num">GPUs</th><th>Layout</th><th class="num">Per user</th><th class="num col-opt">All users</th><th class="num col-mem">GPU memory</th><th></th></tr></thead>
+    <tbody>${rows.join("")}</tbody></table>`;
 }
 
 
@@ -1560,7 +1577,7 @@ function renderThroughput(d){
       ${statCell("prefill", "Prompt reading", fmtTps(t.prefillTps), "tok/s", `in pieces of ${commas(S.chunk)} tokens`)}
     </div>
     <div class="stepwrap">
-      <div class="stephead"><span>One decode step, ${d.reps>1 ? `each copy's ${commas(d.upr)} users` : `all ${commas(S.users)} users`} <span class="i" data-tip="step" tabindex="0">i</span></span>
+      <div class="stephead"><span class="tipl" data-tip="step">One decode step, ${d.reps>1 ? `each copy's ${commas(d.upr)} users` : `all ${commas(S.users)} users`}</span>
         <span class="mono">${stN} ${stU}</span></div>
       <div class="stepbar" role="img" aria-label="Decode step time breakdown">
         ${segs.map(s=>`<div style="width:${(s.v/t.tStep*100).toFixed(2)}%;background:${s.c}"></div>`).join("")}
@@ -1658,10 +1675,9 @@ function syncPrompt(){                   // slider → state, then everything th
   const trimmed = S.wantPrompt > stops[stops.length-1] || S.wantReply > S.reply || S.thinking < (S.think ? S.thinkTok : 0);
   const pp = promptParts();
   $('workloadHint').textContent = WORKLOADS[S.workload].desc
-    + (trimmed ? ` Trimmed to fit this model's ${fmtCtx(activeModel().ctx)} context.` : "")
-    + (pp.fresh < pp.P ? ` With prompt caching, about ${commas(pp.fresh)} tokens of each prompt are new${pp.shared ? `, and ${commas(pp.shared)} are a system prompt shared by everyone` : ""}.` : "");
-  const note = WORKLOADS[S.workload].note;       // what the preset leaves out, on its own line
-  if(note){ const el = document.createElement('div'); el.className = "wl-note"; el.textContent = note; $('workloadHint').appendChild(el); }
+    + (trimmed ? ` Trimmed to this model's ${fmtCtx(activeModel().ctx)} context.` : "")
+    + (pp.fresh < pp.P ? ` About ${commas(pp.fresh)} tokens a turn are new; the rest is cached.` : "")
+    + (WORKLOADS[S.workload].brief ? ` ${WORKLOADS[S.workload].brief}` : "");
 }
 /* the Thinking row: hidden for models that never think, locked on for ones that always do */
 function syncThink(){
@@ -1760,20 +1776,28 @@ function syncWq(){                          // "As released" follows the selecte
 }
 wqSel.addEventListener('change', ()=>{ syncWq(); render(); });
 
-/* boards: click, Enter or Space picks one; picking it again goes back to the suggestion */
+/* boards: click, Enter or Space on a row picks it; picking it again goes back to the suggestion.
+   The chevron at the row's end opens the reasoning underneath instead. */
 const gpuCards = $('gpucards');
-const pickCard = card => {
-  if(card.classList.contains('off')) return;     // won't fit: shown for reference only
-  const n = card.dataset.gpu;
+const pickCard = row => {
+  if(row.classList.contains('off')) return;      // won't fit: shown for reference only
+  const n = row.dataset.gpu;
   S.board = S.board===n ? "auto" : n;
   render(); gpuCards.querySelector(`[data-gpu="${n}"]`)?.focus();
 };
+const toggleWhy = btn => {
+  const n = btn.dataset.why, row = btn.closest('tr'), why = row.nextElementSibling;
+  const open = why.hidden;
+  why.hidden = !open; btn.setAttribute('aria-expanded', open);
+  if(open) OPEN_WHY.add(n); else OPEN_WHY.delete(n);
+};
 gpuCards.addEventListener('click', e=>{
-  const c=e.target.closest('.gpu');
-  if(c && !e.target.closest('[data-tip]')) pickCard(c);   // the interconnect badge shows its tooltip instead
+  const w = e.target.closest('.whybtn'); if(w){ toggleWhy(w); return; }
+  const c=e.target.closest('.brow');
+  if(c && !e.target.closest('[data-tip]')) pickCard(c);   // the link cell shows its tooltip instead
 });
 gpuCards.addEventListener('keydown', e=>{
-  if((e.key==="Enter" || e.key===" ") && e.target.classList.contains('gpu')){ e.preventDefault(); pickCard(e.target); }
+  if((e.key==="Enter" || e.key===" ") && e.target.classList.contains('brow')){ e.preventDefault(); pickCard(e.target); }
 });
 document.querySelector('.verdict').addEventListener('click', e=>{
   const b = e.target.closest('[data-act]'); if(!b) return;
@@ -2163,7 +2187,7 @@ const TIPS = {
   units:"GB is 1,000,000,000 bytes, the unit on spec sheets and download pages. GiB is 1,073,741,824 bytes, the unit nvidia-smi, PyTorch and vLLM report. Switching only relabels memory; the recommendation doesn't change. Board capacities are the size on the box, counted as GB: 80 GB is 74.5 GiB.",
   usable:"The dashed line marks how much memory the model may use: 90% of each GPU. That is vLLM's default limit (gpu_memory_utilization = 0.9); the other 10% is left for the driver and anything else on the card. A setup fits only if its memory stays to the left of the line.",
   perGPU:"What each individual board must hold. This is the number that determines fit — a model can need 300 GB total and still run fine on 4 × 80 GB.",
-  fit:"What one node of each board takes to serve everyone: up to 8 GPUs, as one copy of the model or several, and how much GPU memory that adds up to. If one node can't serve everyone, the card says how many users it does serve. Assumes ~90% of board memory is usable; drivers and the CUDA context claim the rest.",
+  fit:"What one node of each board takes to serve everyone: up to 8 GPUs, as one copy of the model or several, and how much GPU memory that adds up to. If one node can't serve everyone, its row says how many users it does serve. Assumes ~90% of board memory is usable; drivers and the CUDA context claim the rest.",
   nvlink:"NVLink joins GPUs directly, which is what splitting one copy of a model across them needs to be fast. On H100 and H200, bridges link 2 or 4 cards, or an 8-GPU system links all 8. The B200 and B300 come only as 8-GPU systems with all 8 linked.",
   pcie:"PCIe-only — no NVLink. Fine for a single GPU, but tensor parallelism must all-reduce over a far slower link after every layer, so throughput suffers badly.",
   pcieSlow:"Not recommended. This board has no NVLink, and here one copy of the model has to be split across several of them, so the GPUs exchange data over PCIe after every layer. That is slower than the same number of NVLink cards, and the speed shown already reflects it. It works and can be picked, but it is never the suggestion; prefer a board that holds a copy on one GPU, or an NVLink board.",
@@ -2213,7 +2237,9 @@ window.addEventListener('resize', hideTip);
 function labelTips(){
   document.querySelectorAll('[data-tip]').forEach(el=>{
     const txt = TIPS[el.dataset.tip];
-    if(txt) el.setAttribute('aria-label', (el.classList.contains('i')? "Explain: ":"") + txt);
+    if(!txt) return;
+    if(el.classList.contains('i')) el.setAttribute('aria-label', "Explain: " + txt);
+    else el.setAttribute('aria-description', txt);
   });
 }
 /* init */
