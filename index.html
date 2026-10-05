@@ -164,6 +164,7 @@
   .v-sub .warnx{color:var(--warn); font-weight:500}
   .v-why{font-size:13px; color:var(--ink-2); margin-top:6px; line-height:1.55; max-width:100ch}
   .v-why .warnx{color:var(--warn); font-weight:500}
+  .v-why .badx{color:var(--bad); font-weight:600}
   .v-why .linkbtn{margin:0; font-size:13px}
   .v-actions{padding-top:18px}
   .v-top > div:first-child{flex:1 1 320px; min-width:0}   /* long explanations wrap instead of pushing the buttons down */
@@ -251,12 +252,13 @@
   .boards tbody tr.brow{border-top:1px solid var(--line); cursor:pointer; transition:background .12s}
   .boards tbody tr.brow:hover{background:var(--panel-2)}
   .boards tbody tr.brow:focus-visible{outline:2px solid var(--accent); outline-offset:-2px}
-  .boards tbody tr.brow.nr{background:var(--warn-bg)}
-  .boards tbody tr.brow.nr td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
-  .boards tbody tr.brow.nr:hover{background:var(--warn-bg)}
+  .boards tbody tr.brow.nr{background:var(--bad-bg)}
+  .boards tbody tr.brow.nr td:first-child{box-shadow:inset 3px 0 0 var(--bad)}
+  .boards tbody tr.brow.nr:hover{background:var(--bad-bg)}
   .boards tbody tr.brow.nr .gname, .boards tbody tr.brow.nr td.num b{color:var(--ink-2)}
-  .boards tbody tr.brow.nr .pill.warn{background:var(--warn); color:#1b1d26}
+  .boards tbody tr.brow.nr .pill.bad{background:var(--bad); color:#fff}
   .boards .lay{margin-left:8px; font-size:12px; color:var(--muted)}
+  .boards .lay.nr{color:var(--bad); font-weight:500}
   .boards tbody tr.brow.sel{background:var(--panel-2)}
   .boards tbody tr.brow.sel td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
   .boards tbody tr.brow.off{cursor:default}
@@ -295,7 +297,7 @@
     /* the board name stays put while the rest scrolls sideways */
     .boards thead th:first-child, .boards tbody td:first-child{position:sticky; left:0; background:var(--panel); z-index:1}
     .boards tbody tr.brow.sel td:first-child, .boards tbody tr.brow:hover td:first-child{background:var(--panel-2)}
-    .boards tbody tr.brow.nr td:first-child{background:var(--warn-bg)}
+    .boards tbody tr.brow.nr td:first-child{background:var(--bad-bg)}
   }
 
   /* throughput */
@@ -1387,7 +1389,7 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
   if(fits){
     lbl = picked ? (notRecommended(active) ? "Your pick · split over PCIe" : "Your pick") : active.partial ? "Closest single node" : "Suggested deployment";
     main = deployName(active);
-    if(notRecommended(active)) why += `<span class="warnx">Not recommended:</span> this splits one copy of the model across cards with no ${fabric(g)}, so they coordinate over PCIe after every layer. Expect it to be slower than the same number of directly linked cards; the speed shown already reflects that. `;
+    if(notRecommended(active)) why += `<span class="badx">Not recommended:</span> this splits one copy of the model across cards with no ${fabric(g)}, so they coordinate over PCIe after every layer. Expect it to be slower than the same number of directly linked cards; the speed shown already reflects that. `;
     const layout = reps>1
       ? `Runs as <b>${reps} <span class="tipl" data-tip="copies">copies</span></b> of the model on ${tp} GPU${tp>1?"s":""} each, ~${commas(active.upr)} user${active.upr===1 ? "" : "s"} per copy. `
       : "";
@@ -1487,8 +1489,8 @@ function renderCards(deps, active, suggested, picked){
     else if(d.partial) status = `<span class="pill warn">${d.meets ? "Serves" : "Holds"} ${commas(d.served)} of ${commas(S.users)}</span>`;
     else if(!d.meets) status = `<span class="pill warn">Below goal</span>`;
     const layout = d.fits ? layoutText(d) : "—";
-    if(!status && slow) status = `<span class="pill warn" data-tip="pcieSlow${b.fab ? "Amd" : ""}" tabindex="0">Not recommended</span><span class="lay">${layout}</span>`;
-    else if(slow) status += `<span class="lay">not recommended</span>`;
+    if(!status && slow) status = `<span class="pill bad" data-tip="pcieSlow${b.fab ? "Amd" : ""}" tabindex="0">Not recommended</span><span class="lay">${layout}</span>`;
+    else if(slow) status += `<span class="lay nr">not recommended</span>`;
     const linkTxt = b.link ? (systemOf(b) ? "NVLink · all 8" : "NVLink · 2, 4 or 8") : `PCIe${slow ? "" : " only"}`;
     const linkTip = b.link ? "nvlink" : (slow ? "pcieSlow" : "pcie") + (b.fab ? "Amd" : "");
     const rounded = d.fits && b.pop && !systemOf(b) && d.need < d.gpus;
