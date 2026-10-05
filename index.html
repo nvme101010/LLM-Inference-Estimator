@@ -1229,10 +1229,10 @@ function systemsIn(d){
 function memoryReason(d){
   if(d.reps>1){
     const holds = copyCapacity(d.g, d.tp, 1e6, true);
-    return holds < S.users ? {holds, on: d.tp===1 ? "one GPU" : "one copy", verb:"holds"} : null;
+    return holds < S.users ? {holds, on: d.tp===1 ? "one GPU" : "one copy", verb:"has"} : null;
   }
   const n = d.tp/2, holds = copyCapacity(d.g, n, 1e6, true);
-  const r = {holds, on: n===1 ? "one GPU" : `${n} GPUs`, verb: n===1 ? "holds" : "hold"};
+  const r = {holds, on: n===1 ? "one GPU" : `${n} GPUs`, verb: n===1 ? "has" : "have"};
   if(!holds) r.over = {need: compute(n, 1).perGPU*n/GB, usable: d.g.cap*USABLE*n};
   return r;
 }
@@ -1397,10 +1397,12 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
     else if(g.pop && active.need < active.gpus) why += `${g.n} servers take ${popText(g)} GPUs, so the ${active.need} this needs rounds up to ${active.gpus}. `;
     if(active.gpus>1 && !active.partial && !forSpeed(active) && !systemOf(g) && !(active.need < active.gpus)){   // more than one GPU because of memory, not speed
       const mr = memoryReason(active), On = mr && mr.on[0].toUpperCase() + mr.on.slice(1);
-      const then = reps>1 ? `this runs ${reps}${tp===1 ? "" : " copies"}` : `one copy is split across ${tp}`;
+      const then = reps>1 ? `this runs ${reps} copies` : `one copy is split across ${tp}`;
       if(mr) why += mr.over
         ? `Even with one user the model needs ${fmtMem(mr.over.need)}, more than the ${fmtMem(mr.over.usable)} ${mr.on} can use (90% of capacity), so ${then}. `
-        : `${On} ${mr.verb} ${commas(mr.holds)} of your ${commas(S.users)} users in memory, so ${then}. `;
+        : reps>1
+        ? `${On} ${mr.verb} room for only ${commas(mr.holds)} of your ${commas(S.users)} users after the weights, so this runs ${reps} copies. `
+        : `${On} ${mr.verb} room for only ${commas(mr.holds)} of your ${commas(S.users)} users after the weights. Splitting the model across ${tp} GPUs frees enough for everyone, and ${tp===2 ? "both" : `all ${tp}`} serve every user together. `;
     }
     if(forSpeed(active) && !active.partial){
       const lean = active.memOnly;
@@ -1423,7 +1425,7 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
     }
     // how far it stretches, in a sentence rather than a fourth tile
     if(!active.partial && cap && cap.users >= S.users && cap.users > 0)
-      why += ` <span class="tipl" data-tip="capacity">Room for up to <b>${commas(cap.users)}</b> users</span> at these lengths${reps>1 ? ` across ${reps} copies` : ""}, then ${cap.limit==="speed" ? "speed drops below the goal" : "memory runs out"}.`;
+      why = why.trimEnd() + ` <span class="tipl" data-tip="capacity">Room for up to <b>${commas(cap.users)}</b> users</span> at these lengths${reps>1 ? ` across ${reps} copies` : ""}, then ${cap.limit==="speed" ? "speed drops below the goal" : "memory runs out"}.`;
   } else {
     lbl = "No single node fits";
     main = S.tpo==="auto" ? "Too big for one 8-GPU node" : `No board holds a copy at TP ${tp}`;
@@ -1500,7 +1502,8 @@ function renderCards(deps, active, suggested, picked){
       const mr = memoryReason(d);
       const On = mr && mr.on[0].toUpperCase() + mr.on.slice(1);
       if(mr) memWhy = mr.over ? `Too big for ${mr.on}: the model needs ${fmtMem(mr.over.need)}, and only ${fmtMem(mr.over.usable)} is usable (90% of capacity).`
-                              : `${On} ${mr.verb} only ${commas(mr.holds)} of your ${commas(S.users)} users.`;
+                   : d.reps>1 ? `${On} ${mr.verb} room for only ${commas(mr.holds)} of your ${commas(S.users)} users after the weights, so this runs ${d.reps} copies${d.tp>1 ? ` of ${d.tp} GPUs` : ""}, each serving ~${commas(d.upr)} of them.`
+                              : `${On} ${mr.verb} room for only ${commas(mr.holds)} of your ${commas(S.users)} users after the weights. Splitting the model across ${d.gpus} GPUs frees enough for everyone, and ${d.gpus===2 ? "both" : `all ${d.gpus}`} serve every user together.`;
     }
     const why = d.tooWide ? `A copy split across ${d.tp} GPUs doesn't fit here: this board's servers hold up to ${nodeMax(b)}.`
         : !d.fits ? `The model needs ${fmtMem(d.perGB*d.tp)}, but ${d.tp} GPU${d.tp===1 ? "" : "s"} can use only ${fmtMem(b.cap*USABLE*d.tp)} (90% of capacity).${
