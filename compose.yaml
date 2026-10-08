@@ -1,0 +1,17 @@
+# docker compose up --build   →   http://localhost:8080
+services:
+  estimator:
+    build: .
+    image: llm-inference-estimator:local
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    # Hardening that costs nothing for a static site: no root, no capabilities,
+    # read-only image with only /tmp writable (nginx's pid file and caches live there).
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

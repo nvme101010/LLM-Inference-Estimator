@@ -28,6 +28,23 @@ Not sure how many concurrent users to plan for? **Estimate from daily traffic** 
 
 Open `index.html` in a browser. It is one self-contained file with no build step and no server.
 
+## Run it in a container
+
+The image is nginx plus that one file, about 20 MB, running as a non-root user on port 8080.
+
+```bash
+docker compose up --build
+```
+
+Then open <http://localhost:8080>. The same image works anywhere a container runs:
+
+```bash
+docker build -t llm-inference-estimator .
+docker run --rm -p 8080:8080 --read-only --tmpfs /tmp llm-inference-estimator
+```
+
+`/healthz` answers `200 ok` for health checks. The page loads its two fonts from Google Fonts; without internet access it falls back to system fonts and everything else works offline.
+
 ## Share a sizing
 
 - **Download summary** saves a one-page report of the recommendation, the inputs, every board compared and the assumptions. Open it and choose Print to save it as a PDF.
