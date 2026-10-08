@@ -43,6 +43,12 @@ docker build -t llm-inference-estimator .
 docker run --rm -p 8080:8080 --read-only --tmpfs /tmp llm-inference-estimator
 ```
 
+A prebuilt image for amd64 and arm64 is published to GHCR by the [Container workflow](.github/workflows/container.yml) on every merge to `main` (`:latest` and `:sha-<commit>`) and on every `v*` tag (`:1.2.3`, `:1.2`):
+
+```bash
+docker run --rm -p 8080:8080 --read-only --tmpfs /tmp ghcr.io/nvme101010/llm-inference-estimator:latest
+```
+
 `/healthz` answers `200 ok` for health checks. The page loads its two fonts from Google Fonts; without internet access it falls back to system fonts and everything else works offline.
 
 ## Share a sizing
