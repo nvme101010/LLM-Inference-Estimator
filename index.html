@@ -424,7 +424,7 @@
           <option value="native" data-lbl="NATIVE" selected>As released</option>
           <option value="4"     data-lbl="FP32">FP32 — 4 B/param (full)</option>
           <option value="2"     data-lbl="BF16">BF16 / FP16 — 2 B</option>
-          <option value="1"     data-lbl="FP8">FP8 (E4M3) — 1 B (H100+)</option>
+          <option value="1"     data-lbl="FP8">FP8 (E4M3) — 1 B (Hopper+)</option>
           <option value="1"     data-lbl="INT8">INT8 — 1 B (GPTQ/AWQ)</option>
           <option value="0.5625" data-lbl="FP4">FP4 (NVFP4 / MXFP4) — ~0.56 B (Blackwell, MI350)</option>
           <option value="0.5"   data-lbl="INT4">INT4 — 0.5 B (GPTQ/AWQ)</option>
@@ -622,9 +622,9 @@
           <p><b>Concurrent users from traffic</b> — requests in progress at once = requests per second × seconds each one takes. A request takes the wait before its first token plus its thinking and reply, streamed at your speed goal's rate; the goal is a minimum speed, so this errs on the high side. The busiest-hour multiple covers traffic that isn't spread evenly through the day; 2× suits a typical workday.</p>
           <p><b>Sharing</b> — on a hosted copy of this page, the address always holds the current settings, so Copy link sends the exact scenario. Download summary saves a one-page report of the recommendation, the inputs and every board, which prints to PDF.</p>
           <p><b>Single node</b> — this estimates one server of up to 8 GPUs. Every result is a single node; multi-node deployments and NVL rack-scale systems are not covered. If one node of a board can't serve every user, its row says how many it does serve. For production, plan at least one more node (or replica) than this, so the service keeps running if one fails or is being updated.</p>
-          <p><b>Suggestion and capacity</b> — every board is tried at 1, 2, 4 and 8 GPUs per copy (splitting a copy only across NVLink boards), with as many copies as the node's 8 GPUs allow. The suggestion is the node that serves every user within the speed goal with the least GPU memory in total (on any one board, the fewest GPUs). If no node serves everyone within the goal, it is the full node that serves the most users. GPU counts round up to what can be bought: H100 and H200 servers take 1, 2, 4 or 8 GPUs, with NVLink across 2 or 4 cards or all 8 in an 8-GPU system, so 3 rounds up to 4 and 5 to 7 round up to 8; the B200 and B300 ship only as 8-GPU systems. RTX PRO 4500 servers hold any number of cards up to 5 (HPE's limit); because of the split rule above, one copy of a model uses at most 4 of them, and the fifth can run another copy. Spare GPUs run extra copies of the model. <b>Handles up to</b> is the most users the node holds at the current prompt and reply lengths while fitting in memory and, with a goal, still reaching it.</p>
+          <p><b>Suggestion and capacity</b> — every board is tried at 1, 2, 4 and 8 GPUs per copy (splitting a copy only across NVLink boards), with as many copies as the node's 8 GPUs allow. The suggestion is the node that serves every user within the speed goal with the least GPU memory in total (on any one board, the fewest GPUs). If no node serves everyone within the goal, it is the full node that serves the most users. GPU counts round up to what can be bought: H200 NVL servers take 1, 2, 4 or 8 cards, so 3 rounds up to 4 and 5 to 7 round up to 8; but an NVLink bridge joins at most 4 of them, so one copy of a model spans at most 4, and 8 cards run two copies. The HGX H200, HGX B200 and HGX B300 ship only as 8-GPU systems, with all 8 GPUs joined through NVSwitch. RTX PRO 4500 servers hold any number of cards up to 5 (HPE's limit); because of the split rule above, one copy of a model uses at most 4 of them, and the fifth can run another copy. Spare GPUs run extra copies of the model. <b>Handles up to</b> is the most users the node holds at the current prompt and reply lengths while fitting in memory and, with a goal, still reaching it.</p>
           <p><b>Copies (replicas)</b> — for more users, the page runs more copies of the model on the node's GPUs instead of splitting one copy wider. Each copy has its own GPUs and an even share of the users, so memory, the bar and the breakdown describe one copy, while GPU count, output and capacity add up across all of them. Copies don't exchange data while generating, so they need no direct GPU-to-GPU link between them; that's why PCIe boards run several copies well even though they split a single copy poorly, and why, when two layouts use the same number of GPUs, a PCIe board takes more copies over splitting one. When a board needs more GPUs than memory alone calls for, the extra ones are there to reach the speed goal, and the page says so. This assumes requests are spread evenly across the copies.</p>
-          <p><b>Units</b> — every amount is computed in bytes and shown in the unit picked at the top: <b>GB</b> is 10⁹ bytes (spec sheets, download pages), <b>GiB</b> is 2³⁰ bytes (nvidia-smi, PyTorch and vLLM's logs). Switching changes the labels, never the answer. Board capacities are the size on the box, counted as GB, so an H100 is 80 GB or 74.5 GiB. Real boards expose that much or slightly more, so a fit here errs on the safe side.</p>
+          <p><b>Units</b> — every amount is computed in bytes and shown in the unit picked at the top: <b>GB</b> is 10⁹ bytes (spec sheets, download pages), <b>GiB</b> is 2³⁰ bytes (nvidia-smi, PyTorch and vLLM's logs). Switching changes the labels, never the answer. Board capacities are the size on the box, counted as GB, so an H200 is 141 GB or 131 GiB. Real boards expose that much or slightly more, so a fit here errs on the safe side.</p>
         </div>
           <div class="disc">Estimates for planning, not a guarantee. Real usage varies with the serving framework (vLLM, TensorRT-LLM, SGLang), paged-attention block sizing, speculative decoding, and MoE routing. MoE models load <i>all</i> expert weights even though only a few activate per token. The newest attention designs (DeepSeek V4's compressed sparse attention, sparse-attention index keys) are modeled from their configs, so treat those cache figures as ±25%. Model list and architectures checked against Hugging Face in September 2026.</div>
         </div>
@@ -740,7 +740,7 @@ const MODELS = [
   {g:"Moonshot Kimi", items:[
     {id:"kimi-k3", n:"Kimi K3 (2.8T-A104B)", p:2779.93, pa:104, E:896, K:16, L:93, h:7168, ffn:55296, v:163840, ctx:1048576,
      nat:{f:"MXFP4 + BF16", gb:1560.9, cls:"FP4"}, kv:[latent(24,512), linear(69,kda(96),"linear-attention")],
-     note:"69 of 93 layers use linear attention. As released, its weights alone are more than an 8 × B200 node holds."},
+     note:"69 of 93 layers use linear attention. As released, its weights alone are more than an 8-GPU HGX B200 system holds."},
   ]},
   {g:"MiniMax", items:[
     {id:"mm-m27", n:"MiniMax-M2.7 (229B-A10B)", p:228.69, pa:10, E:256, K:8, L:62, h:3072, ffn:12288, v:200064, ctx:204800,
@@ -791,7 +791,8 @@ const thinksOf = m => m.custom ? "optional" : Object.keys(THINKS).find(k=> THINK
 const THINK_LABEL = {always:"always thinks before answering", default:"thinks before answering by default",
                      optional:"thinking can be switched on", none:"answers without thinking"};
 
-/* link:true = NVLink board: bridges join 2 or 4 H100/H200 cards, and an 8-GPU system links all 8.
+/* link:true = NVLink board: bridges join 2 or 4 H200 NVL cards, and in an 8-GPU HGX system
+   (HGX H200, HGX B200, HGX B300) an NVSwitch joins all 8 GPUs' NVLink lanes.
    link:false = PCIe-only — TP all-reduce crosses PCIe and is much slower.
    cap = memory on the box, GB (10⁹ bytes) · mem = memory type · bw = memory bandwidth, GB/s (sets decode speed)
    flops = effective BF16 compute, TFLOPS — rough estimate, sets prefill speed
@@ -799,8 +800,11 @@ const THINK_LABEL = {always:"always thinks before answering", default:"thinks be
    Sources checked for the two entries most often questioned: the RTX PRO 4500 Blackwell here is the
    Server Edition, 800 GB/s on NVIDIA's data-center page (the workstation card is 896 GB/s); the AMD
    MI350P is a PCIe FHFL card with 144 GB HBM3E at 4 TB/s and no Infinity Fabric (AMD / Exxact, 2026).
-   pop = how many GPUs a server of this board can be populated with. H100 and H200 servers take 1, 2, 4
-   or 8; the B200 and B300 ship only as 8-GPU systems (NVL rack-scale systems are out of scope).
+   pop = how many GPUs a server of this board can be populated with. H200 NVL servers take 1, 2, 4 or 8;
+   the HGX H200, HGX B200 and HGX B300 ship only as 8-GPU systems (NVL rack-scale
+   systems are out of scope). linkLbl = the link column's text, when the default doesn't fit.
+   split = the most cards one copy of a model can span, where that is fewer than the server holds: an
+   NVLink bridge joins at most 4 H200 NVL cards, so 8 cards are two bridged groups running two copies.
    A deployment's GPU count rounds up to one that can be bought: see buyable().
    max = the most GPUs one server of this board holds, where that is fewer than a node's 8: HPE servers
    take up to 5 RTX PRO 4500 Blackwell cards. */
@@ -808,12 +812,12 @@ const GPUS = [
   {n:"L4",         cap:24, mem:"GDDR6",  bw:300,  flops:80,   fp8:true,  fp4:false, link:false, lbw:32,  lname:"PCIe Gen4"},
   {n:"RTX PRO 4500 Blackwell", cap:32, mem:"GDDR7", bw:800, flops:135, fp8:true, fp4:true, link:false, lbw:64, lname:"PCIe Gen5", max:5},
   {n:"L40S",       cap:48, mem:"GDDR6",  bw:864,  flops:240,  fp8:true,  fp4:false, link:false, lbw:32,  lname:"PCIe Gen4"},
-  {n:"H100 80GB",  cap:80, mem:"HBM3",   bw:3350, flops:720,  fp8:true,  fp4:false, link:true,  lbw:450, lname:"NVLink 4", pop:[1,2,4,8]},
   {n:"RTX PRO 6000 Blackwell", cap:96, mem:"GDDR7", bw:1792, flops:330, fp8:true, fp4:true, link:false, lbw:64, lname:"PCIe Gen5"},
-  {n:"H200",       cap:141, mem:"HBM3e",  bw:4800, flops:720,  fp8:true,  fp4:false, link:true,  lbw:450, lname:"NVLink 4", pop:[1,2,4,8]},
+  {n:"H200 NVL",   cap:141, mem:"HBM3e",  bw:4800, flops:720,  fp8:true,  fp4:false, link:true,  lbw:450, lname:"NVLink 4 bridge", pop:[1,2,4,8], split:4, linkLbl:"NVLink bridge · up to 4"},
+  {n:"HGX H200",   cap:141, mem:"HBM3e",  bw:4800, flops:720,  fp8:true,  fp4:false, link:true,  lbw:450, lname:"NVLink 4 via NVSwitch", pop:[8]},
   {n:"AMD MI350P", cap:144, mem:"HBM3E",  bw:4000, flops:800,  fp8:true,  fp4:true,  link:false, lbw:64,  lname:"PCIe Gen5", fab:"Infinity Fabric"},
-  {n:"B200",       cap:180, mem:"HBM3e",  bw:7700, flops:1400, fp8:true,  fp4:true,  link:true,  lbw:900, lname:"NVLink 5", pop:[8]},
-  {n:"B300",       cap:288, mem:"HBM3e",  bw:8000, flops:1400, fp8:true,  fp4:true,  link:true,  lbw:900, lname:"NVLink 5", pop:[8]},
+  {n:"HGX B200",       cap:180, mem:"HBM3e",  bw:7700, flops:1400, fp8:true,  fp4:true,  link:true,  lbw:900, lname:"NVLink 5 via NVSwitch", pop:[8]},
+  {n:"HGX B300",       cap:288, mem:"HBM3e",  bw:8000, flops:1400, fp8:true,  fp4:true,  link:true,  lbw:900, lname:"NVLink 5 via NVSwitch", pop:[8]},
 ];
 /* the vendor's direct GPU-to-GPU link, named when saying a board lacks it: NVLink on NVIDIA, Infinity Fabric on AMD */
 const fabric = g => g.fab || "NVLink";
@@ -1142,6 +1146,7 @@ const fitsOn = (g, perGB) => perGB <= g.cap*USABLE;
 const TP_OPTIONS = [1,2,4,8];
 const NODE = 8;   // GPUs in one node
 const nodeMax = g => g.max || NODE;   // fewer on a board whose servers hold fewer
+const splitMax = g => Math.min(nodeMax(g), g.split || NODE);   // and a copy spans no more than its link joins
 function evaluate(g, tp, reps, upr = Math.ceil(S.users/reps)){      // upr = users on each copy
   const r = compute(tp, upr), perGB = r.perGPU/GB, fits = fitsOn(g, perGB);
   const t = fits ? throughput(g, tp, S.chunk, upr) : null, gpus = tp*reps;
@@ -1170,8 +1175,8 @@ const smallest = ds => ds.sort((a,b)=> a.memGB-b.memGB || (a.g.link ? 0 : a.tp-b
    can't fit, the largest copy tried, to show how far off it is.
    The size of a copy (TP) can be fixed in Advanced settings. memOnly is the leanest layout that
    merely holds everyone, so the page can say when extra GPUs are there for speed rather than memory. */
-/* A GPU count that can be bought: a size the board's server comes in. So H100/H200 counts are 1, 2, 4
-   or 8 (3 rounds up to 4, 6 to 8) and B200/B300 are always a whole 8-GPU system; the other boards
+/* A GPU count that can be bought: a size the board's server comes in. So H200 NVL counts are 1, 2, 4
+   or 8 (3 rounds up to 4, 6 to 8), and the 8-GPU systems are always a whole system; the other boards
    take any count up to a node's 8. Copies are rounded up to reach it: the spare GPUs run extra
    copies, which spreads the users thinner and only helps fit and speed. */
 const buyable = (g, n) => g.pop.includes(n) || n > NODE;   // past a node nothing is offered; the caller drops it
@@ -1183,7 +1188,7 @@ function buyableCopies(g, tp, reps){
 }
 function deploymentFor(g){
   // a copy can only be as wide as the board's server: 5 RTX PRO 4500s leave room for a split of 4, not 8
-  const tps = (S.tpo==="auto" ? TP_OPTIONS : [S.tpo]).filter(tp=> tp <= nodeMax(g));
+  const tps = (S.tpo==="auto" ? TP_OPTIONS : [S.tpo]).filter(tp=> tp <= splitMax(g));
   if(!tps.length){                         // a fixed split wider than this board's server holds
     const d = evaluate(g, S.tpo, 1, 1);
     return Object.assign(d, {fits:false, t:null, meets:false, tooWide:true, memOnly:null});
@@ -1217,9 +1222,9 @@ function deploymentFor(g){
 /* extra GPUs beyond what memory needs, added to reach the speed goal */
 const forSpeed = d => d.fits && d.meets && d.memOnly && d.gpus > d.memOnly.gpus;
 /* 1 when a deployment is a full system of the board's largest size: always on a system-only board,
-   and on H100/H200 at 8 GPUs. Otherwise 0, and it's shown as a GPU count. */
+   Otherwise 0, and it's shown as a GPU count. */
 function systemsIn(d){
-  const big = d.g.pop ? Math.max(...d.g.pop) : 0;
+  const big = systemOf(d.g);   // 8 H200 NVL cards are two bridged groups of 4, so they stay a card count
   return big>1 && d.fits && d.gpus>=big && d.gpus%big===0 ? d.gpus/big : 0;
 }
 /* Why memory alone takes this many GPUs, for a layout that isn't there for speed. With several copies,
@@ -1242,7 +1247,7 @@ function layoutText(d){
   if(d.reps===1) return d.tp===1 ? "Fits on one GPU" : `1 copy across ${d.tp} GPUs`;
   return d.tp===1 ? "1 copy per GPU" : `${d.reps} copies, ${d.tp} GPUs each`;
 }
-/* the deployment by name: "2 × H200", or "1 × 8-GPU H100 80GB system" once it's a whole system */
+/* the deployment by name: "2 × H200 NVL", or "1 × 8-GPU HGX H200 system" once it's a whole system */
 function deployName(d){
   const n = systemsIn(d);
   return n ? `${n} × ${Math.max(...d.g.pop)}-GPU ${d.g.n} system${n===1 ? "" : "s"}` : `${d.gpus} × ${d.g.n}`;
@@ -1493,7 +1498,7 @@ function renderCards(deps, active, suggested, picked){
     const layout = d.fits ? layoutText(d) : "—";
     if(!status && slow) status = `<span class="pill bad" data-tip="pcieSlow${b.fab ? "Amd" : ""}" tabindex="0">Not recommended</span><span class="lay">${layout}</span>`;
     else if(slow) status += `<span class="lay nr">not recommended</span>`;
-    const linkTxt = b.link ? (systemOf(b) ? "NVLink · all 8" : "NVLink · 2, 4 or 8") : `PCIe${slow ? "" : " only"}`;
+    const linkTxt = b.link ? (b.linkLbl || (systemOf(b) ? "NVLink via NVSwitch · all 8" : "NVLink · 2, 4 or 8")) : `PCIe${slow ? "" : " only"}`;
     const linkTip = b.link ? "nvlink" : (slow ? "pcieSlow" : "pcie") + (b.fab ? "Amd" : "");
     const rounded = d.fits && b.pop && !systemOf(b) && d.need < d.gpus;
     /* why memory alone takes more than one GPU: too many users for fewer, or a model too big for fewer */
@@ -1505,9 +1510,12 @@ function renderCards(deps, active, suggested, picked){
                    : d.reps>1 ? `${On} ${mr.verb} room for only ${commas(mr.holds)} of your ${commas(S.users)} users after the weights, so this runs ${d.reps} copies${d.tp>1 ? ` of ${d.tp} GPUs` : ""}, each serving ~${commas(d.upr)} of them.`
                               : `${On} ${mr.verb} room for only ${commas(mr.holds)} of your ${commas(S.users)} users after the weights. Splitting the model across ${d.gpus} GPUs frees enough for everyone, and ${d.gpus===2 ? "both" : `all ${d.gpus}`} serve every user together.`;
     }
-    const why = d.tooWide ? `A copy split across ${d.tp} GPUs doesn't fit here: this board's servers hold up to ${nodeMax(b)}.`
+    const why = d.tooWide ? (b.split && d.tp > b.split && d.tp <= nodeMax(b)
+          ? `A copy split across ${d.tp} GPUs doesn't fit here: an NVLink bridge joins at most ${b.split} ${b.n} cards, so one copy spans at most ${b.split}. ${nodeMax(b)} cards run ${nodeMax(b)/b.split} copies instead.`
+          : `A copy split across ${d.tp} GPUs doesn't fit here: this board's servers hold up to ${nodeMax(b)}.`)
         : !d.fits ? `The model needs ${fmtMem(d.perGB*d.tp)}, but ${d.tp} GPU${d.tp===1 ? "" : "s"} can use only ${fmtMem(b.cap*USABLE*d.tp)} (90% of capacity).${
-            b.max && S.tpo==="auto" ? ` Its servers hold up to ${b.max} cards, and one copy of a model can be split across at most ${Math.max(...TP_OPTIONS.filter(t=> t<=b.max))} of them.` : ""}`
+            S.tpo!=="auto" ? "" : b.split ? ` Its servers hold up to ${nodeMax(b)} cards, but an NVLink bridge joins at most ${b.split}, so one copy of a model spans at most ${b.split} of them.`
+            : b.max ? ` Its servers hold up to ${b.max} cards, and one copy of a model can be split across at most ${Math.max(...TP_OPTIONS.filter(t=> t<=b.max))} of them.` : ""}`
         : d.partial ? `This is the most one server can ${d.meets ? "serve" : "hold"}${hasGoal && d.meets ? " at your speed goal" : hasGoal ? ", and it is below your speed goal" : ""}.`
         : forSpeed(d) ? `Fits on ${d.memOnly.gpus} GPU${d.memOnly.gpus===1 ? "" : "s"}, but ${
             d.memOnly.t.perUser < GOALS[S.goal].tps ? `only at ${fmtTpsShort(d.memOnly.t.perUser)} tok/s per user` : `the first reply takes ${fmtTime(d.memOnly.t.ttft).join(" ")}`
@@ -1522,7 +1530,7 @@ function renderCards(deps, active, suggested, picked){
     const cls = `brow${slow ? " nr" : ""}${isActive ? " sel" : ""}${off ? " off" : ""}`;
     return `<tr class="${cls}" data-gpu="${b.n}" role="button" tabindex="${off ? -1 : 0}" aria-pressed="${isPicked}"${off ? ' aria-disabled="true"' : ""}>
       <td class="board"><div class="gname">${b.n}${isSugg ? `<span class="pill sugg">${d.partial ? "Closest" : "Suggested"}</span>` : ""}</div>
-        <div class="gcap">${boxMem(b)} ${b.mem}${systemOf(b) ? ` · ${systemOf(b)}-GPU systems only` : b.max ? ` · up to ${b.max} per server` : ""}</div></td>
+        <div class="gcap">${boxMem(b)} ${b.mem}${systemOf(b) ? ` · ${systemOf(b)}-GPU systems only` : b.split ? ` · up to ${nodeMax(b)} per server, NVLink across ${b.split}` : b.max ? ` · up to ${b.max} per server` : ""}</div></td>
       <td class="link col-opt tipl" data-tip="${linkTip}">${linkTxt}</td>
       <td class="num"><b>${!d.fits ? "—" : systems || d.gpus}</b> <small>× ${systems ? `${Math.max(...b.pop)}-GPU system${systems===1 ? "" : "s"}` : "GPU"}</small></td>
       <td class="layout">${status || layout}</td>
@@ -1645,9 +1653,9 @@ function updateCfgNote(){
 const WQ_NOTES = {
   FP32:"Full precision — training / reference only.",
   BF16:"2 bytes per parameter — the usual starting point before quantizing.",
-  FP8:"1 byte — halves weights vs BF16 with native tensor cores on H100 and newer.",
+  FP8:"1 byte — halves weights vs BF16 with native tensor cores on Hopper and newer.",
   INT8:"1 byte — GPTQ / AWQ; same footprint as FP8, needs dequant on older cards.",
-  FP4:"About 0.56 byte including scales — roughly 3.6× smaller than BF16. Native on NVIDIA Blackwell (B200, B300, RTX PRO 6000) and AMD MI350P; older boards unpack it on the fly.",
+  FP4:"About 0.56 byte including scales — roughly 3.6× smaller than BF16. Native on NVIDIA Blackwell (HGX B200, HGX B300, RTX PRO 6000) and AMD MI350P; older boards unpack it on the fly.",
   INT4:"0.5 byte — 4× smaller than BF16; the go-to for single-GPU large models.",
   INT3:"0.375 byte — aggressive; quality starts to degrade.",
   INT2:"0.25 byte — experimental; expect real accuracy loss.",
@@ -1980,7 +1988,8 @@ function applyHash(){
     pressSeg('pcache', 'cache', q.get("pc")==="off" ? "0" : "1");
     if(w==="custom" && q.has("sh")){ S.shared = Math.max(0, Math.round(+q.get("sh")) || 0); S.fresh = q.get("fr")==="rest" || !q.has("fr") ? null : Math.max(1, Math.round(+q.get("fr")) || 1); }
     setLengths();
-    S.board = GPUS.some(g=> g.n===q.get("b")) ? q.get("b") : "auto";
+    const bq = {"H200":"H200 NVL", "B200":"HGX B200", "B300":"HGX B300"}[q.get("b")] || q.get("b");   // rows renamed when the HGX H200 was added
+    S.board = GPUS.some(g=> g.n===bq) ? bq : "auto";
     const tf = (q.get("tf") || "").split("_").map(Number);
     if(tf.length===4 && tf.every(x=> x>0)){
       Object.assign(S.traffic, {people:tf[0], req:tf[1], hours:Math.min(24, tf[2]), peak:[1,2,3].includes(tf[3]) ? tf[3] : 2});
@@ -2069,12 +2078,14 @@ function buildSummary(){
       + `<td class="n">${d.fits ? d.gpus + (systemsIn(d) ? ` (${systemsIn(d)} system${systemsIn(d)===1 ? "" : "s"})` : "") : "—"}</td><td>${shape}</td><td>${status}</td>`
       + `<td class="n">${d.fits ? boxTotal(d.memGB) : "—"}</td><td class="n">${d.t ? fmtTps(d.t.perUser) : "—"}</td></tr>`;
   }).join("");
-  const names = bs => bs.map(b=> b.n.replace(" 80GB", "")).join(" and ");
+  const names = bs => { const n = bs.map(b=> b.n.replace(" 80GB", "")); return n.length>1 ? `${n.slice(0,-1).join(", ")} and ${n[n.length-1]}` : n[0]; };
   const sysOnly = GPUS.filter(systemOf), sized = GPUS.filter(b=> b.pop && !systemOf(b));
+  const sizes = [...new Set(sized.map(popText))].map(t=> `${names(sized.filter(b=> popText(b)===t))} servers take ${t} GPUs`).join(", ");
   const notes = [
     `Single-node estimate: every result is one server of up to ${NODE} GPUs; multi-node and NVL rack-scale systems are not covered. `
-      + `${names(sized)} servers take ${popText(sized[0])} GPUs, ${names(sysOnly)} come only as ${systemOf(sysOnly[0])}-GPU systems`
-      + GPUS.filter(b=> b.max).map(b=> `, and ${b.n} servers hold up to ${b.max}`).join("") + `.`,
+      + `${sizes}, ${names(sysOnly)} come only as ${systemOf(sysOnly[0])}-GPU systems`
+      + GPUS.filter(b=> b.max && !b.pop).map(b=> `, and ${b.n} servers hold up to ${b.max}`).join("")   // a board whose sizes are listed above needs no second mention
+      + `.` + GPUS.filter(b=> b.split).map(b=> ` An NVLink bridge joins at most ${b.split} ${b.n} cards, so one copy of a model spans at most ${b.split} of them.`).join(""),
     `For production, plan at least one more node (or replica) than this, so the service keeps running if one fails or is being updated.`,
     `Board memory is the size on the box, with 90% treated as usable (vLLM's default limit). Amounts are in ${S.unit==="GiB" ? "GiB (2³⁰ bytes)" : "GB (10⁹ bytes)"}, sized for every concurrent user at full prompt + ${S.thinking ? "thinking + " : ""}reply length.`,
     `Speed and first-reply times are rough planning estimates from a simple model of each board; real results vary with the serving engine and its settings.`,
@@ -2179,7 +2190,7 @@ const TIPS = {
   act:"Short-lived tensors inside one forward pass: hidden states and the MLP intermediates. Freed after each pass, so it scales with how many tokens run at once — not with context length.",
   tpov:"What splitting across GPUs adds. Every GPU carries its own CUDA context, plus NCCL buffers for the all-reduce that runs after each layer. It is added memory, not saved memory.",
   overhead:"CUDA/driver context, allocator fragmentation, framework workspaces and CUDA graphs. Real but hard to predict — the slider sets how conservative you want to be.",
-  wq:"Bytes per weight. As released uses the checkpoint exactly as published; many new models ship in FP8 or FP4. BF16 is 2 bytes; FP8 and INT8 halve it; FP4 and INT4 cut it about 4×. FP8 runs natively on H100, MI350P and newer; FP4 on Blackwell and MI350P.",
+  wq:"Bytes per weight. As released uses the checkpoint exactly as published; many new models ship in FP8 or FP4. BF16 is 2 bytes; FP8 and INT8 halve it; FP4 and INT4 cut it about 4×. FP8 runs natively on Hopper (H200), MI350P and newer; FP4 on Blackwell and MI350P.",
   model:"The most-used open models on Hugging Face as of September 2026, grouped by lab. Layer counts, attention types and cache sizes come from each model's published config.json.",
   kq:"Precision of the cached keys and values. FP8 KV roughly halves cache size with little quality loss — often a better first move than quantizing the weights themselves.",
   ctx:"Tokens each request sends in: system prompt, conversation history, documents, code. Before the first reply the engine reads the new part of the prompt (all of it if prompt caching is off in Advanced settings), and the whole prompt stays in the user's cache while the reply is written.",
@@ -2201,7 +2212,7 @@ const TIPS = {
   usable:"The dashed line marks how much memory the model may use: 90% of each GPU. That is vLLM's default limit (gpu_memory_utilization = 0.9); the other 10% is left for the driver and anything else on the card. A setup fits only if its memory stays to the left of the line.",
   perGPU:"What each individual board must hold. This is the number that determines fit — a model can need 300 GB total and still run fine on 4 × 80 GB.",
   fit:"What one node of each board takes to serve everyone: up to 8 GPUs, as one copy of the model or several, and how much GPU memory that adds up to. If one node can't serve everyone, its row says how many users it does serve. Assumes ~90% of board memory is usable; drivers and the CUDA context claim the rest.",
-  nvlink:"NVLink joins GPUs directly, which is what splitting one copy of a model across them needs to be fast. On H100 and H200, bridges link 2 or 4 cards, or an 8-GPU system links all 8. The B200 and B300 come only as 8-GPU systems with all 8 linked.",
+  nvlink:"NVLink is the direct GPU-to-GPU link that splitting one copy of a model across GPUs needs to be fast. On the H200 NVL card, an NVLink bridge joins 2 or 4 cards to each other, never more: a server with 8 cards has two bridged groups of 4, so it runs two copies of the model, and one copy spans at most 4. In an 8-GPU HGX system (the HGX H200, HGX B200 and HGX B300) an NVSwitch joins all 8 GPUs' NVLink lanes, so every GPU reaches every other at full speed.",
   pcie:"PCIe-only — no NVLink. Fine for a single GPU, but tensor parallelism must all-reduce over a far slower link after every layer, so throughput suffers badly.",
   pcieSlow:"Not recommended. This board has no NVLink, and here one copy of the model has to be split across several of them, so the GPUs exchange data over PCIe after every layer. That is slower than the same number of NVLink cards, and the speed shown already reflects it. It works and can be picked, but it is never the suggestion; prefer a board that holds a copy on one GPU, or an NVLink board.",
   pcieAmd:"PCIe-only — no Infinity Fabric, AMD's direct GPU-to-GPU link. Fine for a single GPU, but tensor parallelism must all-reduce over a far slower link after every layer, so throughput suffers badly.",
