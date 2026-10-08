@@ -14,7 +14,7 @@ It covers 40+ popular open models (Qwen, Gemma, Llama, DeepSeek, gpt-oss, GLM, K
 
 Every result is one server of up to 8 GPUs. If one node of a board can't serve every user, its row says how many it does serve. For production, plan at least one more node (or replica) than this, so the service keeps running if one fails or is being updated.
 
-GPU counts round up to what can be bought. H200 NVL servers take 1, 2 or 4 cards, joined by NVLink bridges. The HGX H200, HGX B200 and HGX B300 are sold only as 8-GPU systems, with all 8 GPUs joined through NVSwitch. RTX PRO 4500 servers hold up to 5 cards (the limit on HPE servers).
+GPU counts round up to what can be bought. H200 NVL servers take 1, 2, 4 or 8 cards, but an NVLink bridge joins at most 4 of them, so one copy of a model spans at most 4 and 8 cards run two copies. The HGX H200, HGX B200 and HGX B300 are sold only as 8-GPU systems, with all 8 GPUs joined through NVSwitch. RTX PRO 4500 servers hold up to 5 cards (the limit on HPE servers).
 
 Separately, one copy of a model is split across 1, 2, 4 or 8 GPUs. Serving engines need the split to divide the model's attention heads evenly, so this is a software rule that applies to every board. On a 5-card RTX PRO 4500 server, one copy uses at most 4 cards and the fifth can run another copy.
 
