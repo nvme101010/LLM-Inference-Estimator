@@ -1465,7 +1465,7 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
                  (answerAt !== null ? `<div class="n2">answer after ${fmtWait(answerAt)} <small>of thinking</small></div>` : "")
                  + (hasGoal
                      ? slowTtft ? `over the ${goal.ttft} s goal`
-                     : slowAnswer ? `within the ${goal.ttft} s goal if the thinking streams · past it if hidden`
+                     : slowAnswer ? `Meets the ${goal.ttft} s goal only if users see the thinking stream. If it is hidden, they wait for the answer.`
                      : `within the ${goal.ttft} s goal`
                      : `${commas(speed.prompt)} new prompt tokens`),
                  slowTtft || slowAnswer ? "warn" : "")
@@ -2057,8 +2057,13 @@ function buildSummary(){
   const stats = fits ? [
     ["Memory per GPU", `${fmtMem(L.perGB)}`, `of ${boxMem(a.g)}, ${Math.round(L.perGB/a.g.cap*100)}% full`],
     ["Speed per user", `${fmtTps(t.perUser)} tok/s`, hasGoal ? `${t.perUser>=goal.tps ? "meets" : "below"} the ${goal.tps}+ goal` : feelFor(t.perUser)],
-    ["First token", fmtTime(t.ttft).join(" "), (hasGoal ? `${t.ttft<=goal.ttft ? "within" : "over"} the ${goal.ttft} s goal` : `${commas(S.prompt)}-token prompt`)
-                    + (S.thinking ? `; the answer starts after ${fmtWait(t.ttft + S.thinking/t.perUser)} of thinking${hasGoal && t.ttft + S.thinking/t.perUser > goal.ttft ? `, past the ${goal.ttft} s goal if the thinking is hidden` : ""}` : "")],
+    ["First token", fmtTime(t.ttft).join(" "), (()=>{
+        const ans = S.thinking ? t.ttft + S.thinking/t.perUser : null, after = ans!==null ? `the answer starts after ${fmtWait(ans)} of thinking` : "";
+        if(!hasGoal) return `${commas(S.prompt)}-token prompt${after ? `; ${after}` : ""}`;
+        if(t.ttft > goal.ttft) return `over the ${goal.ttft} s goal${after ? `; ${after}` : ""}`;
+        if(ans!==null && ans > goal.ttft) return `${after}. Meets the ${goal.ttft} s goal only if users see the thinking stream; if it is hidden, they wait for the answer`;
+        return `within the ${goal.ttft} s goal${after ? `; ${after}` : ""}`;
+      })()],
     ["GPU memory in all", boxTotal(a.memGB), `${a.gpus} × ${boxMem(a.g)}`],
     ["Handles up to", `${commas(L.cap.users)} user${L.cap.users===1 ? "" : "s"}`,
       L.cap.users===0 ? (L.cap.limit==="speed" ? "none within the speed goal" : "none at these lengths")
