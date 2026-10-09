@@ -192,6 +192,8 @@
   .statstrip .cell .n{font-family:"IBM Plex Sans",system-ui,sans-serif; font-variant-numeric:tabular-nums; font-size:21px; font-weight:600; margin-top:3px; line-height:1.1}
   .statstrip .cell .n small{font-size:11px; color:var(--muted); font-weight:500}
   .statstrip .cell .sub{font-size:11.5px; color:var(--muted); margin-top:5px}
+  .statstrip .cell .n2{font-family:"IBM Plex Sans",system-ui,sans-serif; font-variant-numeric:tabular-nums; font-size:14px; font-weight:600; color:var(--ink); margin:2px 0 3px}
+  .statstrip .cell .n2 small{font-size:11px; color:var(--muted); font-weight:500}
   .statstrip .cell.warn{border-color:var(--warn)} .statstrip .cell.warn .sub{color:var(--warn)}
   .statstrip .cell.bad{border-color:var(--bad)}  .statstrip .cell.bad .sub{color:var(--bad)}
 
@@ -618,7 +620,7 @@
           <p><b>Throughput</b> — generating a token means reading this GPU's weight shard plus every active request's KV cache, so a decode step takes <code>bytes read ÷ (memory bandwidth × 0.65)</code>. At very large batches the compute cost <code>users × 2 × active params ÷ (FLOPs × 0.5)</code> takes over, so the step uses whichever is slower. Tensor parallelism adds two all-reduces per layer, sized to the batch's activations and sent over NVLink or PCIe, and the engine adds ~1.5 ms per step. With continuous batching every active request gets exactly one new token per step, so everyone streams at the same rate: <b>speed per user</b> = <code>1 ÷ step time</code>, and output for everyone = <code>users ÷ step time</code>. Adding users doesn't slow the step much until their caches outweigh the weights, which is why the per-user figure holds up as the batch grows and total output climbs. Reading a prompt is compute-bound: <code>prompt × (2 × active params + 2 × layers × prompt × hidden) ÷ (FLOPs × 0.45)</code>. The prompt is read in pieces (512, 2,048 or 8,192 tokens, set by <b>Optimize for</b>), and each piece shares a step with everyone else's next token. So <b>time to first token</b> = prompt compute + pieces × step time, and the <b>pause</b> other users feel = one piece's compute + one step. Smaller pieces mean more steps before the first reply but shorter freezes. Requests are assumed to be halfway through their reply (prompt + half the reply in cache), and the first reply waits on the whole prompt. Quantized weights read fewer bytes but lose some of that gain to dequantization; FP8 also speeds up compute on boards with native FP8 cores. MoE models read more experts as the batch grows; this assumes tokens are routed evenly across experts, and real routing is skewed, so fewer distinct experts are read and real speed can be somewhat higher. Bandwidth and link speeds are published specs; FLOPs are rough estimates.</p>
           <p><b>RAG pipelines</b> — the estimate covers the LLM only. RAG also needs an embedding model and usually a reranker. Small ones (under ~1B parameters) add a few GB and can share a GPU or run on CPU at low traffic. A 4–8B reranker, or heavy traffic, needs its own GPU. The reranker is the larger of the two: it reads the question against every retrieved chunk, often tens of thousands of tokens per query.</p>
           <p><b>Prompt caching</b> — chat and agent prompts mostly repeat: the same system prompt for every user, and each user's earlier turns. vLLM and SGLang cache that by default, so before the first reply only the new part of the prompt is read (it still attends to the cached part), and the shared system prompt's cache is stored once per GPU instead of once per user. Each preset sets the shape: Chat has a 512-token shared system prompt and about 512 new tokens a turn; RAG and Long-document summary read their documents fresh every time; Coding agent shares 4K tokens of system prompt and tool definitions and adds about 4K new tokens a step. Everything else in the prompt still sits in each user's cache, so memory changes only by the shared part. It can be turned off in Advanced settings.</p>
-          <p><b>Thinking</b> — a model that reasons step by step writes thinking tokens before its answer. They're generated like any other token, so a user's cache peaks at prompt + thinking + reply, speed is judged halfway through thinking and reply together, and cost per output token counts them. First reply is when the first token appears, which for a thinking model is the start of its thinking; the stat also says how long the thinking runs before the answer begins. Earlier turns' thinking is normally dropped by the model's chat template, so it doesn't build up in the prompt. The switch starts at each model's own default, taken from its model card and chat template.</p>
+          <p><b>Thinking</b> — a model that reasons step by step writes thinking tokens before its answer. They're generated like any other token, so a user's cache peaks at prompt + thinking + reply, speed is judged halfway through thinking and reply together, and cost per output token counts them. The <b>First token</b> stat is when the first token appears, which for a thinking model is the start of its thinking, and it also says when the answer starts: first token plus the thinking budget at the per-user speed. The speed goal's first-reply limit is checked against the first token, which is what a user sees when the UI streams the thinking; when the answer would start later than the limit, the stat turns orange, since a UI that hides the thinking makes that the wait the user feels. To meet the goal either way, shorten the thinking budget or pick a faster setup. Earlier turns' thinking is normally dropped by the model's chat template, so it doesn't build up in the prompt. The switch starts at each model's own default, taken from its model card and chat template.</p>
           <p><b>Concurrent users from traffic</b> — requests in progress at once = requests per second × seconds each one takes. A request takes the wait before its first token plus its thinking and reply, streamed at your speed goal's rate; the goal is a minimum speed, so this errs on the high side. The busiest-hour multiple covers traffic that isn't spread evenly through the day; 2× suits a typical workday.</p>
           <p><b>Sharing</b> — on a hosted copy of this page, the address always holds the current settings, so Copy link sends the exact scenario. Download summary saves a one-page report of the recommendation, the inputs and every board, which prints to PDF.</p>
           <p><b>Single node</b> — this estimates one server of up to 8 GPUs. Every result is a single node; multi-node deployments and NVL rack-scale systems are not covered. If one node of a board can't serve every user, its row says how many it does serve. For production, plan at least one more node (or replica) than this, so the service keeps running if one fails or is being updated.</p>
@@ -1448,6 +1450,9 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
   const na = "needs a board that fits";
   const slowTps  = hasGoal && speed && speed.perUser < goal.tps;
   const slowTtft = hasGoal && speed && speed.ttft > goal.ttft;
+  // a thinking model's visible answer starts after its thinking; if the UI hides the thinking, that is the wait the user feels
+  const answerAt = speed && S.thinking ? speed.ttft + S.thinking / speed.perUser : null;
+  const slowAnswer = hasGoal && answerAt !== null && answerAt > goal.ttft;
   $('vstats').innerHTML =
       (g ? statCell("perGPU", "Per GPU", fmtMemN(perGB), `of ${boxMem(g)}`,
              fits ? `${Math.round(perGB/g.cap*100)}% full${active.gpus>1 ? ` · ${fmtMem(totGB*reps)} in all` : ""}`
@@ -1456,10 +1461,15 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
     + (speed ? statCell("tpsUser", "Speed per user", fmtTpsShort(speed.perUser), "tok/s",
                  hasGoal ? `${slowTps ? "below" : "meets"} the ${goal.tps}+ goal` : feelFor(speed.perUser), slowTps ? "warn" : "")
              : statCell("tpsUser", "Speed per user", "—", "", na))
-    + (speed ? statCell("ttft", "First reply", ...fmtTime(speed.ttft),
-                 (hasGoal ? `${slowTtft ? "over" : "within"} the ${goal.ttft} s goal` : `${commas(speed.prompt)} new prompt tokens`)
-                 + (S.thinking ? ` · then ${fmtWait(S.thinking / speed.perUser)} of thinking` : ""), slowTtft ? "warn" : "")
-             : statCell("ttft", "First reply", "—", "", na));
+    + (speed ? statCell("ttft", "First token", ...fmtTime(speed.ttft),
+                 (answerAt !== null ? `<div class="n2">answer after ${fmtWait(answerAt)} <small>of thinking</small></div>` : "")
+                 + (hasGoal
+                     ? slowTtft ? `over the ${goal.ttft} s goal`
+                     : slowAnswer ? `within the ${goal.ttft} s goal if the thinking streams · past it if hidden`
+                     : `within the ${goal.ttft} s goal`
+                     : `${commas(speed.prompt)} new prompt tokens`),
+                 slowTtft || slowAnswer ? "warn" : "")
+             : statCell("ttft", "First token", "—", "", na));
 }
 
 
@@ -2047,8 +2057,8 @@ function buildSummary(){
   const stats = fits ? [
     ["Memory per GPU", `${fmtMem(L.perGB)}`, `of ${boxMem(a.g)}, ${Math.round(L.perGB/a.g.cap*100)}% full`],
     ["Speed per user", `${fmtTps(t.perUser)} tok/s`, hasGoal ? `${t.perUser>=goal.tps ? "meets" : "below"} the ${goal.tps}+ goal` : feelFor(t.perUser)],
-    ["First reply", fmtTime(t.ttft).join(" "), (hasGoal ? `${t.ttft<=goal.ttft ? "within" : "over"} the ${goal.ttft} s goal` : `${commas(S.prompt)}-token prompt`)
-                    + (S.thinking ? `, then ${fmtWait(S.thinking/t.perUser)} of thinking` : "")],
+    ["First token", fmtTime(t.ttft).join(" "), (hasGoal ? `${t.ttft<=goal.ttft ? "within" : "over"} the ${goal.ttft} s goal` : `${commas(S.prompt)}-token prompt`)
+                    + (S.thinking ? `; the answer starts after ${fmtWait(t.ttft + S.thinking/t.perUser)} of thinking${hasGoal && t.ttft + S.thinking/t.perUser > goal.ttft ? `, past the ${goal.ttft} s goal if the thinking is hidden` : ""}` : "")],
     ["GPU memory in all", boxTotal(a.memGB), `${a.gpus} × ${boxMem(a.g)}`],
     ["Handles up to", `${commas(L.cap.users)} user${L.cap.users===1 ? "" : "s"}`,
       L.cap.users===0 ? (L.cap.limit==="speed" ? "none within the speed goal" : "none at these lengths")
@@ -2094,7 +2104,7 @@ function buildSummary(){
       : `The recommendation is the node that ${hasGoal ? "reaches the speed goal" : "holds every user"} with the least GPU memory in total; on any one board, that means the fewest GPUs.`,
   ];
   if(WORKLOADS[S.workload].short) notes.push(WORKLOADS[S.workload].short);
-  if(S.thinking) notes.push(`For a thinking model, first reply is when its thinking starts; the answer follows once the thinking is done.`);
+  if(S.thinking) notes.push(`For a thinking model, first token is when its thinking starts, which a user sees only if the UI streams the thinking. The answer starts once the thinking is done; if the UI hides the thinking, that is the wait the user feels, and the speed goal should be judged against it.`);
   if(fits && notRecommended(a)) notes.push(`Not recommended: this splits one copy across cards with no ${fabric(a.g)}, so they coordinate over PCIe after every layer, slower than directly linked cards.`);
   // the layout row already says how copies are arranged, so there is no separate note for them
   // the link back sits beside the date, so it can never be the line that pushes the page onto a second sheet
@@ -2220,7 +2230,7 @@ const TIPS = {
   tput:"A first-order estimate from the board's memory bandwidth, compute and interconnect, not a benchmark. Real results vary with the serving engine, its settings and the traffic. Use it to compare setups, not to promise an SLA.",
   tpsTotal:"Output tokens per second summed across every concurrent user — what the deployment produces. Adding users usually raises it, because the weights are read once per step no matter how many requests share that step.",
   tpsUser:"How fast one person sees text stream in: 1 ÷ the time of one decode step, because each step produces one new token for every active user at once, so everyone streams at the same rate. More users make the step longer, since it must also read their KV caches. Around 20 tok/s or more feels smooth in chat; under 10 feels sluggish.",
-  ttft:"Time to first token: how long someone waits before the answer starts appearing. Uses the new part of the prompt (all of it with prompt caching off), read in pieces while the other users keep being served. Faster chips, FP8 and Fast first reply all shorten it. For a thinking model this is when the thinking starts; the answer follows once it's done.",
+  ttft:"Time to first token: prefill of the new part of the prompt (all of it with prompt caching off), read in pieces while the other users keep being served, plus one shared decode step per piece. Faster chips, FP8 and Fast first reply all shorten it. For a thinking model the first token is a thinking token, so this is when the thinking starts; the answer starts after the thinking, and the tile says when. If your UI streams the thinking, the user sees text at the first token; if it hides the thinking, the answer time is the wait they feel, and the tile turns orange when that misses the goal.",
   step:"Everything needed to produce one token for every active user. The largest segment is the bottleneck. A big blue interconnect segment means tensor parallelism is costing you real speed.",
   bneck:"What limits token generation right now. Memory-bound is normal for decode: the GPU waits on reading weights and cache. Compute-bound appears at very large batches. Interconnect-bound means the GPUs spend more time talking than working.",
 };
