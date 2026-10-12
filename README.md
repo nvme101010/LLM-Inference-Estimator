@@ -51,6 +51,16 @@ docker run --rm -p 8080:8080 --read-only --tmpfs /tmp ghcr.io/nvme101010/llm-inf
 
 `/healthz` answers `200 ok` for health checks. The page loads its two fonts from Google Fonts; without internet access it falls back to system fonts and everything else works offline.
 
+### Kubernetes
+
+[`deploy/k8s`](deploy/k8s) holds a Deployment (2 replicas, non-root, read-only root filesystem, no capabilities, readiness and liveness probes on `/healthz`, 10m CPU and 16 Mi memory requested), a Service on port 80, a PodDisruptionBudget, and an optional Ingress. Apply it from the repository or straight from GitHub:
+
+```bash
+kubectl apply -k "https://github.com/nvme101010/LLM-Inference-Estimator//deploy/k8s?ref=v1.0.2"
+```
+
+Then port-forward to try it (`kubectl port-forward svc/llm-inference-estimator 8080:80`) or set the host in `ingress.yaml` and add it to the kustomization. The image runs two nginx workers regardless of node size, so the 32 Mi limit holds everywhere.
+
 ## Share a sizing
 
 - **Download summary** saves a one-page report of the recommendation, the inputs, every board compared and the assumptions. Open it and choose Print to save it as a PDF.

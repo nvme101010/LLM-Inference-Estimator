@@ -1,0 +1,18 @@
+# Optional: expose it on a hostname through your ingress controller. Change the host, and add
+# TLS (for example a cert-manager annotation and a tls: block) the way your cluster does it.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: llm-inference-estimator
+spec:
+  rules:
+    - host: estimator.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: llm-inference-estimator
+                port:
+                  name: http
