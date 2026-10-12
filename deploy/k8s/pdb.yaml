@@ -1,0 +1,10 @@
+# Keeps one replica serving while nodes drain for upgrades.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: llm-inference-estimator
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: llm-inference-estimator
