@@ -20,6 +20,8 @@ Separately, one copy of a model is split across 1, 2, 4 or 8 GPUs. Serving engin
 
 **Prompt caching** is modelled the way vLLM and SGLang run by default: the repeated part of each prompt (a shared system prompt, earlier turns) is reused, so only the new part is read before the first reply, and the shared part is stored once per GPU. It can be turned off in Advanced settings.
 
+**Several workloads:** one model often serves more than one kind of request at once, such as 16 chat users alongside 10 RAG users. **Add another workload** gives each its own number of concurrent users and its own prompt and reply lengths, up to four in all. They share the same copies of the model, so memory adds up across them and every user streams at the same speed. Each workload has its own first-token time: the headline shows the slowest, and the speed goal is checked against it. Workloads that need a different model are not covered.
+
 **RAG pipelines:** the estimate covers the LLM only. RAG also needs an embedding model and usually a reranker, which aren't sized. Small ones (under ~1B parameters) add a few GB and can share a GPU or run on CPU at low traffic; a 4–8B reranker, or heavy traffic, needs its own GPU.
 
 Not sure how many concurrent users to plan for? **Estimate from daily traffic** turns people, requests per day and hours of use into a concurrent-user count.

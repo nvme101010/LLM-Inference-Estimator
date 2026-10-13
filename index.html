@@ -182,6 +182,21 @@
   .traffic-out{display:flex; align-items:center; flex-wrap:wrap; gap:6px 12px; margin-top:12px; font-size:13px; color:var(--ink-2)}
   .traffic-out .tf-num{font-family:"IBM Plex Sans",system-ui,sans-serif; font-variant-numeric:tabular-nums; font-size:19px; font-weight:600; color:var(--ink)}
   .traffic-out .hint{flex-basis:100%; margin-top:2px}
+  /* more workloads on the same model: one row each */
+  .mix{margin-top:16px; padding-top:14px; border-top:1px dashed var(--line-2)}
+  .mix-head{font-size:13px; font-weight:500; color:var(--ink); margin-bottom:10px}
+  .mix-row{display:grid; grid-template-columns:minmax(0,2fr) repeat(3,minmax(0,1fr)) auto; gap:10px 16px; align-items:end; margin-bottom:10px}
+  .mix-row label.fld{margin-bottom:3px; font-size:11px}
+  .mix-row .linkbtn{margin:0 0 10px}
+  .mix .hint{margin-top:0}
+  @media (max-width:760px){
+    .mix-row{grid-template-columns:repeat(3,minmax(0,1fr)); padding-bottom:10px; border-bottom:1px solid var(--line)}
+    .mix-row > div:first-child{grid-column:span 3}
+    .mix-row .linkbtn{justify-self:start; margin:0}
+  }
+  .mixtable{overflow-x:auto; margin-top:6px}
+  .mixtable td.num{text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums}
+  .mixtable tbody td{padding:8px 18px}
   .btn-sm{border:1px solid var(--accent); background:var(--accent); color:#06110f; border-radius:8px; padding:5px 12px; font:inherit; font-size:12.5px; font-weight:600; cursor:pointer}
   .btn-sm:disabled{background:none; color:var(--muted); border-color:var(--line-2); cursor:default; font-weight:500}
   .btn-sm:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
@@ -407,6 +422,7 @@
           </div>
           <input type="range" id="users" min="0" max="39" step="1" value="15" aria-label="Concurrent users">
           <div class="ticks"><span>1</span><span>1,024</span></div>
+          <div class="hint" id="usersHint" hidden></div>
           <button type="button" class="linkbtn" id="trafficBtn" aria-expanded="false" aria-controls="trafficWrap">Estimate from daily traffic</button>
         </div>
         <div class="field">
@@ -419,6 +435,7 @@
             <option value="custom">Custom lengths</option>
           </select>
           <div class="hint" id="workloadHint"></div>
+          <button type="button" class="linkbtn" id="mixAdd" aria-controls="mixWrap">Add another workload</button>
         </div>
         <div class="field">
           <div class="sliderhead"><label class="fld" for="wq">Weight precision <span class="i" data-tip="wq" tabindex="0">i</span></label></div>
@@ -464,6 +481,11 @@
             </div>
           </div>
         </div>
+      </div>
+      <div id="mixWrap" class="mix" hidden>
+        <div class="mix-head">Also running on this model <span class="i" data-tip="mix" tabindex="0">i</span></div>
+        <div id="mixRows"></div>
+        <div class="hint" id="mixHint"></div>
       </div>
       <div id="customWrap" hidden>
         <div class="customfields">
@@ -620,6 +642,7 @@
           <p><b>Throughput</b> — generating a token means reading this GPU's weight shard plus every active request's KV cache, so a decode step takes <code>bytes read ÷ (memory bandwidth × 0.65)</code>. At very large batches the compute cost <code>users × 2 × active params ÷ (FLOPs × 0.5)</code> takes over, so the step uses whichever is slower. Tensor parallelism adds two all-reduces per layer, sized to the batch's activations and sent over NVLink or PCIe, and the engine adds ~1.5 ms per step. With continuous batching every active request gets exactly one new token per step, so everyone streams at the same rate: <b>speed per user</b> = <code>1 ÷ step time</code>, and output for everyone = <code>users ÷ step time</code>. Adding users doesn't slow the step much until their caches outweigh the weights, which is why the per-user figure holds up as the batch grows and total output climbs. Reading a prompt is compute-bound: <code>prompt × (2 × active params + 2 × layers × prompt × hidden) ÷ (FLOPs × 0.45)</code>. The prompt is read in pieces (512, 2,048 or 8,192 tokens, set by <b>Optimize for</b>), and each piece shares a step with everyone else's next token. So <b>time to first token</b> = prompt compute + pieces × step time, and the <b>pause</b> other users feel = one piece's compute + one step. Smaller pieces mean more steps before the first reply but shorter freezes. Requests are assumed to be halfway through their reply (prompt + half the reply in cache), and the first reply waits on the whole prompt. Quantized weights read fewer bytes but lose some of that gain to dequantization; FP8 also speeds up compute on boards with native FP8 cores. MoE models read more experts as the batch grows; this assumes tokens are routed evenly across experts, and real routing is skewed, so fewer distinct experts are read and real speed can be somewhat higher. Bandwidth and link speeds are published specs; FLOPs are rough estimates. Every speed figure is measured at the server in steady state, with the other users mid-reply: it leaves out the network round trip, TLS and any gateway, queueing before the engine admits a request, and tokenization. Those add little to the streaming rate but can outweigh a short first token. Real results land on both sides: routing skew and a warm prompt cache make things faster, bursts and long-tail prompts slower.</p>
           <p><b>RAG pipelines</b> — the estimate covers the LLM only. RAG also needs an embedding model and usually a reranker. Small ones (under ~1B parameters) add a few GB and can share a GPU or run on CPU at low traffic. A 4–8B reranker, or heavy traffic, needs its own GPU. The reranker is the larger of the two: it reads the question against every retrieved chunk, often tens of thousands of tokens per query.</p>
           <p><b>Prompt caching</b> — chat and agent prompts mostly repeat: the same system prompt for every user, and each user's earlier turns. vLLM and SGLang cache that by default, so before the first reply only the new part of the prompt is read (it still attends to the cached part), and the shared system prompt's cache is stored once per GPU instead of once per user. Each preset sets the shape: Chat has a 512-token shared system prompt and about 512 new tokens a turn; RAG and Long-document summary read their documents fresh every time; Coding agent shares 4K tokens of system prompt and tool definitions and adds about 4K new tokens a step. Everything else in the prompt still sits in each user's cache, so memory changes only by the shared part. It can be turned off in Advanced settings.</p>
+          <p><b>Several workloads</b> — one model often serves more than one kind of request at once: chat users alongside a RAG app, say. <b>Add another workload</b> gives each its own number of concurrent users and its own prompt and reply lengths. They share the same copies of the model, and each copy takes the workloads in the same proportions. <b>Memory</b> adds up: each workload's users hold a cache of that workload's length, and each workload's shared system prompt is stored once per GPU. <b>Speed per user</b> is the same for everyone, because one decode step writes a token for the whole batch; the step reads every request's cache, so long-context users slow the others a little. <b>First token</b> differs, since each workload waits on its own new prompt tokens: the headline is the workload that waits longest, the speed goal is checked against it, and Speed on this setup lists each one. The <b>pause</b> is the longest any workload's prompt causes, so long RAG or agent prompts are what chat users feel. One engine setting, <b>Optimize for</b>, reads every workload's prompts; it follows the first workload's preset and can be changed in Advanced settings. Because the cache grows in step with length on most models, memory and speed come out almost the same as one workload at the user-weighted average lengths; what a mix adds is each workload's own start time. Workloads that need a different model are not covered.</p>
           <p><b>Thinking</b> — a model that reasons step by step writes thinking tokens before its answer. They're generated like any other token, so a user's cache peaks at prompt + thinking + reply, speed is judged halfway through thinking and reply together, and cost per output token counts them. The <b>First token</b> stat is when the first token appears, which for a thinking model is the start of its thinking, and it also says when the answer starts: first token plus the thinking budget at the per-user speed. The speed goal's first-reply limit is checked against the first token, which is what a user sees when the UI streams the thinking; when the answer would start later than the limit, the stat turns orange, since a UI that hides the thinking makes that the wait the user feels. To meet the goal either way, shorten the thinking budget or pick a faster setup. Earlier turns' thinking is normally dropped by the model's chat template, so it doesn't build up in the prompt. The switch starts at each model's own default, taken from its model card and chat template.</p>
           <p><b>Concurrent users from traffic</b> — requests in progress at once = requests per second × seconds each one takes. A request takes the wait before its first token plus its thinking and reply, streamed at your speed goal's rate; the goal is a minimum speed, so this errs on the high side. The busiest-hour multiple covers traffic that isn't spread evenly through the day; 2× suits a typical workday.</p>
           <p><b>Sharing</b> — on a hosted copy of this page, the address always holds the current settings, so Copy link sends the exact scenario. Download summary saves a one-page report of the recommendation, the inputs and every board, which prints to PDF.</p>
@@ -866,12 +889,12 @@ const WORKLOADS = {
 const DATA_AS_OF = "October 2026";   // when the model and board figures were last checked
 /* how a prompt splits under prompt caching: the part new to this request is the only part read
    before the first reply; the shared part is stored once per GPU, not once per user */
-function promptParts(){
-  const P = S.prompt;
+function promptParts(w = S){             // w = a workload: the first one (S) or an added one
+  const P = w.prompt;
   if(!S.cache) return {P, shared:0, fresh:P};
-  if(S.fresh==null){ const shared = Math.min(S.shared, Math.floor(P/2)); return {P, shared, fresh:P-shared}; }
-  const fresh = Math.min(S.fresh, P);
-  return {P, shared:Math.min(S.shared, P-fresh), fresh};
+  if(w.fresh==null){ const shared = Math.min(w.shared, Math.floor(P/2)); return {P, shared, fresh:P-shared}; }
+  const fresh = Math.min(w.fresh, P);
+  return {P, shared:Math.min(w.shared, P-fresh), fresh};
 }
 
 /* memory units are display only; the viewer's choice is remembered in this browser */
@@ -884,18 +907,37 @@ function loadUnit(){ try { return localStorage.getItem(UNIT_KEY)==="GiB" ? "GiB"
 /* prompt/reply = lengths in use; wantPrompt/wantReply = what the workload asked for, kept so a
    model with a shorter context trims them and switching back restores them.
    think = the Thinking switch · thinkTok = thinking tokens asked for · thinking = tokens in use (0 when off).
-   ctxTok = prompt + thinking + reply. */
+   A user's context is prompt + thinking + reply. */
 const S = { wq:2, wqLbl:"NATIVE", kq:2, tp:1, tpo:"auto", chunk:512, ovpct:7, users:16, board:"auto",
             goal:"smooth",
-            workload:"chat", prompt:2048, reply:512, wantPrompt:2048, wantReply:512, ctxTok:2560,
+            workload:"chat", prompt:2048, reply:512, wantPrompt:2048, wantReply:512,
             think:false, thinkTok:4096, thinking:0,
             cache:1, shared:512, fresh:512,                    // prompt caching on, and the last preset's shape of a prompt
             traffic:{people:1000, req:20, hours:8, peak:2},   // the traffic estimator's inputs
             trafficApplied:null,                               // those inputs and the users they gave, once used
             chunkBase:512,     // the Optimize-for choice the last preset made, so Advanced can flag your own change
+            extra:[],          // workloads added to the first: {workload, users, prompt, reply, wantPrompt, wantReply, shared, fresh}
             unit:loadUnit() };
 let M = findModel("l31-8b");
 let LAST = null;   // what the last render showed, for the downloadable summary
+
+/* ---------------- several workloads on one model ----------------
+   One model often serves more than one kind of request at once: chat users alongside a RAG app, say.
+   The first workload is the one the main controls set (S itself); S.extra holds any added ones, each
+   with its own users and lengths. They share the same copies of the model, so memory adds up across
+   them and every user streams at the same speed, while each has its own first-token time.
+   A copy carrying n users carries the workloads in the mix's proportions (so a workload's share of
+   them needn't be whole), which lets the search for a layout keep working on one number of users. */
+const MIX_MAX  = 3;                                  // added workloads, beyond the first
+const groups   = () => [S, ...S.extra];
+const mixed    = () => S.extra.length > 0;
+const allUsers = () => S.extra.reduce((n, w)=> n + w.users, S.users);
+const mixAt    = n => { const all = allUsers(); return groups().map(w=> ({w, users: w.users*n/all, ctx: w.prompt + S.thinking + w.reply})); };
+/* each workload's name, numbered when two share one ("Custom 1", "Custom 2") */
+function groupNames(){
+  const names = groups().map(w=> WORKLOADS[w.workload].name);
+  return names.map((n, i)=> names.filter(x=> x===n).length>1 ? `${n} ${names.slice(0, i+1).filter(x=> x===n).length}` : n);
+}
 
 /* ---------------- populate model select ---------------- */
 const modelSel = document.getElementById('model');
@@ -1021,12 +1063,16 @@ const precClass = m => S.wqLbl==="NATIVE" ? m.nat.cls : S.wqLbl;
 
 function compute(tpOverride, usersOverride){
   const m = activeModel();
-  const ctx = S.ctxTok, users = usersOverride ?? S.users, tp = tpOverride ?? S.tp;
+  const users = usersOverride ?? allUsers(), tp = tpOverride ?? S.tp;
   const cuda = 1.0 * GB;                                            // per-GPU CUDA/driver context
 
   // aggregate core (whole deployment, before sharding)
   const weights  = m.p*1e9 * S.wq;                                  // bytes
-  const cache    = cacheFor(m, ctx, tp);                            // one user's cache, whole model and per GPU
+  /* each workload's users hold a cache of that workload's length (one user's cache, whole model and
+     per GPU), and the shared start of its prompts is kept once per GPU */
+  const mix   = mixAt(users).map(x=> ({...x, cache: cacheFor(m, x.ctx, tp), sh: sharedCacheFor(m, promptParts(x.w).shared, x.ctx, tp)}));
+  const sum   = f => mix.reduce((s, x)=> s + f(x), 0);
+  const ctx   = mix[0].ctx, cache = mix[0].cache;                   // copying and data-parallel follow the model and the split, not the lengths
 
   /* Activations. Peak is a forward pass over T tokens in flight (prefill chunk, or the
      decode batch — whichever is larger). Live buffers per pass: a few hidden-sized
@@ -1042,25 +1088,28 @@ function compute(tpOverride, usersOverride){
 
   // tensor-parallel sharding
   const w_pg       = weights / tp;
-  const sh = sharedCacheFor(m, promptParts().shared, ctx, tp);     // the shared prompt start, kept once per GPU
   const onGpu = cache.dp ? Math.ceil(users/tp) : users;            // users whose cache sits on each GPU
-  const kv_pg      = cache.dp ? cache.req*onGpu - sh.req*Math.max(0, onGpu-1)   // data-parallel: this GPU's own users, whole caches
-                              : cache.pg*users - sh.pg*Math.max(0, users-1);
+  const kv_pg      = sum(x=>{
+    const u = x.users*onGpu/users;                                  // this workload's share of them
+    return cache.dp ? x.cache.req*u - x.sh.req*Math.max(0, u-1)     // data-parallel: this GPU's own users, whole caches
+                    : x.cache.pg*u - x.sh.pg*Math.max(0, u-1);
+  });
   const act_pg     = act / tp;
   const frag_pg    = (w_pg + kv_pg + act_pg) * (S.ovpct/100);
   const tpcomm_pg  = tp>1 ? (0.3*GB + users*m.h*2*4) : 0;           // NCCL workspace + comm buffers
   const perGPU     = w_pg + kv_pg + act_pg + cuda + frag_pg + tpcomm_pg;
 
   // aggregate components for the bar/table (sum across all GPUs)
-  const kv_agg       = cache.dp ? cache.req*users - sh.req*Math.max(0, users - Math.min(users, tp))
+  const kvReq        = sum(x=> x.cache.req*x.users);                // everyone's cache, counted once
+  const kv_agg       = cache.dp ? sum(x=> x.cache.req*x.users - x.sh.req*Math.max(0, x.users - Math.min(x.users, tp)))
                                 : kv_pg * tp;                       // inflates when tp > kv_heads (replication)
-  const kv_saved     = (cache.dp ? cache.req*users : cache.pg*users*tp) - kv_agg;   // what sharing the prompt start saves
+  const kv_saved     = (cache.dp ? kvReq : sum(x=> x.cache.pg*x.users)*tp) - kv_agg;   // what sharing the prompt start saves
   const act_agg      = act_pg * tp;
   const overhead_agg = cuda + frag_pg*tp;                           // one base context + fragmentation on every GPU
   const tp_agg       = tp>1 ? (tp-1)*cuda + tpcomm_pg*tp : 0;       // extra contexts + all comm buffers
   const total        = weights + kv_agg + act_agg + overhead_agg + tp_agg;
 
-  return {m, ctx, users, tp, cache, T, ffn, vocab, actBuf, actLogit,
+  return {m, ctx, users, tp, cache, mix, kvReq, T, ffn, vocab, actBuf, actLogit,
           weights, kv:kv_agg, act:act_agg, overhead:overhead_agg, tpov:tp_agg,
           w_pg, kv_pg, act_pg, tpcomm_pg, perGPU, total, kv_saved};
 }
@@ -1079,9 +1128,9 @@ const PREC = {                  // d = share of the bandwidth saving realized ·
   INT8:{d:0.85, p:0.8},  INT4:{d:0.75, p:0.8}, INT3:{d:0.7, p:0.75}, INT2:{d:0.65, p:0.7},
 };
 
-function throughput(g, tp, chunk = S.chunk, users = S.users){
+function throughput(g, tp, chunk = S.chunk, users = allUsers()){
   const m = activeModel();
-  const fill = S.prompt + (S.thinking + S.reply)/2;   // a request halfway through thinking + reply
+  const mix = mixAt(users);
   const cls = precClass(m);
   let {d, p} = PREC[cls];
   if(cls==="FP8" && !g.fp8){ d=0.85; p=0.9; }   // weight-only FP8 kernels on boards without FP8 cores
@@ -1101,36 +1150,50 @@ function throughput(g, tp, chunk = S.chunk, users = S.users){
   const alpha = g.link ? 0.03e-3 : 0.15e-3;
   const allReduce = bytes => tp>1 ? alpha + 2*(tp-1)/tp * bytes/(g.lbw*GB) : 0;
 
-  // decode step
-  const live      = cacheFor(m, fill, tp);       // what each request's cache costs to read per step
-  const readBytes = paramsRead*S.wq/tp + live.readPg * users;
+  /* decode step: one step writes a token for every request, whatever its workload, so it reads
+     every request's cache. Each is taken halfway through its thinking + reply. */
+  let cacheRead = 0, flops = 0;
+  for(const x of mix){
+    const live = cacheFor(m, x.w.prompt + (S.thinking + x.w.reply)/2, tp);   // what each request's cache costs to read per step
+    cacheRead += live.readPg * x.users;
+    // attention is two matmuls (scores, then values) over the span, 2 FLOPs per multiply-add
+    flops += x.users * (2*paramsActive + 4*live.span*m.h);
+  }
+  const readBytes = paramsRead*S.wq/tp + cacheRead;
   const tMem      = readBytes / (g.bw*GB * MBU * d);
-  // attention is two matmuls (scores, then values) over the span, 2 FLOPs per multiply-add
-  const tCompute  = users * (2*paramsActive + 4*live.span*m.h) / (g.flops*1e12 * MFU_DECODE * p * tp);
+  const tCompute  = flops / (g.flops*1e12 * MFU_DECODE * p * tp);
   const tComm     = 2*m.L * allReduce(users*m.h*2);
   const tStep     = Math.max(tMem, tCompute) + tComm + STEP_OVERHEAD;
 
-  /* prefill one prompt of `fill` tokens, split into chunks. Each chunk shares a step with the
+  /* prefill one prompt, split into chunks. Each chunk shares a step with the
      decode of everyone already replying, so:
        · more, smaller chunks → the new prompt waits through more steps (slower first reply)
-       · bigger chunks → each shared step is longer, so running replies freeze for longer */
-  // with prompt caching only the new part of the prompt is read; it still attends to the cached part
-  const pp = promptParts(), P = Math.max(1, pp.fresh), piece = Math.min(chunk, P), chunks = Math.ceil(P / chunk);
-  const spanAll = cacheFor(m, Math.max(1, pp.P), tp).span, spanNew = cacheFor(m, P, tp).span;
-  /* each new token attends to everything before it: the cached part plus, on average, half the new
-     part. Two matmuls at 2 FLOPs per multiply-add: 4 × (span − new/2) × hidden, which is
-     2 × span × hidden when nothing is cached. */
-  const attnPerTok = 4 * Math.max(0, spanAll - spanNew/2) * m.h;
-  const promptCompute = n => n*(2*paramsActive + attnPerTok) / (g.flops*1e12 * MFU_PREFILL * p * tp);
-  const chunkComm = 2*m.L * allReduce(piece*m.h*2);
-  const ttft  = promptCompute(P) + chunks*(tStep + chunkComm);
-  const pause = promptCompute(piece) + chunkComm + tStep;   // longest gap between tokens for running replies
+       · bigger chunks → each shared step is longer, so running replies freeze for longer
+     Each workload reads its own prompts, so each has its own first reply and causes its own pause. */
+  const per = mix.map((x, i)=>{
+    // with prompt caching only the new part of the prompt is read; it still attends to the cached part
+    const pp = promptParts(x.w), P = Math.max(1, pp.fresh), piece = Math.min(chunk, P), chunks = Math.ceil(P / chunk);
+    const spanAll = cacheFor(m, Math.max(1, pp.P), tp).span, spanNew = cacheFor(m, P, tp).span;
+    /* each new token attends to everything before it: the cached part plus, on average, half the new
+       part. Two matmuls at 2 FLOPs per multiply-add: 4 × (span − new/2) × hidden, which is
+       2 × span × hidden when nothing is cached. */
+    const attnPerTok = 4 * Math.max(0, spanAll - spanNew/2) * m.h;
+    const promptCompute = n => n*(2*paramsActive + attnPerTok) / (g.flops*1e12 * MFU_PREFILL * p * tp);
+    const chunkComm = 2*m.L * allReduce(piece*m.h*2);
+    const ttft  = promptCompute(P) + chunks*(tStep + chunkComm);
+    const pause = promptCompute(piece) + chunkComm + tStep;   // longest gap between tokens for running replies
+    return {i, w:x.w, users:x.users, prompt:P, ttft, pause, prefillTps: P/ttft};
+  });
+  /* the goal is judged on the workload that waits longest for its first token; the pause is the
+     longest any workload's prompt causes */
+  const slow  = per.reduce((a, b)=> b.ttft > a.ttft ? b : a);
+  const stall = per.reduce((a, b)=> b.pause > a.pause ? b : a);
 
   const core = Math.max(tMem, tCompute);
   const bottleneck = tComm > core ? "interconnect" : STEP_OVERHEAD > core ? "scheduler"
                    : tCompute > tMem ? "compute" : "memory";
-  return { perUser: 1/tStep, total: users/tStep, ttft, pause, prefillTps: P/ttft, prompt: P,
-           tMem, tCompute, tComm, tOver: STEP_OVERHEAD, tStep, bottleneck };
+  return { perUser: 1/tStep, total: users/tStep, ttft: slow.ttft, pause: stall.pause, prefillTps: slow.prefillTps, prompt: slow.prompt,
+           per, slow, stall, tMem, tCompute, tComm, tOver: STEP_OVERHEAD, tStep, bottleneck };
 }
 
 const fitsOn = (g, perGB) => perGB <= g.cap*USABLE;
@@ -1149,7 +1212,7 @@ const TP_OPTIONS = [1,2,4,8];
 const NODE = 8;   // GPUs in one node
 const nodeMax = g => g.max || NODE;   // fewer on a board whose servers hold fewer
 const splitMax = g => Math.min(nodeMax(g), g.split || NODE);   // and a copy spans no more than its link joins
-function evaluate(g, tp, reps, upr = Math.ceil(S.users/reps)){      // upr = users on each copy
+function evaluate(g, tp, reps, upr = Math.ceil(allUsers()/reps)){   // upr = users on each copy
   const r = compute(tp, upr), perGB = r.perGPU/GB, fits = fitsOn(g, perGB);
   const t = fits ? throughput(g, tp, S.chunk, upr) : null, gpus = tp*reps;
   return {g, tp, reps, upr, gpus, r, perGB, fits, t, meets: !!t && meetsGoal(t), memGB: gpus*g.cap};   // memGB = GPU memory bought
@@ -1195,10 +1258,11 @@ function deploymentFor(g){
     const d = evaluate(g, S.tpo, 1, 1);
     return Object.assign(d, {fits:false, t:null, meets:false, tooWide:true, memOnly:null});
   }
+  const all = allUsers();
   const layouts = memOnly => tps.map(tp=>{
-    const cap = copyCapacity(g, tp, S.users, memOnly);
+    const cap = copyCapacity(g, tp, all, memOnly);
     if(!cap) return null;
-    const reps = Math.ceil(S.users/cap), copies = buyableCopies(g, tp, reps);
+    const reps = Math.ceil(all/cap), copies = buyableCopies(g, tp, reps);
     if(tp*copies > nodeMax(g)) return null;      // more than one node holds
     const d = evaluate(g, tp, copies);
     d.need = tp*reps;                      // GPUs the workload needs, before rounding up to a buyable count
@@ -1236,7 +1300,7 @@ function systemsIn(d){
 function memoryReason(d){
   if(d.reps>1){
     const holds = copyCapacity(d.g, d.tp, 1e6, true);
-    return holds < S.users ? {holds, on: d.tp===1 ? "one GPU" : "one copy", verb:"has"} : null;
+    return holds < allUsers() ? {holds, on: d.tp===1 ? "one GPU" : "one copy", verb:"has"} : null;
   }
   const n = d.tp/2, holds = copyCapacity(d.g, n, 1e6, true);
   const r = {holds, on: n===1 ? "one GPU" : `${n} GPUs`, verb: n===1 ? "has" : "have"};
@@ -1294,13 +1358,24 @@ const LAYER_LABEL = {
   index:      g => `${g.n} layers of sparse-attention index keys${g.r>1?` (${g.r}:1)`:""}`,
   linear:     g => `${g.n} ${g.kind} layers`,
 };
+const fmtUsers = n => Number.isInteger(n) ? commas(n) : n.toFixed(1);   // a copy's share of one workload's users needn't be whole
 function kvFormula(r){
-  const {cache, ctx, users, tp} = r;
-  const lines = cache.parts.map(({g, bytes})=> g.state
-    ? `${LAYER_LABEL.linear(g)}: fixed ${fmtBytes(g.state)} state each = ${fmtBytes(bytes)}`
-    : `${LAYER_LABEL[g.t](g)}: ${fmtBytes(g.n*g.per*S.kq/(g.r||1))}/tok × ${commas(Math.min(ctx, g.win ?? Infinity))} tok = ${fmtBytes(bytes)}`);
-  lines.push(`= ${fmtBytes(cache.req)} per user at ${commas(ctx)} tokens (prompt + ${S.thinking ? "thinking + " : ""}reply) × ${commas(users)} user${users>1?"s":""} (${kqLabel()} cache)`);
-  if(r.kv_saved > 0) lines.push(`− ${fmtMem(r.kv_saved/GB)}: the ${commas(promptParts().shared)}-token shared system prompt is stored once per GPU, not once per user (prompt caching)`);
+  const {cache, ctx, users, tp, mix} = r, len = `prompt + ${S.thinking ? "thinking + " : ""}reply`;
+  let lines;
+  if(mix.length===1){
+    lines = cache.parts.map(({g, bytes})=> g.state
+      ? `${LAYER_LABEL.linear(g)}: fixed ${fmtBytes(g.state)} state each = ${fmtBytes(bytes)}`
+      : `${LAYER_LABEL[g.t](g)}: ${fmtBytes(g.n*g.per*S.kq/(g.r||1))}/tok × ${commas(Math.min(ctx, g.win ?? Infinity))} tok = ${fmtBytes(bytes)}`);
+    lines.push(`= ${fmtBytes(cache.req)} per user at ${commas(ctx)} tokens (${len}) × ${commas(users)} user${users>1?"s":""} (${kqLabel()} cache)`);
+  } else {                                   // several workloads: the rate per token once, then each workload's users at its own length
+    const names = groupNames();
+    lines = cache.parts.map(({g})=> g.state
+      ? `${LAYER_LABEL.linear(g)}: fixed ${fmtBytes(g.state)} state each`
+      : `${LAYER_LABEL[g.t](g)}: ${fmtBytes(g.n*g.per*S.kq/(g.r||1))}/tok`);
+    mix.forEach((x, i)=> lines.push(`${names[i]}: ${fmtBytes(x.cache.req)} per user at ${commas(x.ctx)} tokens × ${fmtUsers(x.users)} user${x.users===1 ? "" : "s"} = ${fmtBytes(x.cache.req*x.users)}`));
+    lines.push(`= ${fmtMem(r.kvReq/GB)} for ${commas(users)} users (${len}, ${kqLabel()} cache)`);
+  }
+  if(r.kv_saved > 0) lines.push(`− ${fmtMem(r.kv_saved/GB)}: ${mix.length===1 ? `the ${commas(promptParts().shared)}-token shared system prompt` : "each workload's shared system prompt"} is stored once per GPU, not once per user (prompt caching)`);
   if(tp>1) lines.push(cache.dp
     ? `data-parallel attention across ${tp} GPUs: each holds its own users' cache, up to ${commas(Math.ceil(users/tp))} user${Math.ceil(users/tp)===1 ? "" : "s"} = <b>${fmtMem(r.kv_pg/GB)}/GPU</b>`
     : `split across ${tp} GPUs${cache.replicated ? " — layers with fewer KV heads than GPUs copy to every GPU" : ""} = <b>${fmtMem(r.kv_pg/GB)}/GPU</b>`);
@@ -1334,7 +1409,7 @@ function render(){
     {k:"KV cache", v:r.kv, c:"var(--kv)", bar:"bkv", tip:"kv", f:kvFormula(r),
      // split across more GPUs than a layer has KV heads, each GPU keeps that layer's cache: say how much that adds
      extra: r.cache.dp ? `data-parallel attention: each GPU holds its own users' cache`
-          : r.cache.replicated ? `incl. ${fmtMem((r.kv + r.kv_saved - r.users*r.cache.req)/GB)} repeated across ${tp} GPUs` : ""},
+          : r.cache.replicated ? `incl. ${fmtMem((r.kv + r.kv_saved - r.kvReq)/GB)} repeated across ${tp} GPUs` : ""},
     {k:"Activations", v:r.act, c:"var(--act)", bar:"bact", tip:"act",
      f:`${commas(r.T)} tokens per step × (${commas(m.h)}h × 4 + ${commas(r.ffn)}ffn × 2) × 2 B = ${fmtMem(r.actBuf/GB)}`
        + `<br>+ ${commas(r.users)} × ${commas(r.vocab)} vocab × 4 B fp32 logits = ${fmtMem(r.actLogit/GB)}`
@@ -1377,6 +1452,7 @@ function render(){
   renderTpNote(m, tp, active);
   renderAdvState();
   renderTraffic();
+  syncMix();
   LAST = {m, r, tp, reps, g, fits, active, picked, suggested, deps, speed, cap, perGB, tot, shown};
   syncHash();
   labelTips();   // name the icons this pass just created
@@ -1389,7 +1465,11 @@ const boxTotal = gb => S.unit==="GiB" ? fmtMem(gb) : `${commas(gb)} GB`;
 function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, speed, cap}){
   const goal = GOALS[S.goal], hasGoal = S.goal!=="any", goalText = goal.desc.replace(/\.$/, "");
   const prec = S.wqLbl==="NATIVE" ? `${m.nat.f}, as released` : S.wqLbl;
-  const who = `${m.custom ? "Custom model" : m.n} · ${commas(S.users)} user${S.users>1?"s":""} · ${WORKLOADS[S.workload].name}: ${commas(S.prompt)} in, ${commas(S.reply)} out${S.thinking ? ` + ${commas(S.thinking)} thinking` : ""} · ${prec}`;
+  const all = allUsers(), names = groupNames();
+  const who = `${m.custom ? "Custom model" : m.n} · ${commas(all)} user${all>1?"s":""} · `
+    + (mixed() ? groups().map((w, i)=> `${commas(w.users)} ${names[i]}: ${commas(w.prompt)} in, ${commas(w.reply)} out`).join(" · ") + (S.thinking ? ` · ${commas(S.thinking)} thinking each` : "")
+               : `${names[0]}: ${commas(S.prompt)} in, ${commas(S.reply)} out${S.thinking ? ` + ${commas(S.thinking)} thinking` : ""}`)
+    + ` · ${prec}`;
   const back = `<button type="button" class="linkbtn" data-act="auto">Back to the suggestion</button>`;
   const autoTp = S.tpo!=="auto" ? `<button type="button" class="linkbtn" data-act="tpauto">Let TP choose automatically</button>` : "";
   let lbl, main, sub = who, acts = "", why = "";
@@ -1408,8 +1488,8 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
       if(mr) why += mr.over
         ? `Even with one user the model needs ${fmtMem(mr.over.need)}, more than the ${fmtMem(mr.over.usable)} ${mr.on} can use (90% of capacity), so ${then}. `
         : reps>1
-        ? `${On} ${mr.verb} room for only ${commas(mr.holds)} of your ${commas(S.users)} users after the weights, so this runs ${reps} copies. `
-        : `${On} ${mr.verb} room for only ${commas(mr.holds)} of your ${commas(S.users)} users after the weights. Splitting the model across ${tp} GPUs frees enough for everyone, and ${tp===2 ? "both" : `all ${tp}`} serve every user together. `;
+        ? `${On} ${mr.verb} room for only ${commas(mr.holds)} of your ${commas(all)} users after the weights, so this runs ${reps} copies. `
+        : `${On} ${mr.verb} room for only ${commas(mr.holds)} of your ${commas(all)} users after the weights. Splitting the model across ${tp} GPUs frees enough for everyone, and ${tp===2 ? "both" : `all ${tp}`} serve every user together. `;
     }
     if(forSpeed(active) && !active.partial){
       const lean = active.memOnly;
@@ -1419,7 +1499,7 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
     }
     if(active.partial){
       acts = picked ? back : "";
-      why += layout + `<span class="warnx">One node can't serve all ${commas(S.users)} users${hasGoal && active.meets ? " within your speed goal" : ""}.</span> `
+      why += layout + `<span class="warnx">One node can't serve all ${commas(all)} users${hasGoal && active.meets ? " within your speed goal" : ""}.</span> `
            + `${picked ? "This one" : "This is the board that comes closest: it"} ${active.meets ? "serves" : "holds"} up to ${commas(active.served)}`
            + `${hasGoal && !active.meets ? ", below your speed goal" : ""}.`;
     } else if(picked){
@@ -1431,8 +1511,8 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
         : `<span class="warnx">Nothing reaches your speed goal</span> (${goalText}), so this is the setup that comes closest. Try FP8 or shorter prompts.`);
     }
     // how far it stretches, in a sentence rather than a fourth tile
-    if(!active.partial && cap && cap.users >= S.users && cap.users > 0)
-      why = why.trimEnd() + ` <span class="tipl" data-tip="capacity">Room for up to <b>${commas(cap.users)}</b> users</span> at these lengths${reps>1 ? ` across ${reps} copies` : ""}, then ${cap.limit==="speed" ? "speed drops below the goal" : "memory runs out"}.`;
+    if(!active.partial && cap && cap.users >= all && cap.users > 0)
+      why = why.trimEnd() + ` <span class="tipl" data-tip="capacity">Room for up to <b>${commas(cap.users)}</b> users</span> ${mixed() ? "in this mix" : "at these lengths"}${reps>1 ? ` across ${reps} copies` : ""}, then ${cap.limit==="speed" ? "speed drops below the goal" : "memory runs out"}.`;
   } else {
     lbl = "No single node fits";
     main = S.tpo==="auto" ? "Too big for one 8-GPU node" : `No board holds a copy at TP ${tp}`;
@@ -1453,6 +1533,9 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
   // a thinking model's visible answer starts after its thinking; if the UI hides the thinking, that is the wait the user feels
   const answerAt = speed && S.thinking ? speed.ttft + S.thinking / speed.perUser : null;
   const slowAnswer = hasGoal && answerAt !== null && answerAt > goal.ttft;
+  // several workloads: the tile shows the one that waits longest, and names the others' times beside it
+  const perWl = speed && speed.per.length>1
+    ? `${names[speed.slow.i]}, the slowest to start · ${speed.per.filter(x=> x!==speed.slow).map(x=> `${names[x.i]} ${fmtTime(x.ttft).join(" ")}`).join(" · ")}<br>` : "";
   $('vstats').innerHTML =
       (g ? statCell("perGPU", "Per GPU", fmtMemN(perGB), `of ${boxMem(g)}`,
              fits ? `${Math.round(perGB/g.cap*100)}% full${active.gpus>1 ? ` · ${fmtMem(totGB*reps)} in all` : ""}`
@@ -1463,7 +1546,7 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
              : statCell("tpsUser", "Speed per user", "—", "", na))
     + (speed ? statCell("ttft", "First token", ...fmtTime(speed.ttft),
                  (answerAt !== null ? `<div class="n2">answer after ${fmtWait(answerAt)} <small>of thinking</small></div>` : "")
-                 + (hasGoal
+                 + perWl + (hasGoal
                      ? slowTtft ? `over the ${goal.ttft} s goal`
                      : slowAnswer ? `Meets the ${goal.ttft} s goal only if users see the thinking stream. If it is hidden, they wait for the answer.`
                      : `within the ${goal.ttft} s goal`
@@ -1493,7 +1576,7 @@ function renderBar(comps, totGB, capGB, g, tp, reps){
    reasoning behind a row's GPU count behind a chevron (open by default on the active board) */
 const OPEN_WHY = new Set();
 function renderCards(deps, active, suggested, picked){
-  const hasGoal = S.goal!=="any";
+  const hasGoal = S.goal!=="any", all = allUsers();
   $('fitcap').innerHTML = (S.tpo==="auto"
       ? `One node of each board, up to 8 GPUs, sized to serve everyone${hasGoal ? " within your speed goal" : ""}.`
       : `Every board at <b>${S.tpo} GPU${S.tpo>1?"s":""} per copy</b>, fixed in Advanced settings.`)
@@ -1503,7 +1586,7 @@ function renderCards(deps, active, suggested, picked){
     const systems = systemsIn(d);          // counted in whole systems, the layout then says how they're used
     let status = "";                        // a pill only when something is wrong; a good fit is quiet
     if(!d.fits) status = `<span class="pill bad">${S.tpo==="auto" ? "Won't fit on a node" : `Not at TP ${d.tp}`}</span>`;
-    else if(d.partial) status = `<span class="pill warn">${d.meets ? "Serves" : "Holds"} ${commas(d.served)} of ${commas(S.users)}</span>`;
+    else if(d.partial) status = `<span class="pill warn">${d.meets ? "Serves" : "Holds"} ${commas(d.served)} of ${commas(all)}</span>`;
     else if(!d.meets) status = `<span class="pill warn">Below goal</span>`;
     const layout = d.fits ? layoutText(d) : "—";
     if(!status && slow) status = `<span class="pill bad" data-tip="pcieSlow${b.fab ? "Amd" : ""}" tabindex="0">Not recommended</span><span class="lay">${layout}</span>`;
@@ -1517,8 +1600,8 @@ function renderCards(deps, active, suggested, picked){
       const mr = memoryReason(d);
       const On = mr && mr.on[0].toUpperCase() + mr.on.slice(1);
       if(mr) memWhy = mr.over ? `Too big for ${mr.on}: the model needs ${fmtMem(mr.over.need)}, and only ${fmtMem(mr.over.usable)} is usable (90% of capacity).`
-                   : d.reps>1 ? `${On} ${mr.verb} room for only ${commas(mr.holds)} of your ${commas(S.users)} users after the weights, so this runs ${d.reps} copies${d.tp>1 ? ` of ${d.tp} GPUs` : ""}, each serving ~${commas(d.upr)} of them.`
-                              : `${On} ${mr.verb} room for only ${commas(mr.holds)} of your ${commas(S.users)} users after the weights. Splitting the model across ${d.gpus} GPUs frees enough for everyone, and ${d.gpus===2 ? "both" : `all ${d.gpus}`} serve every user together.`;
+                   : d.reps>1 ? `${On} ${mr.verb} room for only ${commas(mr.holds)} of your ${commas(all)} users after the weights, so this runs ${d.reps} copies${d.tp>1 ? ` of ${d.tp} GPUs` : ""}, each serving ~${commas(d.upr)} of them.`
+                              : `${On} ${mr.verb} room for only ${commas(mr.holds)} of your ${commas(all)} users after the weights. Splitting the model across ${d.gpus} GPUs frees enough for everyone, and ${d.gpus===2 ? "both" : `all ${d.gpus}`} serve every user together.`;
     }
     const why = d.tooWide ? (b.split && d.tp > b.split && d.tp <= nodeMax(b)
           ? `A copy split across ${d.tp} GPUs doesn't fit here: an NVLink bridge joins at most ${b.split} ${b.n} cards, so one copy spans at most ${b.split}. ${nodeMax(b)} cards run ${nodeMax(b)/b.split} copies instead.`
@@ -1564,11 +1647,14 @@ function renderChunkOptions(d){
     const t = throughput(d.g, d.tp, +b.dataset.v, d.upr);
     num.textContent = `${fmtTime(t.ttft).join(" ")} · ${fmtTime(t.pause).join(" ")}`;
   });
+  const fresh = Math.max(...groups().map(w=> promptParts(w).fresh));   // the most new tokens any workload's prompt brings
   $('chunkfoot').innerHTML =
-    (d ? `Timings for a ${commas(S.prompt)}-token prompt${promptParts().fresh < S.prompt ? ` (${commas(promptParts().fresh)} new tokens; the rest is cached)` : ""} on ${d.tp} × ${d.g.n}${d.reps>1 ? `, ${commas(d.upr)} users per copy` : ""}.`
-       : `Timings appear once a board fits.`)
-    + (promptParts().fresh<=512 ? `<br>All three are the same here: 512 new tokens or fewer are read in one piece either way.`
-       : promptParts().fresh<=2048 ? `<br>Balanced and Fast first reply are the same here: 2K new tokens or fewer are read in one piece either way.` : "")
+    (!d ? `Timings appear once a board fits.`
+       : (mixed() ? `One setting reads every workload's prompts. First reply is for the workload that waits longest, and the pause is the longest any of them causes,`
+                  : `Timings for a ${commas(S.prompt)}-token prompt${fresh < S.prompt ? ` (${commas(fresh)} new tokens; the rest is cached)` : ""}`)
+         + ` on ${d.tp} × ${d.g.n}${d.reps>1 ? `, ${commas(d.upr)} users per copy` : ""}.`)
+    + (fresh<=512 ? `<br>All three are the same here: 512 new tokens or fewer are read in one piece either way.`
+       : fresh<=2048 ? `<br>Balanced and Fast first reply are the same here: 2K new tokens or fewer are read in one piece either way.` : "")
     + `<br>Engine setting: <code>max_num_batched_tokens = ${commas(S.chunk)}</code>`;
 }
 
@@ -1601,14 +1687,21 @@ function renderThroughput(d){
     {l: "Scheduler",                                  v: t.tOver, c:"var(--ov)"},
   ].filter(s=> s.v>0);
 
+  // several workloads: what each one's prompts cost, since they differ only in how they start
+  const all = allUsers(), names = groupNames(), many = t.per.length>1;
+  const perWl = many ? `<div class="mixtable"><table>
+      <thead><tr><th>Workload</th><th class="num">Users</th><th class="num">New prompt tokens</th><th class="num">First token</th><th class="num">Pause it causes</th></tr></thead>
+      <tbody>${t.per.map(x=> `<tr><td class="name">${names[x.i]}</td><td class="num">${commas(x.w.users)}</td><td class="num">${commas(x.prompt)}</td>`
+        + `<td class="num">${fmtTime(x.ttft).join(" ")}</td><td class="num">${fmtTime(x.pause).join(" ")}</td></tr>`).join("")}</tbody></table></div>` : "";
+
   body.innerHTML = `
     <div class="statstrip">
-      ${statCell("tpsTotal", "Output, all users", fmtTps(t.total*d.reps), "tok/s", `${commas(S.users)} × ${fmtTps(t.perUser)} tok/s`)}
-      ${statCell("pause", "Pause while a prompt is read", paN, paU, pauseFeel)}
-      ${statCell("prefill", "Prompt reading", fmtTps(t.prefillTps), "tok/s", `in pieces of ${commas(S.chunk)} tokens`)}
-    </div>
+      ${statCell("tpsTotal", "Output, all users", fmtTps(t.total*d.reps), "tok/s", `${commas(all)} × ${fmtTps(t.perUser)} tok/s`)}
+      ${statCell("pause", "Pause while a prompt is read", paN, paU, pauseFeel + (many ? `, from a ${names[t.stall.i]} prompt` : ""))}
+      ${statCell("prefill", "Prompt reading", fmtTps(t.prefillTps), "tok/s", `in pieces of ${commas(S.chunk)} tokens${many ? ` · ${names[t.slow.i]}` : ""}`)}
+    </div>${perWl}
     <div class="stepwrap">
-      <div class="stephead"><span class="tipl" data-tip="step">One decode step, ${d.reps>1 ? `each copy's ${commas(d.upr)} users` : `all ${commas(S.users)} users`}</span>
+      <div class="stephead"><span class="tipl" data-tip="step">One decode step, ${d.reps>1 ? `each copy's ${commas(d.upr)} users` : `all ${commas(all)} users`}</span>
         <span class="mono">${stN} ${stU}</span></div>
       <div class="stepbar" role="img" aria-label="Decode step time breakdown">
         ${segs.map(s=>`<div style="width:${(s.v/t.tStep*100).toFixed(2)}%;background:${s.c}"></div>`).join("")}
@@ -1693,12 +1786,18 @@ function setLengths(){                   // fit the wanted lengths to this model
   ctxSlider.max = stops.length-1;
   ctxSlider.value = nearestStop(stops, Math.min(S.wantPrompt, stops[stops.length-1]));
   $('ctxMaxTick').textContent = fmtCtx(stops[stops.length-1]);
+  S.extra.forEach(fitExtra);
   syncPrompt();
+}
+/* an added workload's lengths, trimmed to the model's context the same way (its prompt is typed, not on the slider) */
+function fitExtra(w){
+  const ctx = activeModel().ctx;
+  w.reply  = Math.max(1, Math.min(w.wantReply, ctx - 512 - S.thinking));
+  w.prompt = Math.max(1, Math.min(w.wantPrompt, Math.max(512, ctx - S.thinking - w.reply)));
 }
 function syncPrompt(){                   // slider → state, then everything that shows the lengths
   const stops = promptStops();
   S.prompt = stops[+ctxSlider.value] ?? stops[stops.length-1];
-  S.ctxTok = S.prompt + S.thinking + S.reply;
   $('ctxVal').textContent = commas(S.prompt);
   ctxSlider.setAttribute('aria-valuetext', `${commas(S.prompt)} tokens`);
   if(document.activeElement!==replyNum) replyNum.value = S.reply;   // don't fight someone typing
@@ -1854,6 +1953,78 @@ CUSTOM_FIELDS.forEach(id=>{
   f.addEventListener('change', ()=>{ f.value = customNum(id); });   // show the value actually used
 });
 
+/* ---------------- more workloads on the same model ----------------
+   One row per added workload: which preset, how many users, and its lengths. Typing a length makes
+   the row Custom, as moving the prompt slider does for the first workload. */
+const mixRows = $('mixRows');
+const WL_OPTIONS = workloadSel.innerHTML.replace(/ selected(="")?/, "");
+const MIX_WANT = {prompt:"wantPrompt", reply:"wantReply"};
+/* a preset gives a workload its lengths and the shape of its prompt; Custom keeps what it had */
+function presetInto(w, key){
+  const p = WORKLOADS[key];
+  w.workload = key;
+  if(key!=="custom") Object.assign(w, {wantPrompt:p.prompt, wantReply:p.reply, shared:p.shared, fresh:p.fresh});
+  return w;
+}
+function renderMix(){                    // rebuild the rows: after adding or removing one, or opening a link
+  $('mixWrap').hidden = !mixed();
+  $('mixAdd').hidden = S.extra.length >= MIX_MAX;
+  mixRows.innerHTML = S.extra.map((w, i)=> `<div class="mix-row" data-i="${i}">
+      <div><label class="fld" for="mxw${i}">Workload</label><select id="mxw${i}" data-f="workload">${WL_OPTIONS}</select></div>
+      <div><label class="fld" for="mxu${i}">Concurrent users</label><input type="number" id="mxu${i}" data-f="users" min="1" max="${USERS_MAX}" step="1" inputmode="numeric"></div>
+      <div><label class="fld" for="mxp${i}">Prompt length (tok)</label><input type="number" id="mxp${i}" data-f="prompt" min="1" max="1048576" step="1" inputmode="numeric"></div>
+      <div><label class="fld" for="mxr${i}">Reply length (tok)</label><input type="number" id="mxr${i}" data-f="reply" min="1" max="1048576" step="1" inputmode="numeric"></div>
+      <button type="button" class="linkbtn" data-f="remove" aria-label="Remove workload ${i+2}">Remove</button>
+    </div>`).join("");
+  syncMix();
+}
+function syncMix(){                      // state → the rows' fields and the notes around them
+  S.extra.forEach((w, i)=>{
+    const row = mixRows.children[i]; if(!row) return;
+    for(const f of ["workload", "users", "prompt", "reply"]){
+      const el = row.querySelector(`[data-f=${f}]`);
+      if(document.activeElement!==el) el.value = w[f];   // don't fight someone typing
+    }
+  });
+  $('usersHint').hidden = !mixed();
+  if(!mixed()) return;
+  const names = groupNames(), all = commas(allUsers());
+  $('usersHint').textContent = `For ${names[0]}. ${all} in all, with the workload${S.extra.length>1 ? "s" : ""} added below.`;
+  $('mixHint').textContent = `${all} concurrent users in all: ${groups().map((w, i)=> `${commas(w.users)} ${names[i]}`).join(" + ")}. `
+    + `They share the same copies of the model, so everyone streams at the same speed and each workload has its own first-token time.`
+    + (S.extra.some(w=> w.prompt < w.wantPrompt || w.reply < w.wantReply) ? ` Lengths trimmed to this model's ${fmtCtx(activeModel().ctx)} context.` : "")
+    + (S.workload!=="rag" && S.extra.some(w=> w.workload==="rag") ? ` ${WORKLOADS.rag.brief}` : "");
+}
+mixRows.addEventListener('input', e=>{
+  const row = e.target.closest('.mix-row'), f = e.target.dataset.f;
+  if(!row || !(f==="users" || MIX_WANT[f])) return;
+  const w = S.extra[+row.dataset.i], n = Math.round(+e.target.value);
+  if(e.target.value==="" || !(n>=1)) return;   // mid-edit or invalid — keep last good value
+  if(f==="users") w.users = Math.min(n, USERS_MAX);
+  else { w[MIX_WANT[f]] = Math.min(n, 1048576); w.workload = "custom"; fitExtra(w); }
+  render();
+});
+mixRows.addEventListener('change', e=>{
+  const row = e.target.closest('.mix-row'), f = e.target.dataset.f; if(!row) return;
+  const w = S.extra[+row.dataset.i];
+  if(f==="workload"){ presetInto(w, e.target.value); fitExtra(w); render(); }
+  else e.target.value = w[f];                  // show the value actually used
+});
+mixRows.addEventListener('click', e=>{
+  const b = e.target.closest('[data-f=remove]'); if(!b) return;
+  S.extra.splice(+b.closest('.mix-row').dataset.i, 1);
+  renderMix(); render();
+  (mixRows.querySelector('select') || $('mixAdd')).focus();
+});
+$('mixAdd').addEventListener('click', ()=>{
+  if(S.extra.length >= MIX_MAX) return;
+  const used = groups().map(w=> w.workload);   // start on a preset that isn't in the mix yet
+  const w = presetInto({users:8}, Object.keys(WORKLOADS).find(k=> k!=="custom" && !used.includes(k)) || "chat");
+  fitExtra(w); S.extra.push(w);
+  renderMix(); render();
+  mixRows.lastElementChild.querySelector('select').focus();
+});
+
 /* memory units: relabels every amount; the math is in bytes either way */
 const unitBox = document.querySelector('.unit-toggle');
 function setUnit(u){
@@ -1895,7 +2066,7 @@ function renderTraffic(){
   if($('trafficWrap').hidden) return;
   const e = trafficEstimate(), T = S.traffic, goal = GOALS[S.goal], using = S.users===e.users;
   const gen = S.thinking ? `a ${commas(S.reply)}-token reply plus ${commas(S.thinking)} thinking tokens` : `a ${commas(S.reply)}-token reply`;
-  $('tfOut').innerHTML = `<span class="tf-num">≈ ${commas(e.users)}</span><span>concurrent users in the busiest hour</span>`
+  $('tfOut').innerHTML = `<span class="tf-num">≈ ${commas(e.users)}</span><span>concurrent ${mixed() ? `${groupNames()[0]} ` : ""}users in the busiest hour</span>`
     + `<button type="button" class="btn-sm" id="tfUse"${using ? " disabled" : ""}>${using ? "In use" : `Use ${commas(e.users)}`}</button>`
     + `<div class="hint">${commas(Math.round(T.people*T.req))} requests a day over ${T.hours} hour${T.hours===1 ? "" : "s"} is ${fmtRate(e.perSec)} a second. `
     + `Each takes about ${fmtWait(e.secs)}: ${gen} at ${e.tps} tok/s ${goal.tps ? "(your speed goal)" : "(a typical chat speed)"}, plus up to ${e.start} s before it starts. `
@@ -1945,6 +2116,9 @@ function stateToHash(){
   q.set("u", S.users);
   q.set("w", S.workload);
   if(S.workload==="custom"){ q.set("p", S.wantPrompt); q.set("r", S.wantReply); q.set("cb", S.chunkBase); }
+  // added workloads: preset_users, or custom_users_prompt_reply_shared_fresh, joined by dots
+  if(mixed()) q.set("x", S.extra.map(w=> [w.workload, w.users,
+    ...(w.workload==="custom" ? [w.wantPrompt, w.wantReply, w.shared, w.fresh==null ? "rest" : w.fresh] : [])].join("_")).join("."));
   if(thinksOf(m)!=="none") q.set("th", S.think ? S.thinkTok : "off");
   if(S.wqLbl!=="NATIVE") q.set("wq", S.wqLbl);
   if(S.goal!=="smooth") q.set("g", S.goal);
@@ -1997,7 +2171,15 @@ function applyHash(){
     ovSlider.value = q.has("ov") && ov>=0 && ov<=25 ? ov : 7; syncOv();
     pressSeg('pcache', 'cache', q.get("pc")==="off" ? "0" : "1");
     if(w==="custom" && q.has("sh")){ S.shared = Math.max(0, Math.round(+q.get("sh")) || 0); S.fresh = q.get("fr")==="rest" || !q.has("fr") ? null : Math.max(1, Math.round(+q.get("fr")) || 1); }
-    setLengths();
+    S.extra = (q.get("x") || "").split(".").map(s=>{
+      const [key, u, p, r, sh, fr] = s.split("_"), n = Math.round(+u);
+      if(!WORKLOADS[key] || !(n>=1)) return null;
+      const x = presetInto({users: Math.min(USERS_MAX, n)}, key);
+      if(key==="custom") Object.assign(x, {wantPrompt: Math.min(1048576, Math.max(1, Math.round(+p) || 2048)), wantReply: Math.min(1048576, Math.max(1, Math.round(+r) || 512)),
+        shared: Math.max(0, Math.round(+sh) || 0), fresh: fr===undefined || fr==="rest" ? null : Math.max(1, Math.round(+fr) || 1)});
+      return x;
+    }).filter(Boolean).slice(0, MIX_MAX);
+    setLengths(); renderMix();
     const bq = {"H200":"H200 NVL", "B200":"HGX B200", "B300":"HGX B300"}[q.get("b")] || q.get("b");   // rows renamed when the HGX H200 was added
     S.board = GPUS.some(g=> g.n===bq) ? bq : "auto";
     const tf = (q.get("tf") || "").split("_").map(Number);
@@ -2046,11 +2228,12 @@ function buildSummary(){
   const L = LAST, m = L.m, a = L.active, fits = L.fits, t = L.speed, goal = GOALS[S.goal], hasGoal = S.goal!=="any";
   const name = m.custom ? "Custom model" : m.n;
   const prec = S.wqLbl==="NATIVE" ? `${m.nat.f}, as released` : S.wqLbl;
+  const all = allUsers(), wl = groupNames(), gs = groups();
   const date = new Date().toLocaleDateString('en-US', {year:'numeric', month:'long', day:'numeric'});
   const head = fits ? deployName(a) : "Too big for one 8-GPU node";
   const role = fits ? (L.picked ? (notRecommended(a) ? "Selected node · split over PCIe" : "Selected node") : a.partial ? "Closest single node" : "Recommended node") : "No single node fits";
   const short = fits && a.partial
-    ? `One node ${a.meets ? "serves" : "holds"} up to ${commas(a.served)} of the ${commas(S.users)} users${hasGoal ? (a.meets ? " within the speed goal" : ", below the speed goal") : ""}.` : "";
+    ? `One node ${a.meets ? "serves" : "holds"} up to ${commas(a.served)} of the ${commas(all)} users${hasGoal ? (a.meets ? " within the speed goal" : ", below the speed goal") : ""}.` : "";
   const layout = !fits ? "—" : a.reps>1 ? `${a.reps} copies of the model, ${a.tp} GPU${a.tp>1 ? "s" : ""} each, about ${commas(a.upr)} users per copy`
     : a.tp>1 ? `One copy split across ${a.tp} GPUs over ${a.g.lname}` : "One copy on one GPU";
   const tf = trafficInUse() ? S.trafficApplied : null;
@@ -2059,23 +2242,29 @@ function buildSummary(){
     ["Speed per user", `${fmtTps(t.perUser)} tok/s`, hasGoal ? `${t.perUser>=goal.tps ? "meets" : "below"} the ${goal.tps}+ goal` : feelFor(t.perUser)],
     ["First token", fmtTime(t.ttft).join(" "), (()=>{
         const ans = S.thinking ? t.ttft + S.thinking/t.perUser : null, after = ans!==null ? `the answer starts after ${fmtWait(ans)} of thinking` : "";
-        if(!hasGoal) return `${commas(S.prompt)}-token prompt${after ? `; ${after}` : ""}`;
-        if(t.ttft > goal.ttft) return `over the ${goal.ttft} s goal${after ? `; ${after}` : ""}`;
-        if(ans!==null && ans > goal.ttft) return `${after}. Meets the ${goal.ttft} s goal only if users see the thinking stream; if it is hidden, they wait for the answer`;
-        return `within the ${goal.ttft} s goal${after ? `; ${after}` : ""}`;
+        // several workloads: the figure is the slowest one's, with the others named after it
+        const which = t.per.length>1 ? `${wl[t.slow.i]}, the slowest to start; ${t.per.filter(x=> x!==t.slow).map(x=> `${wl[x.i]} ${fmtTime(x.ttft).join(" ")}`).join(", ")}; ` : "";
+        if(!hasGoal) return which + `${commas(gs[t.slow.i].prompt)}-token prompt${after ? `; ${after}` : ""}`;
+        if(t.ttft > goal.ttft) return which + `over the ${goal.ttft} s goal${after ? `; ${after}` : ""}`;
+        if(ans!==null && ans > goal.ttft) return which + `${after}. Meets the ${goal.ttft} s goal only if users see the thinking stream; if it is hidden, they wait for the answer`;
+        return which + `within the ${goal.ttft} s goal${after ? `; ${after}` : ""}`;
       })()],
     ["GPU memory in all", boxTotal(a.memGB), `${a.gpus} × ${boxMem(a.g)}`],
     ["Handles up to", `${commas(L.cap.users)} user${L.cap.users===1 ? "" : "s"}`,
       L.cap.users===0 ? (L.cap.limit==="speed" ? "none within the speed goal" : "none at these lengths")
                       : L.cap.limit==="speed" ? "before the speed goal slips" : "before memory runs out"],
   ] : [];
+  const fromTraffic = tf ? ` · estimated from ${commas(tf.people)} people × ${tf.req} requests a day over ${tf.hours} hours, busiest hour ${tf.peak}× the average` : "";
+  const lengths = w => `${commas(w.prompt)}-token prompts, ${commas(w.reply)}-token replies`
+                 + (S.thinking ? `, ${commas(S.thinking)} thinking tokens per reply` : "")
+                 + (promptParts(w).fresh < w.prompt ? ` (${commas(promptParts(w).fresh)} new per request, the rest cached)` : "");
   const inputs = [
     ["Model", name + (m.custom ? "" : ` · ${fmtB(m.p)} params${m.E ? `, ${fmtB(m.pa)} active` : ""}`)],
     ["Weight precision", prec],
-    ["Concurrent users", commas(S.users) + (tf ? ` · estimated from ${commas(tf.people)} people × ${tf.req} requests a day over ${tf.hours} hours, busiest hour ${tf.peak}× the average` : "")],
-    ["Workload", `${WORKLOADS[S.workload].name}: ${commas(S.prompt)}-token prompts, ${commas(S.reply)}-token replies`
-                 + (S.thinking ? `, ${commas(S.thinking)} thinking tokens per reply` : "")
-                 + (promptParts().fresh < S.prompt ? ` (${commas(promptParts().fresh)} new per request, the rest cached)` : "")],
+    ...(mixed() ? [["Concurrent users", `${commas(all)} in all, across ${gs.length} workloads on the same model`],
+                   ...gs.map((w, i)=> [`Workload ${i+1}`, `${wl[i]}, ${commas(w.users)} user${w.users===1 ? "" : "s"}${i ? "" : fromTraffic}: ${lengths(w)}`])]
+                : [["Concurrent users", commas(S.users) + fromTraffic],
+                   ["Workload", `${wl[0]}: ${lengths(S)}`]]),
     ["Speed goal", hasGoal ? goal.desc.replace(/\.$/, "") : "None: the smallest setup that fits"],
     ["Layout", layout],
     ["Advanced", `KV cache ${kqLabel()} · GPUs per copy ${S.tpo==="auto" ? "chosen automatically" : S.tpo} · ${CHUNK_NAME[S.chunk]} · ${S.ovpct}% overhead`],
@@ -2086,7 +2275,7 @@ function buildSummary(){
   const boards = GPUS.map(g=>{
     const d = L.deps.get(g.n);
     const status = !d.fits ? "Won't fit on one node" : d.tp>1 && !g.link ? "Not recommended: PCIe split"
-                 : d.partial ? `${d.meets ? "Serves" : "Holds"} ${commas(d.served)} of ${commas(S.users)} users`
+                 : d.partial ? `${d.meets ? "Serves" : "Holds"} ${commas(d.served)} of ${commas(all)} users`
                  : !d.meets ? "Below speed goal" : hasGoal ? "Meets goal" : "Fits";
     const shape = !d.fits ? "—" : d.gpus===1 ? "1 GPU" : layoutText(d);
     return `<tr${a && a.g.n===g.n ? ' class="hl"' : !pickable(d) ? ' class="dim"' : ""}><td>${esc(g.n)}${L.suggested && L.suggested.g.n===g.n ? ` <span class="tag">${L.suggested.partial ? "closest" : "suggested"}</span>` : ""}</td>`
@@ -2108,13 +2297,15 @@ function buildSummary(){
       ? `No single node serves every user${hasGoal ? " within the speed goal" : ""}, so this is the board whose node serves the most.`
       : `The recommendation is the node that ${hasGoal ? "reaches the speed goal" : "holds every user"} with the least GPU memory in total; on any one board, that means the fewest GPUs.`,
   ];
-  if(WORKLOADS[S.workload].short) notes.push(WORKLOADS[S.workload].short);
+  if(mixed()) notes.push(`The workloads share the same copies of the model, each copy taking them in the same proportions. Memory adds up across them; every user streams at the same speed; first token is the slowest workload's, and the speed goal is checked against it.`);
+  [...new Set(gs.map(w=> WORKLOADS[w.workload].short).filter(Boolean))].forEach(s=> notes.push(s));
   if(S.thinking) notes.push(`For a thinking model, first token is when its thinking starts, which a user sees only if the UI streams the thinking. The answer starts once the thinking is done; if the UI hides the thinking, that is the wait the user feels, and the speed goal should be judged against it.`);
   if(fits && notRecommended(a)) notes.push(`Not recommended: this splits one copy across cards with no ${fabric(a.g)}, so they coordinate over PCIe after every layer, slower than directly linked cards.`);
   // the layout row already says how copies are arranged, so there is no separate note for them
   // the link back sits beside the date, so it can never be the line that pushes the page onto a second sheet
   const link = CAN_LINK ? ` · <a href="${esc(location.href.split("#")[0] + "#" + stateToHash())}">open this scenario</a>` : "";
-  const title = `GPU sizing estimate: ${name}, ${commas(S.users)} user${S.users===1 ? "" : "s"}`;
+  const title = `GPU sizing estimate: ${name}, ${commas(all)} user${all===1 ? "" : "s"}`;
+  const what = mixed() ? gs.map((w, i)=> `${commas(w.users)} ${wl[i]}`).join(" + ") : wl[0];
   const html = `<!DOCTYPE html>
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title>
@@ -2164,7 +2355,7 @@ function buildSummary(){
   <button class="print" onclick="print()">Print or save as PDF</button>
   <div class="eyebrow">LLM Inference Estimator · ${esc(role)}</div>
   <h1>${esc(head)}</h1>
-  <p class="sub">${esc(name)} · ${commas(S.users)} concurrent user${S.users===1 ? "" : "s"} · ${esc(WORKLOADS[S.workload].name)} · ${esc(prec)}</p>
+  <p class="sub">${esc(name)} · ${commas(all)} concurrent user${all===1 ? "" : "s"} · ${esc(what)} · ${esc(prec)}</p>
   <div class="date">Prepared ${esc(date)} · model and board data as of ${esc(DATA_AS_OF)}${link}</div>
   ${short ? `<p class="short">${esc(short)}</p>` : ""}
   ${stats.length ? `<div class="stats">${stats.map(([k, v, s])=> `<div class="stat"><span>${esc(k)}</span><b>${esc(v)}</b><small>${esc(s)}</small></div>`).join("")}</div>` : ""}
@@ -2174,7 +2365,7 @@ function buildSummary(){
   <section class="notes"><h2>Assumptions</h2><ul>${notes.map(n=> `<li>${esc(n)}</li>`).join("")}</ul></section>
 </main>
 </html>`;
-  return {filename: `llm-inference-estimate-${slug(name)}-${S.users}-users.html`, html};
+  return {filename: `llm-inference-estimate-${slug(name)}-${all}-users.html`, html};
 }
 async function downloadSummary(btn){
   if(!LAST) return;
@@ -2213,16 +2404,17 @@ const TIPS = {
   traffic:"Concurrent users are the requests being answered at the same moment, not everyone who has access. This turns daily traffic into that number: requests per second × how long each takes. It assumes replies stream at your speed goal's rate, the slowest the goal allows, so it errs on the high side.",
   think:"Many newer models reason step by step before they answer. Those thinking tokens are generated like any others, so they take cache memory and time even though users usually don't see them. The switch starts at the model's own default. About 4K tokens is typical; hard math or code can run past 10K. Earlier turns' thinking is normally dropped from the conversation, so it doesn't pile up in the prompt.",
   workload:"What each request looks like: how long the prompt is and how long the reply is. Presets cover common patterns and pick how prompts are read; move the prompt slider or type a reply length to set your own. Whether the model thinks before answering is set separately, under Reply length.",
+  mix:"Other kinds of request the same model serves at the same time, each with its own number of concurrent users and its own lengths. They share the same copies of the model, so memory adds up across them and every user streams at the same speed. What differs is the wait for a first token: each workload reads its own prompts, the headline shows the slowest, and the speed goal is checked against it. Typing a length makes a row Custom.",
   users:"How many requests are served at once — the batch. Each carries its own KV cache, so this scales cache memory linearly and is the main lever on serving capacity.",
   chunk:"When a new question arrives, the server reads the prompt in pieces while it keeps writing replies for everyone else. Small pieces keep other people's replies flowing smoothly, but a long prompt waits longer to start. Big pieces start long prompts sooner, but everyone else's text briefly freezes while each piece is read. The numbers on each choice show both effects on your setup.",
-  pause:"While a new prompt is being read, everyone already mid-reply waits. This is the longest gap they would see between words. Under 0.1 s is unnoticeable; choose Smooth streaming to shorten it.",
+  pause:"While a new prompt is being read, everyone already mid-reply waits, whichever workload they belong to. This is the longest gap they would see between words. Under 0.1 s is unnoticeable; choose Smooth streaming to shorten it.",
   tp:"How many GPUs one copy of the model is split across (tensor parallelism). Every layer's weights are divided and the GPUs all-reduce after each layer, so splitting needs NVLink to be fast. A copy is split 1, 2, 4 or 8 ways because serving engines need the split to divide the model's attention heads evenly; that is a software rule and applies to every board. Auto picks the smallest layout; a fixed number applies to every board.",
   copies:"A copy (replica) is a full, independent instance of the model on its own GPUs within the node, serving its share of the users. More copies serve more users without slowing each other down, and unlike splitting one copy across GPUs, they need no direct GPU-to-GPU link between them.",
   prefill:"How fast a new prompt is read, in tokens per second. Reading is limited by compute rather than memory speed, so faster chips and FP8 or FP4 help most. Optimize for, in Advanced settings, sets the piece size.",
   pcache:"Chat and agent prompts mostly repeat: the same system prompt for everyone, and each user's earlier turns. vLLM and SGLang keep that part cached by default, so only the new text is read before the first reply, and the shared system prompt is stored once per GPU rather than once per user. Each workload preset sets how much of its prompt is new and how much is shared; the workload hint says. Turn it off to size for prompts that never repeat.",
   ovpct:"Headroom for allocator fragmentation and framework buffers, as a percentage of weights + cache + activations. 5–10% is typical; raise it if you have hit OOM under load.",
   goal:"How fast each user should see answers: at least this many tokens per second, and a first reply within the time limit. The suggestion is the setup that reaches it with the least GPU memory in total. Any speed just finds the smallest setup that fits.",
-  capacity:"The most users this node holds at the current prompt and reply lengths, across all its copies. Either memory runs out, or each user's speed drops below your goal, whichever comes first. The gap to your user count is your room to grow.",
+  capacity:"The most users this node holds at the current prompt and reply lengths, across all its copies. Either memory runs out, or each user's speed drops below your goal, whichever comes first. The gap to your user count is your room to grow. With several workloads, they grow together in the same proportions.",
   units:"GB is 1,000,000,000 bytes, the unit on spec sheets and download pages. GiB is 1,073,741,824 bytes, the unit nvidia-smi, PyTorch and vLLM report. Switching only relabels memory; the recommendation doesn't change. Board capacities are the size on the box, counted as GB: 80 GB is 74.5 GiB.",
   usable:"The dashed line marks how much memory the model may use: 90% of each GPU. That is vLLM's default limit (gpu_memory_utilization = 0.9); the other 10% is left for the driver and anything else on the card. A setup fits only if its memory stays to the left of the line.",
   perGPU:"What each individual board must hold. This is the number that determines fit — a model can need 300 GB total and still run fine on 4 × 80 GB.",
@@ -2235,7 +2427,7 @@ const TIPS = {
   tput:"A first-order estimate from the board's memory bandwidth, compute and interconnect, not a benchmark. Real results vary with the serving engine, its settings and the traffic. Use it to compare setups, not to promise an SLA.",
   tpsTotal:"Output tokens per second summed across every concurrent user — what the deployment produces. Adding users usually raises it, because the weights are read once per step no matter how many requests share that step.",
   tpsUser:"How fast one person sees text stream in: 1 ÷ the time of one decode step, because each step produces one new token for every active user at once, so everyone streams at the same rate. More users make the step longer, since it must also read their KV caches. Around 20 tok/s or more feels smooth in chat; under 10 feels sluggish.",
-  ttft:"Time to first token: prefill of the new part of the prompt (all of it with prompt caching off), read in pieces while the other users keep being served, plus one shared decode step per piece. Faster chips, FP8 and Fast first reply all shorten it. For a thinking model the first token is a thinking token, so this is when the thinking starts; the answer starts after the thinking, and the tile says when. If your UI streams the thinking, the user sees text at the first token; if it hides the thinking, the answer time is the wait they feel, and the tile turns orange when that misses the goal. Measured at the server, in steady state: add your network round trip and any queueing before the engine admits the request, which can outweigh the number here.",
+  ttft:"Time to first token: prefill of the new part of the prompt (all of it with prompt caching off), read in pieces while the other users keep being served, plus one shared decode step per piece. Faster chips, FP8 and Fast first reply all shorten it. With several workloads this is the one that waits longest, and the others' times are listed under it. For a thinking model the first token is a thinking token, so this is when the thinking starts; the answer starts after the thinking, and the tile says when. If your UI streams the thinking, the user sees text at the first token; if it hides the thinking, the answer time is the wait they feel, and the tile turns orange when that misses the goal. Measured at the server, in steady state: add your network round trip and any queueing before the engine admits the request, which can outweigh the number here.",
   step:"Everything needed to produce one token for every active user. The largest segment is the bottleneck. A big blue interconnect segment means tensor parallelism is costing you real speed.",
   bneck:"What limits token generation right now. Memory-bound is normal for decode: the GPU waits on reading weights and cache. Compute-bound appears at very large batches. Interconnect-bound means the GPUs spend more time talking than working.",
 };
@@ -2289,7 +2481,7 @@ $('pcache').addEventListener('click', e=>{
   const b = e.target.closest('button'); if(!b) return;
   pressSeg('pcache', 'cache', b.dataset.v); setLengths(); render();
 });
-updateCfgNote(); syncWq(); resetThink(); updateGoalHint(); applyWorkload(S.workload); syncUsers(); syncOv();
+updateCfgNote(); syncWq(); resetThink(); updateGoalHint(); applyWorkload(S.workload); syncUsers(); syncOv(); renderMix();
 applyHash();   // a shared link's settings, if the address has any
 render();
 </script>
