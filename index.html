@@ -341,6 +341,9 @@
   .tput .hint{padding:0 18px}
   .tput .hint.load{margin-top:12px; color:var(--ink-2)}
   .pill.neutral{background:var(--panel-2); color:var(--ink-2); border:1px solid var(--line-2); font-size:10.5px}
+  /* a speed with no benchmark of its own behind it */
+  .pill.est{margin-left:6px; padding:1px 7px; font-size:10px; font-weight:500; vertical-align:1px; cursor:help}
+  .fit .cap a{color:var(--accent-ink); text-underline-offset:2px}
   .tput .cap .pill{margin:0 0 0 8px; vertical-align:middle; cursor:help}
   .stepwrap{padding:18px 18px 0}
   .stephead{display:flex; justify-content:space-between; align-items:baseline; gap:10px; font-size:12.5px; color:var(--ink-2); margin-bottom:7px}
@@ -879,16 +882,19 @@ const THINK_LABEL = {always:"always thinks before answering", default:"thinks be
    guide names Gen5 for the RTX PRO 6000 and H200 NVL, Gen4 for the L40S; the rest from their
    datasheets). The HGX systems' GPUs sit on their own baseboard, so they have none.
    guide:false = left out with Server set to NVIDIA guidance, which is written for NVIDIA GPUs. Delete
-   it to size the board by the same rules, as a stand-in (the Server panel then says so). */
+   it to size the board by the same rules, as a stand-in (the Server panel then says so).
+   bench = the board has published benchmarks of its own in the validation set (validation/benchmarks.json:
+   NVIDIA NIM and SemiAnalysis InferenceX runs). Every other board's speed applies the shares fitted on
+   these to its datasheet, so the page marks it extrapolated. */
 const GPUS = [
   {n:"L4",         cap:24, mem:"GDDR6",  bw:300,  flops:121,  fp8:true,  fp4:false, link:false, lbw:32,  lname:"PCIe Gen4", slot:4},
   {n:"RTX PRO 4500 Blackwell", cap:32, mem:"GDDR7", bw:800, flops:203, fp8:true, fp4:true, link:false, lbw:64, lname:"PCIe Gen5", max:5, slot:5},
-  {n:"L40S",       cap:48, mem:"GDDR6",  bw:864,  flops:362,  fp8:true,  fp4:false, link:false, lbw:32,  lname:"PCIe Gen4", slot:4},
+  {n:"L40S",       cap:48, mem:"GDDR6",  bw:864,  flops:362,  fp8:true,  fp4:false, link:false, lbw:32,  lname:"PCIe Gen4", slot:4, bench:true},
   {n:"RTX PRO 6000 Blackwell", cap:96, mem:"GDDR7", bw:1597, flops:500, fp8:true, fp4:true, link:false, lbw:64, lname:"PCIe Gen5", slot:5},
   {n:"H200 NVL",   cap:141, mem:"HBM3e",  bw:4800, flops:836,  fp8:true,  fp4:false, link:true,  lbw:450, lname:"NVLink 4 bridge", pop:[1,2,4,8], split:4, linkLbl:"NVLink bridge · up to 4", slot:5},
-  {n:"HGX H200",   cap:141, mem:"HBM3e",  bw:4800, flops:989,  fp8:true,  fp4:false, link:true,  lbw:450, lname:"NVLink 4 via NVSwitch", pop:[8]},
+  {n:"HGX H200",   cap:141, mem:"HBM3e",  bw:4800, flops:989,  fp8:true,  fp4:false, link:true,  lbw:450, lname:"NVLink 4 via NVSwitch", pop:[8], bench:true},
   {n:"AMD MI350P", cap:144, mem:"HBM3E",  bw:4000, flops:1150, fp8:true,  fp4:true,  link:false, lbw:64,  lname:"PCIe Gen5", fab:"Infinity Fabric", stack:"rocm", slot:5, guide:false},
-  {n:"HGX B200",       cap:180, mem:"HBM3e",  bw:7700, flops:2250, fp8:true,  fp4:true,  link:true,  lbw:900, lname:"NVLink 5 via NVSwitch", pop:[8]},
+  {n:"HGX B200",       cap:180, mem:"HBM3e",  bw:7700, flops:2250, fp8:true,  fp4:true,  link:true,  lbw:900, lname:"NVLink 5 via NVSwitch", pop:[8], bench:true},
   {n:"HGX B300",       cap:288, mem:"HBM3e",  bw:8000, flops:2250, fp8:true,  fp4:true,  link:true,  lbw:900, lname:"NVLink 5 via NVSwitch", pop:[8]},
 ];
 /* the vendor's direct GPU-to-GPU link, named when saying a board lacks it: NVLink on NVIDIA, Infinity Fabric on AMD */
@@ -1578,6 +1584,9 @@ const likelyTps  = x => `likely ${fmtTps(x*RANGE.speed[0])}–${fmtTps(x*RANGE.s
 const likelyTime = s => { const lo = s*RANGE.ttft[0], hi = s*RANGE.ttft[1], d = x => x>=10 ? Math.round(x) : x.toFixed(1);
   return hi >= 1 ? `likely ${d(lo)}–${d(hi)} s` : `likely ${Math.round(lo*1000)}–${Math.round(hi*1000)} ms`; };
 
+/* a board with no benchmark of its own: its speed and first token apply shares fitted on other boards */
+const VALIDATION_URL = "https://github.com/nvme101010/LLM-Inference-Estimator/blob/main/validation/README.md";
+const extrapBadge = g => g && !g.bench ? `<span class="pill neutral est" data-tip="extrap" tabindex="0">extrapolated</span>` : "";
 /* ---------------- render ---------------- */
 const $ = id => document.getElementById(id);
 const LAYER_LABEL = {
@@ -1791,17 +1800,17 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
                   : `${fmtMem(perGB - g.cap*USABLE)} over the usable ${fmtMem(g.cap*USABLE)}`, fits ? "" : "bad")
          : statCell("perGPU", "Per GPU", fmtMemN(perGB), S.unit, `split ${tp} ways — more than any board holds`, "bad"))
     + (speed ? statCell("tpsUser", "Speed per user", fmtTpsShort(speed.perUser), "tok/s",
-                 (hasGoal ? tpsVsGoal(speed) : feelFor(speed.perUser)) + `<br>${likelyTps(speed.perUser)}` + between, slowTps ? "warn" : "")
+                 (hasGoal ? tpsVsGoal(speed) : feelFor(speed.perUser)) + `<br>${likelyTps(speed.perUser)}${extrapBadge(g)}` + between, slowTps ? "warn" : "")
              : statCell("tpsUser", "Speed per user", "—", "", na))
     + (!speed ? statCell("ttft", "First token", "—", "", na)
        // users don't see the thinking: the wait they feel, and the goal, run to the start of the answer
        : hid ? statCell("answer", "Answer starts", ...waitParts(answerAt),
                  `after ${fmtWait(S.thinking/speed.perUser)} of thinking users don't see<br>` + perWl + queued
-                 + (hasGoal ? answerVsGoal(speed) : `first token ${fmtTime(speed.ttft).join(" ")}`) + `<br>${likelyAnswer(speed)}`,
+                 + (hasGoal ? answerVsGoal(speed) : `first token ${fmtTime(speed.ttft).join(" ")}`) + `<br>${likelyAnswer(speed)}${extrapBadge(g)}`,
                  slowWait ? "warn" : "")
        : statCell("ttft", "First token", ...fmtTime(speed.ttft),
                  (answerAt !== null ? `<div class="n2">answer after ${fmtWait(answerAt)} <small>of thinking users see</small></div>` : "")
-                 + perWl + queued + (hasGoal ? ttftVsGoal(speed) : `${commas(speed.prompt)} new prompt tokens`) + `<br>${likelyTime(speed.ttft)}`,
+                 + perWl + queued + (hasGoal ? ttftVsGoal(speed) : `${commas(speed.prompt)} new prompt tokens`) + `<br>${likelyTime(speed.ttft)}${extrapBadge(g)}`,
                  slowWait ? "warn" : ""));
 }
 
@@ -1861,6 +1870,7 @@ function renderCards(deps, active, suggested, picked){
       : `Every board at <b>${S.tpo} GPU${S.tpo>1?"s":""} per copy</b>, fixed in Advanced settings.`)
     + (S.srv ? ` GPU counts follow <b>NVIDIA's server guidance</b>: 2, 4 or 8 per server.` : "")
     + (leftOut().length ? ` The ${leftOut().map(b=> b.n).join(" and ")} ${leftOut().length>1 ? "are" : "is"} left out, since the guidance is written for NVIDIA GPUs.` : "")
+    + ` Boards marked <i>speed extrapolated</i> have no benchmark of their own (<a href="${VALIDATION_URL}" target="_blank" rel="noopener">validation</a>).`
     + ` Click a row to plan on that board.`;
   const rows = boardsInPlay().map(b=>{
     const d = deps.get(b.n), slow = notRecommended(d);
@@ -1908,7 +1918,7 @@ function renderCards(deps, active, suggested, picked){
       <td class="board"><div class="gname">${b.n}${isSugg ? `<span class="pill sugg">${d.partial ? "Closest" : "Suggested"}</span>` : ""}</div>
         <div class="gcap">${boxMem(b)} ${b.mem}${systemOf(b) ? ` · ${systemOf(b)}-GPU systems only`
           : S.srv ? ` · ${popText(b)} per server${b.split ? `, NVLink across ${b.split}` : ""}`
-          : b.split ? ` · up to ${nodeMax(b)} per server, NVLink across ${b.split}` : b.max ? ` · up to ${b.max} per server` : ""}</div></td>
+          : b.split ? ` · up to ${nodeMax(b)} per server, NVLink across ${b.split}` : b.max ? ` · up to ${b.max} per server` : ""}${b.bench ? "" : ` · <span class="tipl" data-tip="extrap">speed extrapolated</span>`}</div></td>
       <td class="link col-opt tipl" data-tip="${linkTip}">${linkTxt}</td>
       <td class="num"><b>${!d.fits ? "—" : systems || d.gpus}</b> <small>× ${systems ? `${Math.max(...b.pop)}-GPU system${systems===1 ? "" : "s"}` : "GPU"}</small></td>
       <td class="layout">${status || layout}</td>
@@ -2575,7 +2585,7 @@ function buildSummary(){
   const queued  = t && t.wait >= 0.01 && t.wait >= t.ttft*0.05 ? `${fmtTime(t.wait).join(" ")} of it waiting for other prompts; ` : "";
   const stats = fits ? [
     ["Memory per GPU", `${fmtMem(L.perGB)}`, `of ${boxMem(a.g)}, ${Math.round(L.perGB/a.g.cap*100)}% full`],
-    ["Speed per user", `${fmtTps(t.perUser)} tok/s`, (hasGoal ? tpsVsGoal(t) : feelFor(t.perUser)) + `; ${likelyTps(t.perUser)}` + between],
+    ["Speed per user", `${fmtTps(t.perUser)} tok/s`, (hasGoal ? tpsVsGoal(t) : feelFor(t.perUser)) + `; ${likelyTps(t.perUser)}` + (a.g.bench ? "" : "; extrapolated: no benchmark on this board") + between],
     // as on the page: the wait to the first token, or to the answer when users don't see the thinking
     hideThink()
       ? ["Answer starts", fmtWait(answerStart(t)),
@@ -2629,7 +2639,7 @@ function buildSummary(){
     const shape = !d.fits ? "—" : d.gpus===1 ? "1 GPU" : layoutText(d);
     return `<tr${a && a.g.n===g.n ? ' class="hl"' : !pickable(d) ? ' class="dim"' : ""}><td>${esc(g.n)}${L.suggested && L.suggested.g.n===g.n ? ` <span class="tag">${L.suggested.partial ? "closest" : "suggested"}</span>` : ""}</td>`
       + `<td class="n">${d.fits ? d.gpus + (systemsIn(d) ? ` (${systemsIn(d)} system${systemsIn(d)===1 ? "" : "s"})` : "") : "—"}</td><td>${shape}</td><td>${status}</td>`
-      + `<td class="n">${d.fits ? boxTotal(d.memGB) : "—"}</td><td class="n">${d.t ? fmtTps(d.t.perUser) : "—"}</td></tr>`;
+      + `<td class="n">${d.fits ? boxTotal(d.memGB) : "—"}</td><td class="n">${d.t ? fmtTps(d.t.perUser) + (g.bench ? "" : "*") : "—"}</td></tr>`;
   }).join("");
   const names = bs => { const n = bs.map(b=> b.n.replace(" 80GB", "")); return n.length>1 ? `${n.slice(0,-1).join(", ")} and ${n[n.length-1]}` : n[0]; };
   const shown = boardsInPlay(), sysOnly = shown.filter(systemOf), sized = shown.filter(b=> popOf(b) && !systemOf(b));
@@ -2654,6 +2664,8 @@ function buildSummary(){
   if(S.thinking) notes.push(S.seeThink
     ? `Users see the thinking stream, so the speed goal's wait is judged to the first token, which for a thinking model is the start of its thinking. The answer starts once the thinking is done.`
     : `Users don't see the thinking, so the speed goal's wait is judged to the start of the answer, after the thinking: within ${GOALS[S.goal].ans} s for this goal, a limit of the estimator's own.`);
+  const extrap = boardsInPlay().filter(b=> !b.bench);
+  if(extrap.length) notes.push(`* Speed and first-token figures for boards with no benchmark of their own (${names(extrap)}) are extrapolated: they apply the shares fitted on HGX H200, HGX B200 and L40S runs to each board's datasheet. Validation: ${VALIDATION_URL}`);
   if(fits && notRecommended(a)) notes.push(`Not recommended: this splits one copy across cards with no ${fabric(a.g)}, so they coordinate over PCIe after every layer, slower than directly linked cards.`);
   // the layout row already says how copies are arranged, so there is no separate note for them
   // the link back sits beside the date, so it can never be the line that pushes the page onto a second sheet
@@ -2786,6 +2798,7 @@ const TIPS = {
   srvCpu:"Physical cores, not threads, across both sockets, as HPE builds the AI worker nodes of HPE Private Cloud AI, its inference platform with NVIDIA: two 32-core CPUs for 2 GPUs, two 64-core CPUs for 4 or 8. That is 32 cores per GPU in a 2- or 4-GPU server and 16 per GPU in an 8-GPU one, well above NVIDIA's floor of 6 per GPU for certified inference servers. The CPUs need PCIe Gen5 and a base clock of 2.0 GHz or more. The serving engine uses only a few cores per copy, for its API server, tokenization and scheduling; the rest run everything else on the host, such as Kubernetes, a vector database or embedding for RAG.",
   srvRam:"The least system memory (RAM) NVIDIA recommends for a certified inference server: twice the GPU memory. How it is made up from memory modules is the vendor's choice; NVIDIA asks for it to be spread evenly over every memory channel of both sockets. Shown in GB as sold.",
   srvDisk: srvDiskTip(),
+  extrap:"No published benchmark in the validation set covers this board. Its speed and first-token figures apply the shares of memory bandwidth and compute fitted on HGX H200, HGX B200 and L40S runs (Llama 3.1 8B, Llama 3.3 70B and gpt-oss-120b) to its datasheet, so its likely range is borrowed from those boards and may be wider in practice. The H200 NVL is the same chip as the benchmarked H200 at a lower power limit, so it is the closest; the MI350P also carries the factor for AMD's software stack fitted on MI355X runs. The validation results are linked from the Every board caption. Confirm with a load test before buying.",
   tput:"An estimate from the board's memory bandwidth, compute and interconnect, with efficiency shares fitted to published benchmarks; not a measurement of this setup. It includes the work of reading the prompts that keep arriving, assuming each user sends a new request as soon as the last is answered. The likely range beside speed and first token is where measured results fell for 80% of benchmark points the fit did not see. Real results vary with the serving engine, its settings and the traffic. Use it to compare setups and choose what to load-test, not to promise an SLA.",
   tpsTotal:"Output tokens per second summed across every concurrent user — what the deployment produces. Adding users usually raises it, because the weights are read once per step no matter how many requests share that step.",
   tpsUser:"How fast one person sees text stream in, on average while new prompts keep arriving. Each step writes one new token for every active user, so everyone streams at the same rate, but a step that also reads a new prompt takes longer: the more of the time goes to reading prompts, the slower the average. When that costs much, the tile also gives the speed between prompt reads, 1 ÷ one decode step. More users make every step longer, since it must also read their KV caches. Around 20 tok/s or more feels smooth in chat; under 10 feels sluggish. An estimate, not a measurement. The likely range is where measured speed fell around the estimate for 80% of published benchmark points the fit did not see; the speed goal is judged at its low end.",
