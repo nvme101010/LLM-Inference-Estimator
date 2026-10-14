@@ -7,7 +7,7 @@ A single-page tool for estimating what LLM inference needs. Pick a model, the nu
 - **Memory:** model weights, KV cache, activations and overhead, per GPU and in total, in GB or GiB.
 - **Speed:** estimated tokens per second per user and time to first reply while new prompts keep arriving, each with a likely range measured against published benchmarks, including thinking time for models that reason before answering.
 - **Capacity:** how many GPUs of each board one node takes, and how many users it can handle: what fits in memory, and what also reaches the speed goal on the estimate.
-- **Server (optional):** the CPUs, system memory, drives, network and management around those GPUs, following NVIDIA's recommendations for certified inference servers.
+- **Server (optional):** the CPUs, system memory and local storage around those GPUs, following NVIDIA's recommendations for certified inference servers.
 
 It covers 40+ popular open models (Qwen, Gemma, Llama, DeepSeek, gpt-oss, GLM, Kimi, Mistral and others) on NVIDIA L4, L40S, H200 NVL, HGX H200, HGX B200, HGX B300, RTX PRO 4500/6000 Blackwell, and AMD MI350P.
 
@@ -33,14 +33,12 @@ Not sure how many concurrent users to plan for? **Estimate from daily traffic** 
 
 Set **Server** to **NVIDIA guidance** in Advanced settings to size the whole server, following the inference server table in NVIDIA's [Certified Systems Configuration Guide](https://docs.nvidia.com/certification-programs/latest/nvidia-certified-configuration-guide.html). GPU counts then round up to 2, 4 or 8 per server, split evenly across two CPU sockets (2 or 4 for the RTX PRO 4500). That can change which board is suggested: 56 chat users on Llama 3.1 8B move from 1 × RTX PRO 6000 to 2 × L40S. A Server panel under the answer gives what goes around those GPUs:
 
-- **CPUs:** two sockets with PCIe Gen5 and a base clock of 2.0 GHz or more. Cores follow the AI worker nodes HPE builds for [HPE Private Cloud AI](https://www.hpe.com/us/en/collaterals/collateral.a50009216enw.html): 32 physical cores per GPU in a 2- or 4-GPU server and 16 per GPU in an 8-GPU one (2 × 32-core CPUs for 2 GPUs, 2 × 64-core for 4 or 8). NVIDIA's own floor, 6 per GPU, is shown beside it.
+- **CPUs:** two sockets with PCIe Gen5 and a base clock of 2.0 GHz or more. Cores follow the AI worker nodes HPE builds for [HPE Private Cloud AI](https://www.hpe.com/us/en/collaterals/collateral.a50009216enw.html): 32 physical cores per GPU in a 2- or 4-GPU server and 16 per GPU in an 8-GPU one (2 × 32-core CPUs for 2 GPUs, 2 × 64-core for 4 or 8). NVIDIA's own floor is 6 per GPU.
 - **System memory:** at least twice the GPU memory, filling every memory channel; the page suggests a layout of modules that does.
 - **Slots and switches:** each GPU in an x16 slot of its own PCIe generation, behind PCIe Gen5 switches when there are 8.
 - **Local storage, as usable capacity** (drives and RAID are the vendor's choice): NVIDIA's 1 TB of NVMe per socket for data, or more if the model needs it, plus a separate 1 TB boot volume from NVIDIA's reference architectures. The model needs two copies of its weights (the version serving and the next one downloading) and 100 GB for images, caches and logs, kept under 80% full, which NVIDIA's 2 TB covers for every model a PCIe server here holds. Offloading KV cache to disk (NVIDIA Dynamo) is given as an addition: at least the larger of 100 GB and the GPUs' KV cache.
-- **Network:** 200 Gb/s or more, up to 400 Gb/s per GPU, once one copy of a model spans servers; for one server the guide sets no minimum.
-- **Management and security:** a BMC with Redfish 1.0 or later, and TPM 2.0 with Secure Boot.
 
-The HGX H200, HGX B200 and HGX B300 come as whole systems from their manufacturer, so their CPUs, memory, drives and network are left to its spec sheet. The AMD MI350P is left out while Server is set to NVIDIA guidance, since the guide is written for NVIDIA GPUs; deleting `guide:false` from its entry in `GPUS` brings it back, sized by the same rules as a stand-in. These are planning minimums, not a certification: a server is NVIDIA-Certified only if it is on [NVIDIA's list](https://docs.nvidia.com/certification-programs/latest/nvidia-certified-systems.html). With Server left on GPUs only, every figure is the same as in 1.2.0.
+NVIDIA's guide also covers network cards, remote management and TPM; the page leaves those to the conversation with the customer. The HGX H200, HGX B200 and HGX B300 come as whole systems from their manufacturer, so their CPUs, memory and storage are left to its spec sheet. The AMD MI350P is left out while Server is set to NVIDIA guidance, since the guide is written for NVIDIA GPUs; deleting `guide:false` from its entry in `GPUS` brings it back, sized by the same rules as a stand-in. These are planning minimums, not a certification: a server is NVIDIA-Certified only if it is on [NVIDIA's list](https://docs.nvidia.com/certification-programs/latest/nvidia-certified-systems.html). With Server left on GPUs only, every figure is the same as in 1.2.0.
 
 ## Use it
 
