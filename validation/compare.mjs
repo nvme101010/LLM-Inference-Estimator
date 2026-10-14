@@ -1,52 +1,25 @@
 // Runs the page's own speed model on every point in benchmarks.json and reports how far it lands from
-// the measured figures. Usage: node validation/compare.mjs [--write]
+// the measured figures. Usage: node validation/compare.mjs [--write] [--index path/to/index.html]
 //   --write  also writes validation/results.md (the full table)
+//   --index  checks another copy of the page, such as an earlier release
 //
-// The model is taken from index.html itself: its script, from the start up to the display helpers,
-// runs here against a stand-in for the page, so this checks exactly what the page shows.
+// The model is taken from index.html itself (see model.mjs), so this checks exactly what the page shows.
 
 import { readFileSync, writeFileSync } from "node:fs";
+import { load, predict, markIdle, group, INDEX } from "./model.mjs";
 
 const here = p => new URL(p, import.meta.url);
-const html = readFileSync(here("../index.html"), "utf8").split(/\r?\n/);
-const from = html.findIndex(l => l.startsWith("<script>")) + 1, to = html.findIndex(l => l.startsWith("const fmtTps"));
-if(from < 1 || to < from) throw new Error("index.html layout changed: script or fmtTps line not found");
-const el = () => new Proxy(function(){}, { get: (t, k)=> k==="value" ? "" : k==="style" || k==="dataset" ? {} : el(), apply: ()=> el(), set: ()=> true });
-globalThis.document = { getElementById: el, querySelector: el, querySelectorAll: ()=> [], createElement: el, documentElement: el() };
-globalThis.localStorage = { getItem: ()=> null, setItem: ()=> {} };
-const P = new Function(html.slice(from, to).join("\n")
-  + ";return {S, GPUS, GB, USABLE, VERSION, compute, throughput, findModel, setModel: m=>{ M = m; }};")();
-
+const arg = k => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : null; };
+const P = load(arg("--index") ?? INDEX);
 const { points, fetched, sources } = JSON.parse(readFileSync(here("./benchmarks.json"), "utf8"));
-const BYTES = { FP8: 1, BF16: 2, FP16: 2 };
-
-/* one benchmark point through the model: prompt caching off (the prompts are random), no thinking,
-   the run's mean lengths, its split, its piece size and its number of requests in flight */
-function predict(p){
-  const m = P.findModel(p.model), g = P.GPUS.find(b=> b.n===p.board);
-  if(!m || !g) throw new Error(`unknown model or board in ${JSON.stringify(p)}`);
-  P.setModel(m);
-  const mean = len => Math.round(len*(1 + p.spread)/2);
-  Object.assign(P.S, { wqLbl: p.weights, wq: p.weights==="NATIVE" ? m.nat.gb/m.p : BYTES[p.weights], kq: BYTES[p.kv],
-    cache: 0, thinking: 0, extra: [], workload: "custom", prompt: mean(p.isl), reply: mean(p.osl), shared: 0, fresh: null,
-    chunk: p.chunk, users: p.conc, goal: "any", ovpct: 7 });
-  const t = P.throughput(g, p.tp, p.chunk, p.conc);
-  const perGB = P.compute(p.tp, p.conc).perGPU / P.GB;
-  return { speed: t.perUser, ttft: t.ttft, tput: t.rate * P.S.reply, fits: perGB <= g.cap*P.USABLE, perGB, busy: t.busy };
-}
-
-const rows = points.map(p=> {
-  const x = predict(p);
-  return { p, x, speed: x.speed * p.tpot, ttft: x.ttft / p.ttft, tput: x.tput / p.tput };   // predicted ÷ measured
-});
 
 /* The first token at each curve's lowest concurrency (1 for NIM, 4 for InferenceX) is the prompt read
    with almost nothing queued; above it, the measured first token also holds the benchmark's queueing,
    which the page models for random arrivals (see validation/README.md). */
-const curve = p => [p.src, p.model, p.board, p.weights, p.kv, p.tp, p.isl, p.osl].join("|");
-const lowest = {};
-rows.forEach(({p})=> { lowest[curve(p)] = Math.min(lowest[curve(p)] ?? Infinity, p.conc); });
-rows.forEach(r=> { r.idle = r.p.conc === lowest[curve(r.p)]; });
+const rows = markIdle(points).map(p=> {
+  const x = predict(P, p);
+  return { p, x, idle: p.idle, speed: x.speed * p.tpot, ttft: x.ttft / p.ttft, tput: x.tput / p.tput };   // predicted ÷ measured
+});
 
 /* summaries over the points that fit in memory by the page's own sizing (the others it would never
    suggest): the median ratio, the middle 80% of ratios, and the share within ±25% */
@@ -63,7 +36,7 @@ const thead = `| Group | Points | Speed per user | Output, all users | First tok
 const lengths = r => r.p.isl <= 1024 ? "a: prompts up to 1K" : r.p.isl <= 8192 ? "b: prompts of 5K–8K" : "c: prompts of 20K";
 const head = `Estimator ${P.VERSION}, benchmarks fetched ${fetched}. ${fit.length} of ${rows.length} points fit in memory by the page's sizing and are summarized.\n\n`
   + `Each cell: median of predicted ÷ measured (10th–90th percentile), and the share of points within ±25%. Below 1, the page predicts slower speed, lower output or a shorter first token than measured.\n\n`
-  + thead + [line("All", fit), ...by(k=> k, r=> `${r.p.src} · ${r.p.model} · ${r.p.board}`)].join("\n")
+  + thead + [line("All", fit), ...by(k=> k, r=> group(r.p))].join("\n")
   + `\n\nBy prompt length:\n\n` + thead + by(k=> k.slice(3), lengths).sort().join("\n");
 console.log(head);
 
