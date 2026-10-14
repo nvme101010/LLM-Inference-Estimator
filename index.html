@@ -161,6 +161,8 @@
   .v-main{font-family:"IBM Plex Mono",monospace; font-size:34px; font-weight:600; letter-spacing:-.02em; line-height:1.15; margin-top:6px; text-wrap:balance}
   .v-main.bad{color:var(--bad); font-size:26px}
   .v-sub{font-size:13px; color:var(--ink-2); margin-top:6px; line-height:1.5}
+  .v-facts{font-size:14px; color:var(--ink-2); margin-top:6px}
+  .v-facts b{color:var(--ink); font-weight:600}
   .v-sub .warnx{color:var(--warn); font-weight:500}
   .v-why{font-size:13px; color:var(--ink-2); margin-top:6px; line-height:1.55; max-width:100ch}
   .v-why .warnx{color:var(--warn); font-weight:500}
@@ -496,6 +498,10 @@
               <input type="number" id="thinkNum" class="valinput" min="0" max="131072" step="1" value="4096" inputmode="numeric" aria-label="Thinking tokens per reply"> <small>tok</small>
             </div>
           </div>
+          <div class="sliderhead think-row" id="seeRow" hidden>
+            <label class="fld" id="seeLbl">Users see the thinking <span class="i" data-tip="seeThink" tabindex="0">i</span></label>
+            <div class="val"><input type="checkbox" id="seeOn" class="switch" role="switch" aria-labelledby="seeLbl" checked></div>
+          </div>
         </div>
       </div>
       <div id="mixWrap" class="mix" hidden>
@@ -540,6 +546,7 @@
         <div>
           <div class="lbl" id="vlbl">Suggested deployment</div>
           <div class="v-main" id="vmain">—</div>
+          <div class="v-facts" id="vfacts" hidden></div>
           <div class="v-sub" id="vsub"></div>
           <div class="v-why" id="vwhy" hidden></div>
         </div>
@@ -674,7 +681,7 @@
           <p><b>RAG pipelines</b> — the estimate covers the LLM only. RAG also needs an embedding model and usually a reranker. Small ones (under ~1B parameters) add a few GB and can share a GPU or run on CPU at low traffic. A 4–8B reranker, or heavy traffic, needs its own GPU. The reranker is the larger of the two: it reads the question against every retrieved chunk, often tens of thousands of tokens per query.</p>
           <p><b>Prompt caching</b> — chat and agent prompts mostly repeat: the same system prompt for every user, and each user's earlier turns. vLLM and SGLang cache that by default, so before the first reply only the new part of the prompt is read (it still attends to the cached part), and the shared system prompt's cache is stored once per GPU instead of once per user. Each preset sets the shape: Chat has a 512-token shared system prompt and about 512 new tokens a turn; RAG and Long-document summary read their documents fresh every time; Coding agent shares 4K tokens of system prompt and tool definitions and adds about 4K new tokens a step. Everything else in the prompt still sits in each user's cache, so memory changes only by the shared part. It can be turned off in Advanced settings.</p>
           <p><b>Several workloads</b> — one model often serves more than one kind of request at once: chat users alongside a RAG app, say. <b>Add another workload</b> gives each its own number of concurrent users and its own prompt and reply lengths. They share the same copies of the model, and each copy takes the workloads in the same proportions. <b>Memory</b> adds up: each workload's users hold a cache of that workload's length, and each workload is taken to have its own shared system prompt, stored once per GPU, so two rows of one preset cost one more shared prompt than a single row with their users combined. <b>Speed per user</b> is the same for everyone, because one decode step writes a token for the whole batch; the step reads every request's cache, so long-context users slow the others a little, and every workload's prompts take their share of the engine's time, so long-prompt users slow the others a lot. <b>First token</b> differs, since each workload waits on its own new prompt tokens: the headline is the workload that waits longest, the speed goal's first-reply limit is checked against it (so a slow-starting workload can call for a bigger setup even when the others would be fine), and Speed on this setup lists each one. Every workload's prompts join one queue and are read one at a time, so each first token is the same average wait for prompts ahead plus the time to read that workload's own prompt. The <b>pause</b> is one piece's worth and is much the same for every workload; what a long prompt adds is how many pieces come back to back. One engine setting, <b>Optimize for</b>, reads every workload's prompts; it follows the first workload's preset and can be changed in Advanced settings. The Thinking switch applies to every workload, since it is a property of the model. Because the cache grows in step with length on most models, memory and speed come out almost the same as one workload at the user-weighted average lengths; what a mix adds is each workload's own start time. Workloads that need a different model are not covered.</p>
-          <p><b>Thinking</b> — a model that reasons step by step writes thinking tokens before its answer. They're generated like any other token, so a user's cache peaks at prompt + thinking + reply, speed is judged halfway through thinking and reply together, and cost per output token counts them. The <b>First token</b> stat is when the first token appears, which for a thinking model is the start of its thinking, and it also says when the answer starts: first token plus the thinking budget at the per-user speed. The speed goal's first-reply limit is checked against the first token, which is what a user sees when the UI streams the thinking; when the answer would start later than the limit, the stat turns orange, since a UI that hides the thinking makes that the wait the user feels. To meet the goal either way, shorten the thinking budget or pick a faster setup. Earlier turns' thinking is normally dropped by the model's chat template, so it doesn't build up in the prompt. The switch starts at each model's own default, taken from its model card and chat template.</p>
+          <p><b>Thinking</b> — a model that reasons step by step writes thinking tokens before its answer. They're generated like any other token, so a user's cache peaks at prompt + thinking + reply, speed is judged halfway through thinking and reply together, and cost per output token counts them. The <b>First token</b> stat is when the first token appears, which for a thinking model is the start of its thinking, and it also says when the answer starts: first token plus the thinking budget at the per-user speed. <b>Users see the thinking</b> says which wait the speed goal is judged on. On (the default), the UI streams the thinking, so the goal's first-reply limit is checked against the first token. Off, users wait for the answer, so the tile becomes <b>Answer starts</b> and the limit is on that: within 15 s for Fast, 30 s for Smooth chat and 60 s for Readable, at the cautious end of the estimate (the first token at its slow end, the thinking at the low end of the speed range). Those limits are the estimator's own judgement; a first reply in 1 to 5 s is out of reach once thousands of tokens of thinking come first. To start answers sooner, shorten the thinking budget or pick a faster setup. Earlier turns' thinking is normally dropped by the model's chat template, so it doesn't build up in the prompt. The switch starts at each model's own default, taken from its model card and chat template.</p>
           <p><b>Concurrent users from traffic</b> — requests in progress at once = requests per second × seconds each one takes. A request takes the wait before its first token plus its thinking and reply, streamed at your speed goal's rate; the goal is a minimum speed, so this errs on the high side. The busiest-hour multiple covers traffic that isn't spread evenly through the day; 2× suits a typical workday.</p>
           <p><b>Sharing</b> — on a hosted copy of this page, the address always holds the current settings, so Copy link sends the exact scenario. Download summary saves a one-page report of the recommendation, the inputs and every board, which prints to PDF. Both record the estimator's version; a link made with an older version opens with what has changed in the figures since then, and the image of that version to run to see them as they were.</p>
           <p><b>Single node</b> — this estimates one server of up to 8 GPUs. Every result is a single node; multi-node deployments and NVL rack-scale systems are not covered. If one node of a board can't serve every user, its row says how many it does serve. For production, plan at least one more node (or replica) than this, so the service keeps running if one fails or is being updated.</p>
@@ -902,25 +909,42 @@ const USABLE = 0.90; // share of board memory the server may use (vLLM's gpu_mem
 const BIGGEST = GPUS.reduce((a,b)=> b.cap>a.cap ? b : a);   // what "too big" is measured against
 
 /* ---------------- speed goals ----------------
-   A goal is a floor on each user's speed and a ceiling on the wait for a first reply. */
+   A goal is a floor on each user's speed and a ceiling on the wait for a first reply. When users
+   don't see a thinking model's thinking (Users see the thinking off), the wait they feel is to the
+   start of the answer, so the ceiling is on that instead: ans, in seconds, longer because thinking
+   takes time. Those limits are the page's own judgement. */
 const GOALS = {
-  any:    {tps:0,  ttft:Infinity, desc:"No speed goal: the smallest setup that holds the model."},
-  read:   {tps:10, ttft:5,        desc:"10+ tok/s per user, first reply under 5 s."},
-  smooth: {tps:20, ttft:2,        desc:"20+ tok/s per user, first reply under 2 s."},
-  fast:   {tps:40, ttft:1,        desc:"40+ tok/s per user, first reply under 1 s."},
+  any:    {tps:0,  ttft:Infinity, ans:Infinity, desc:"No speed goal: the smallest setup that holds the model."},
+  read:   {tps:10, ttft:5,        ans:60,       desc:"10+ tok/s per user, first reply under 5 s."},
+  smooth: {tps:20, ttft:2,        ans:30,       desc:"20+ tok/s per user, first reply under 2 s."},
+  fast:   {tps:40, ttft:1,        ans:15,       desc:"40+ tok/s per user, first reply under 1 s."},
 };
+/* the goal in words, for the thinking as users see it */
+const goalDesc = () => { const g = GOALS[S.goal]; return S.goal!=="any" && hideThink() ? `${g.tps}+ tok/s per user, answer within ${g.ans} s.` : g.desc; };
 /* A goal is met only if the cautious end of the likely range reaches it: speed per user at its low end,
    first token at its slow end (RANGE: where measured results fell for benchmarks held out of the fit).
    The figures shown are the central estimates; judging on the cautious end means a setup that passes
    should pass in practice. */
 const tpsLow   = t => t.perUser * RANGE.speed[0];
 const ttftHigh = t => t.ttft * RANGE.ttft[1];
-const meetsGoal = t => tpsLow(t) >= GOALS[S.goal].tps && ttftHigh(t) <= GOALS[S.goal].ttft;
+/* With the thinking hidden from users, the wait is to the start of the answer: the first token, then
+   the thinking at the per-user speed. answerHigh is that at the cautious end of both. */
+const hideThink   = () => !S.seeThink && S.thinking > 0;
+const answerStart = t => t.ttft + S.thinking / t.perUser;
+const answerHigh  = t => ttftHigh(t) + S.thinking / tpsLow(t);
+const waitHigh    = t => hideThink() ? answerHigh(t) : ttftHigh(t);
+const waitLimit   = () => hideThink() ? GOALS[S.goal].ans : GOALS[S.goal].ttft;
+const meetsGoal = t => tpsLow(t) >= GOALS[S.goal].tps && waitHigh(t) <= waitLimit();
 /* how far a setup is from the goal, on whichever side is worse: 1 or less means it's met */
-const goalGap = t => Math.max(GOALS[S.goal].tps / tpsLow(t), ttftHigh(t) / GOALS[S.goal].ttft);
+const goalGap = t => Math.max(GOALS[S.goal].tps / tpsLow(t), waitHigh(t) / waitLimit());
 /* a figure against the goal, in words: short of it outright, or only at the cautious end */
 const tpsVsGoal  = t => { const g = GOALS[S.goal].tps;  return t.perUser < g ? `below the ${g}+ goal` : tpsLow(t) < g ? `below the ${g}+ goal at the low end` : `meets the ${g}+ goal`; };
 const ttftVsGoal = t => { const g = GOALS[S.goal].ttft; return t.ttft > g ? `over the ${g} s goal` : ttftHigh(t) > g ? `over the ${g} s goal at the slow end` : `within the ${g} s goal`; };
+const answerVsGoal = t => { const g = GOALS[S.goal].ans; return answerStart(t) > g ? `over the ${g} s goal` : answerHigh(t) > g ? `over the ${g} s goal at the slow end` : `within the ${g} s goal`; };
+/* a wait of seconds to minutes, as a figure and its unit, and the likely range of the answer's start */
+const waitParts = s => s >= 90 ? [(s/60).toFixed(1), "min"] : s >= 10 ? [String(Math.round(s)), "s"] : [s.toFixed(1), "s"];
+const likelyAnswer = t => { const lo = t.ttft*RANGE.ttft[0] + S.thinking/(t.perUser*RANGE.speed[1]), hi = answerHigh(t);
+  return hi >= 90 ? `likely ${(lo/60).toFixed(1)}–${(hi/60).toFixed(1)} min` : `likely ${waitParts(lo)[0]}–${waitParts(hi).join(" ")}`; };
 
 /* ---------------- workloads ----------------
    A workload is what each request sends in (prompt) and gets back (reply). A thinking model also
@@ -982,6 +1006,7 @@ const S = { wq:2, wqLbl:"NATIVE", kq:2, tp:1, tpo:"auto", chunk:512, ovpct:7, us
             srv:0,             // Server: 0 = GPUs only, 1 = NVIDIA's guidance for the whole server (see serverFor)
             workload:"chat", prompt:2048, reply:512, wantPrompt:2048, wantReply:512,
             think:false, thinkTok:4096, thinking:0,
+            seeThink:true,     // Users see the thinking: the speed goal's wait is to the first token; off, to the answer
             cache:1, shared:512, fresh:512,                    // prompt caching on, and the last preset's shape of a prompt
             traffic:{people:1000, req:20, hours:8, peak:2},   // the traffic estimator's inputs
             trafficApplied:null,                               // those inputs and the users they gave, once used
@@ -1522,7 +1547,7 @@ function serverFor(d){
 /* a capacity as sold, rounded up: to 10 GB below a TB, to a tenth of a TB above */
 const capParts = gb => gb < 1000 ? [commas(Math.ceil(gb/10)*10), "GB"] : [(Math.ceil(gb/100)/10).toFixed(1), "TB"];
 /* the storage tile's tooltip, with what KV-cache offload to disk would add on the server on screen */
-const srvDiskTip = kv => "Usable capacity on local NVMe for this model, beside a separate boot volume for the OS: how it's made from drives and RAID is the vendor's choice. It holds two copies of the model's weights at the chosen precision (the version serving and the next one downloading) and 100 GB for container images, compile caches and logs, kept under 80% full. Other models kept on the server need room on top. "
+const srvDiskTip = kv => "What this workload needs on local NVMe, as usable capacity, beside a separate boot volume for the OS. It is not a drive configuration: how it's made from drives and RAID is the vendor's choice. It holds two copies of the model's weights at the chosen precision (the version serving and the next one downloading) and 100 GB for container images, compile caches and logs, kept under 80% full. Other models kept on the server need room on top. "
   + "Offloading KV cache to disk, as NVIDIA Dynamo's KV block manager can, is uncommon on a single server; it needs room at least as large as the GPUs' KV cache, and 100 GB or more" + (kv ? `: ${kv} or more on this server.` : ".")
   + " For reference, NVIDIA's guide asks for one NVMe drive of at least 1 TB per CPU socket, on the same switch or root complex as the GPUs, and its reference architectures add a 1 TB boot drive.";
 /* the server as rows, shared by the page's tiles and the summary's table: a figure and one short
@@ -1536,12 +1561,10 @@ function serverRows(s){
      sub:`2 × ${commas(s.cores/GUIDE.sockets)}-core CPUs · ${GUIDE.ghz.toFixed(1)} GHz base or more`},
     {tip:"srvRam", k:"Recommended minimum system memory", n:commas(s.ram), unit:"GB",
      sub:`${GUIDE.memX} × GPU memory`},
-    {tip:"srvDisk", k:"Local NVMe", n:diskN, unit:`${diskU} usable`,
+    {tip:"srvDisk", k:"Workload storage", n:diskN, unit:`${diskU} usable NVMe`,
      sub:`+ boot volume`},
   ];
 }
-/* the sentence for a GPU count rounded up to one a server is bought with */
-const roundText = (g, need, gpus) => `${S.srv ? "By NVIDIA's server guidance a server holds" : `${g.n} servers take`} ${popText(g)} GPUs, so the ${need} this needs rounds up to ${gpus}.`;
 
 
 const fmtTps = x => x>=100 ? commas(Math.round(x)) : x>=10 ? x.toFixed(0) : x.toFixed(1);
@@ -1659,6 +1682,7 @@ function render(){
   renderThroughput(fits ? active : null);
   renderTpNote(m, tp, active);
   renderAdvState();
+  updateGoalHint();   // the goal's wait follows whether the model thinks and users see it
   renderTraffic();
   syncMix();
   LAST = {m, r, tp, reps, g, fits, active, picked, suggested, deps, speed, cap, perGB, tot, shown, server};
@@ -1671,7 +1695,7 @@ function render(){
 /* a total of box sizes: "192 GB" as sold, or its GiB equivalent */
 const boxTotal = gb => S.unit==="GiB" ? fmtMem(gb) : `${commas(gb)} GB`;
 function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, speed, cap}){
-  const goal = GOALS[S.goal], hasGoal = S.goal!=="any", goalText = goal.desc.replace(/\.$/, "");
+  const goal = GOALS[S.goal], hasGoal = S.goal!=="any", goalText = goalDesc().replace(/\.$/, "");
   const prec = S.wqLbl==="NATIVE" ? `${m.nat.f}, as released` : S.wqLbl;
   const all = allUsers(), names = groupNames();
   const who = `${m.custom ? "Custom model" : m.n} · ${commas(all)} user${all>1?"s":""} · `
@@ -1680,16 +1704,22 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
     + ` · ${prec}`;
   const back = `<button type="button" class="linkbtn" data-act="auto">Back to the suggestion</button>`;
   const autoTp = S.tpo!=="auto" ? `<button type="button" class="linkbtn" data-act="tpauto">Let TP choose automatically</button>` : "";
-  let lbl, main, sub = who, acts = "", why = "";
+  let lbl, main, sub = who, acts = "", why = "", facts = "";
   if(fits){
-    lbl = picked ? (notRecommended(active) ? "Your pick · split over PCIe" : "Your pick") : active.partial ? "Closest single node" : "Suggested deployment";
+    // what the suggestion is chosen for, beside it
+    lbl = picked ? (notRecommended(active) ? "Your pick · split over PCIe" : "Your pick")
+        : active.partial ? "Closest single node · serves the most users"
+        : `Suggested deployment · least GPU memory that ${hasGoal ? "meets your goal" : "fits"}`;
     main = deployName(active);
+    // what the workload needs, apart from what the server it goes in holds
+    if(!systemOf(g) && popOf(g) && active.need < active.gpus)
+      facts = `Workload needs <b>${active.need} GPU${active.need===1 ? "" : "s"}</b> · `
+        + (S.srv ? `server holds <b>${active.gpus}</b>, by NVIDIA's guidance` : `${g.n} servers come with <b>${active.gpus}</b>`);
     if(notRecommended(active)) why += `<span class="badx">Not recommended:</span> this splits one copy of the model across cards with no ${fabric(g)}, so they coordinate over PCIe after every layer. Expect it to be slower than the same number of directly linked cards; the speed shown already reflects that. `;
     const layout = reps>1
       ? `Runs as <b>${reps} <span class="tipl" data-tip="copies">copies</span></b> of the model on ${tp} GPU${tp>1?"s":""} each, ~${commas(active.upr)} user${active.upr===1 ? "" : "s"} per copy. `
       : "";
     if(systemOf(g)) why += `The ${g.n} is sold only as ${systemOf(g)}-GPU systems, so this is a whole system. `;
-    else if(popOf(g) && active.need < active.gpus) why += roundText(g, active.need, active.gpus) + " ";
     if(active.gpus>1 && !active.partial && !forSpeed(active) && !systemOf(g) && !(active.need < active.gpus)){   // more than one GPU because of memory, not speed
       const mr = memoryReason(active), On = mr && mr.on[0].toUpperCase() + mr.on.slice(1);
       const then = reps>1 ? `this runs ${reps} copies` : `one copy is split across ${tp}`;
@@ -1702,7 +1732,9 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
     if(forSpeed(active) && !active.partial){
       const lean = active.memOnly;
       const short = [tpsLow(lean.t) < goal.tps ? `${fmtTpsShort(lean.t.perUser)} tok/s per user (${likelyTps(lean.t.perUser)})` : "",
-                     ttftHigh(lean.t) > goal.ttft ? `${fmtTime(lean.t.ttft).join(" ")} to first reply (${likelyTime(lean.t.ttft)})` : ""].filter(Boolean);
+                     waitHigh(lean.t) <= waitLimit() ? ""
+                     : hideThink() ? `${fmtWait(answerStart(lean.t))} to the answer (${likelyAnswer(lean.t)})`
+                     : `${fmtTime(lean.t.ttft).join(" ")} to first reply (${likelyTime(lean.t.ttft)})`].filter(Boolean);
       why += `${lean.gpus} × ${g.n} would hold the model, but at ${short.join(" and ")} it can't be counted on to reach your speed goal, so this adds ${active.gpus - lean.gpus} more. `;
     }
     if(active.partial){
@@ -1715,7 +1747,7 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
       why += layout + (hasGoal && !active.meets ? `<span class="warnx">Below your speed goal</span> — ${goalText}.` : "");
     } else {
       why += layout + (active.meets
-        ? `${hasGoal ? "Estimated to serve everyone within your speed goal, even at the cautious end of the estimate," : "Holds everyone"} with the least GPU memory in total (${boxTotal(active.memGB)}).`
+        ? `${hasGoal ? "Estimated to serve everyone within your speed goal, even at the cautious end of the estimate" : "Holds everyone"}, with ${boxTotal(active.memGB)} of GPU memory in all.`
         : `<span class="warnx">Nothing reaches your speed goal</span> (${goalText}), so this is the setup that comes closest. Try FP8 or shorter prompts.`);
     }
     // how far it stretches, in a sentence rather than a fourth tile; memory's limit is said apart from the speed estimate's
@@ -1733,6 +1765,8 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
   $('vlbl').textContent = lbl;
   $('vmain').textContent = main;
   $('vmain').classList.toggle('bad', !fits);
+  $('vfacts').innerHTML = facts;
+  $('vfacts').hidden = !facts;
   $('vsub').innerHTML = sub;
   $('vwhy').innerHTML = why;
   $('vwhy').hidden = !why;
@@ -1740,13 +1774,13 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
 
   const na = "needs a board that fits";
   const slowTps  = hasGoal && speed && tpsLow(speed) < goal.tps;      // judged at the cautious end, as the suggestion is
-  const slowTtft = hasGoal && speed && ttftHigh(speed) > goal.ttft;
-  // a thinking model's visible answer starts after its thinking; if the UI hides the thinking, that is the wait the user feels
-  const answerAt = speed && S.thinking ? speed.ttft + S.thinking / speed.perUser : null;
-  const slowAnswer = hasGoal && answerAt !== null && ttftHigh(speed) + S.thinking/tpsLow(speed) > goal.ttft;
+  // the wait the goal is judged on: to the first token, or to the answer when users don't see the thinking
+  const slowWait = hasGoal && speed && waitHigh(speed) > waitLimit();
+  const hid = hideThink(), answerAt = speed && S.thinking ? answerStart(speed) : null;
   // several workloads: the tile shows the one that waits longest, and names the others' times beside it
+  const wlWait = x => hid ? fmtWait(x.ttft + S.thinking/speed.perUser) : fmtTime(x.ttft).join(" ");
   const perWl = speed && speed.per.length>1
-    ? `${names[speed.slow.i]}, the slowest to start · ${speed.per.filter(x=> x!==speed.slow).map(x=> `${names[x.i]}: ${fmtTime(x.ttft).join(" ")}`).join(" · ")}<br>` : "";
+    ? `${names[speed.slow.i]}, the slowest to start · ${speed.per.filter(x=> x!==speed.slow).map(x=> `${names[x.i]}: ${wlWait(x)}`).join(" · ")}<br>` : "";
   /* both figures are averages while new prompts keep arriving; say what that costs when it's noticeable:
      the speed between prompt reads, and the part of the first token spent waiting for other prompts */
   const between = speed && speed.between > speed.perUser*1.05 ? `<br>${fmtTps(speed.between)} tok/s between prompt reads` : "";
@@ -1759,15 +1793,16 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
     + (speed ? statCell("tpsUser", "Speed per user", fmtTpsShort(speed.perUser), "tok/s",
                  (hasGoal ? tpsVsGoal(speed) : feelFor(speed.perUser)) + `<br>${likelyTps(speed.perUser)}` + between, slowTps ? "warn" : "")
              : statCell("tpsUser", "Speed per user", "—", "", na))
-    + (speed ? statCell("ttft", "First token", ...fmtTime(speed.ttft),
-                 (answerAt !== null ? `<div class="n2">answer after ${fmtWait(answerAt)} <small>of thinking</small></div>` : "")
-                 + perWl + queued + (hasGoal
-                     ? slowTtft ? ttftVsGoal(speed)
-                     : slowAnswer ? `Meets the ${goal.ttft} s goal only if users see the thinking stream. If it is hidden, they wait for the answer.`
-                     : ttftVsGoal(speed)
-                     : `${commas(speed.prompt)} new prompt tokens`) + `<br>${likelyTime(speed.ttft)}`,
-                 slowTtft || slowAnswer ? "warn" : "")
-             : statCell("ttft", "First token", "—", "", na));
+    + (!speed ? statCell("ttft", "First token", "—", "", na)
+       // users don't see the thinking: the wait they feel, and the goal, run to the start of the answer
+       : hid ? statCell("answer", "Answer starts", ...waitParts(answerAt),
+                 `after ${fmtWait(S.thinking/speed.perUser)} of thinking users don't see<br>` + perWl + queued
+                 + (hasGoal ? answerVsGoal(speed) : `first token ${fmtTime(speed.ttft).join(" ")}`) + `<br>${likelyAnswer(speed)}`,
+                 slowWait ? "warn" : "")
+       : statCell("ttft", "First token", ...fmtTime(speed.ttft),
+                 (answerAt !== null ? `<div class="n2">answer after ${fmtWait(answerAt)} <small>of thinking users see</small></div>` : "")
+                 + perWl + queued + (hasGoal ? ttftVsGoal(speed) : `${commas(speed.prompt)} new prompt tokens`) + `<br>${likelyTime(speed.ttft)}`,
+                 slowWait ? "warn" : ""));
 }
 
 
@@ -1857,7 +1892,9 @@ function renderCards(deps, active, suggested, picked){
             : nodeMax(b) < NODE ? ` Its servers hold up to ${nodeMax(b)} cards${S.srv ? " by NVIDIA's guidance" : ""}, and one copy of a model can be split across at most ${Math.max(...TP_OPTIONS.filter(t=> t<=nodeMax(b)))} of them.` : ""}`
         : d.partial ? `This is the most one server can ${d.meets ? "serve" : "hold"}${hasGoal && d.meets ? " at your speed goal" : hasGoal ? ", and it is below your speed goal" : ""}.`
         : forSpeed(d) ? `Fits on ${d.memOnly.gpus} GPU${d.memOnly.gpus===1 ? "" : "s"}, but ${
-            tpsLow(d.memOnly.t) < GOALS[S.goal].tps ? `only at ${fmtTpsShort(d.memOnly.t.perUser)} tok/s per user (${likelyTps(d.memOnly.t.perUser)})` : `the first reply takes ${fmtTime(d.memOnly.t.ttft).join(" ")} (${likelyTime(d.memOnly.t.ttft)})`
+            tpsLow(d.memOnly.t) < GOALS[S.goal].tps ? `only at ${fmtTpsShort(d.memOnly.t.perUser)} tok/s per user (${likelyTps(d.memOnly.t.perUser)})`
+            : hideThink() ? `the answer starts after ${fmtWait(answerStart(d.memOnly.t))} (${likelyAnswer(d.memOnly.t)})`
+            : `the first reply takes ${fmtTime(d.memOnly.t.ttft).join(" ")} (${likelyTime(d.memOnly.t.ttft)})`
           }. ${d.reps===1 ? `Splitting it across ${d.gpus} GPUs meets`
                : d.tp===1 ? `${d.gpus} GPUs, each running its own copy, meet`
                : `${d.reps} copies on ${d.tp} GPUs each meet`} your speed goal.`
@@ -2034,7 +2071,7 @@ function updateWqNote(){
 
 /* ---------------- inputs ---------------- */
 const ctxSlider=$('ctx'), usersSlider=$('users'), ovSlider=$('ovpct'), replyNum=$('replyNum'), workloadSel=$('workload');
-const thinkOn=$('thinkOn'), thinkNum=$('thinkNum');
+const thinkOn=$('thinkOn'), thinkNum=$('thinkNum'), seeOn=$('seeOn');
 
 /* prompt + thinking + reply must fit the model's context: thinking is capped at half of it, the
    reply at what's left after 512 prompt tokens, and the prompt slider runs up to the remainder */
@@ -2079,6 +2116,8 @@ function syncThink(){
   thinkOn.disabled = mode==="always";
   thinkOn.title = mode==="always" ? `${m.n} always thinks before answering` : "";
   thinkNum.disabled = !S.think;
+  $('seeRow').hidden = mode==="none" || !S.think;   // only matters while the model thinks
+  seeOn.checked = S.seeThink;
 }
 function resetThink(){                   // a newly picked model starts at its own default
   const mode = thinksOf(activeModel());
@@ -2097,7 +2136,8 @@ function applyWorkload(key){             // a preset sets both lengths and how p
   setLengths();
 }
 function markCustom(){ S.workload = "custom"; workloadSel.value = "custom"; }
-thinkOn.addEventListener('change', ()=>{ S.think = thinkOn.checked; syncThink(); setLengths(); render(); });
+thinkOn.addEventListener('change', ()=>{ S.think = thinkOn.checked; syncThink(); setLengths(); updateGoalHint(); render(); });
+seeOn.addEventListener('change', ()=>{ S.seeThink = seeOn.checked; updateGoalHint(); render(); });
 thinkNum.addEventListener('input', ()=>{
   const n = Math.round(+thinkNum.value);
   if(thinkNum.value==="" || !(n>=0)) return;   // mid-edit or invalid — keep last good value
@@ -2200,7 +2240,7 @@ document.querySelector('.verdict').addEventListener('click', e=>{
 });
 
 /* speed goal */
-const updateGoalHint = () => { $('goalHint').textContent = GOALS[S.goal].desc; };
+const updateGoalHint = () => { $('goalHint').textContent = goalDesc(); };
 $('goal').addEventListener('change', e=>{ S.goal = e.target.value; updateGoalHint(); render(); });
 
 /* model change */
@@ -2391,6 +2431,7 @@ function stateToHash(){
   if(mixed()) q.set("x", S.extra.map(w=> [w.workload, w.users,
     ...(w.workload==="custom" ? [w.wantPrompt, w.wantReply, w.shared, w.fresh==null ? "rest" : w.fresh] : [])].join("_")).join("."));
   if(thinksOf(m)!=="none") q.set("th", S.think ? S.thinkTok : "off");
+  if(thinksOf(m)!=="none" && S.think && !S.seeThink) q.set("tv", "hidden");
   if(S.wqLbl!=="NATIVE") q.set("wq", S.wqLbl);
   if(S.goal!=="smooth") q.set("g", S.goal);
   if(S.kq!==2) q.set("kv", kqLabel());
@@ -2445,8 +2486,9 @@ function applyHash(){
     if(th && mode!=="none"){
       if(th==="off"){ if(mode!=="always") S.think = false; }
       else if(+th>=0){ S.think = true; S.thinkTok = Math.min(131072, Math.round(+th)); }
-      syncThink();
     }
+    S.seeThink = q.get("tv")!=="hidden";
+    syncThink();
     const w = WORKLOADS[q.get("w")] ? q.get("w") : "chat";
     if(w==="custom"){ S.wantPrompt = Math.max(1, Math.round(+q.get("p")) || 2048); S.wantReply = Math.max(1, Math.round(+q.get("r")) || 512); }
     applyWorkload(w);
@@ -2534,13 +2576,17 @@ function buildSummary(){
   const stats = fits ? [
     ["Memory per GPU", `${fmtMem(L.perGB)}`, `of ${boxMem(a.g)}, ${Math.round(L.perGB/a.g.cap*100)}% full`],
     ["Speed per user", `${fmtTps(t.perUser)} tok/s`, (hasGoal ? tpsVsGoal(t) : feelFor(t.perUser)) + `; ${likelyTps(t.perUser)}` + between],
-    ["First token", fmtTime(t.ttft).join(" "), (()=>{
-        const ans = S.thinking ? t.ttft + S.thinking/t.perUser : null, after = ans!==null ? `the answer starts after ${fmtWait(ans)} of thinking` : "";
+    // as on the page: the wait to the first token, or to the answer when users don't see the thinking
+    hideThink()
+      ? ["Answer starts", fmtWait(answerStart(t)),
+         `after ${fmtWait(S.thinking/t.perUser)} of thinking users don't see; `
+         + (t.per.length>1 ? `${wl[t.slow.i]}, the slowest to start; ${t.per.filter(x=> x!==t.slow).map(x=> `${wl[x.i]}: ${fmtWait(x.ttft + S.thinking/t.perUser)}`).join(", ")}; ` : "") + queued
+         + (hasGoal ? answerVsGoal(t) : `first token ${fmtTime(t.ttft).join(" ")}`) + `; ${likelyAnswer(t)}`]
+      : ["First token", fmtTime(t.ttft).join(" "), (()=>{
+        const ans = S.thinking ? answerStart(t) : null, after = ans!==null ? `the answer starts after ${fmtWait(ans)} of thinking users see` : "";
         // several workloads: the figure is the slowest one's, with the others named after it
         const which = (t.per.length>1 ? `${wl[t.slow.i]}, the slowest to start; ${t.per.filter(x=> x!==t.slow).map(x=> `${wl[x.i]}: ${fmtTime(x.ttft).join(" ")}`).join(", ")}; ` : "") + queued;
         if(!hasGoal) return which + `${commas(gs[t.slow.i].prompt)}-token prompt${after ? `; ${after}` : ""}`;
-        if(ttftHigh(t) > goal.ttft) return which + `${ttftVsGoal(t)}${after ? `; ${after}` : ""}`;
-        if(ans!==null && ttftHigh(t) + S.thinking/tpsLow(t) > goal.ttft) return which + `${after}. Meets the ${goal.ttft} s goal only if users see the thinking stream; if it is hidden, they wait for the answer`;
         return which + `${ttftVsGoal(t)}${after ? `; ${after}` : ""}`;
       })() + `; ${likelyTime(t.ttft)}`],
     ["GPU memory in all", boxTotal(a.memGB), `${a.gpus} × ${boxMem(a.g)}`],
@@ -2550,7 +2596,7 @@ function buildSummary(){
   ] : [];
   const fromTraffic = tf ? ` · estimated from ${commas(tf.people)} people × ${tf.req} requests a day over ${tf.hours} hours, busiest hour ${tf.peak}× the average` : "";
   const lengths = w => `${commas(w.prompt)}-token prompts, ${commas(w.reply)}-token replies`
-                 + (S.thinking ? `, ${commas(S.thinking)} thinking tokens per reply` : "")
+                 + (S.thinking ? `, ${commas(S.thinking)} thinking tokens per reply, ${S.seeThink ? "shown" : "not shown"} to users` : "")
                  + (promptParts(w).fresh < w.prompt ? ` (${commas(promptParts(w).fresh)} new per request, the rest cached)` : "");
   const inputs = [
     ["Model", name + (m.custom ? "" : ` · ${fmtB(m.p)} params${m.E ? `, ${fmtB(m.pa)} active` : ""}`)],
@@ -2559,7 +2605,7 @@ function buildSummary(){
                    ...gs.map((w, i)=> [`Workload ${i+1}`, `${wl[i]}, ${commas(w.users)} user${w.users===1 ? "" : "s"}: ${lengths(w)}${i ? "" : fromTraffic.replace(" · estimated", " · users estimated")}`])]
                 : [["Concurrent users", commas(S.users) + fromTraffic],
                    ["Workload", `${wl[0]}: ${lengths(S)}`]]),
-    ["Speed goal", hasGoal ? goal.desc.replace(/\.$/, "") : "None: the smallest setup that fits"],
+    ["Speed goal", hasGoal ? goalDesc().replace(/\.$/, "") : "None: the smallest setup that fits"],
     ["Layout", layout],
     ["Advanced", `KV cache ${kqLabel()} · GPUs per copy ${S.tpo==="auto" ? "chosen automatically" : S.tpo} · ${CHUNK_NAME[S.chunk]} · ${S.ovpct}% overhead`
       + ` · ${S.srv ? "server sized by NVIDIA's guidance" : "GPUs only"}`],
@@ -2605,7 +2651,9 @@ function buildSummary(){
   ];
   if(mixed()) notes.push(`The workloads share the same copies of the model, each copy taking them in the same proportions. Memory adds up across them, with each workload's own shared system prompt stored once per GPU; every user streams at the same speed; first token is the slowest workload's, and the speed goal is checked against it. Every workload's prompts join one queue, so each first-token time is the same average wait for prompts ahead plus the time to read that workload's own prompt.`);
   [...new Set(gs.map(w=> WORKLOADS[w.workload].short).filter(Boolean))].forEach(s=> notes.push(s));
-  if(S.thinking) notes.push(`For a thinking model, first token is when its thinking starts, which a user sees only if the UI streams the thinking. The answer starts once the thinking is done; if the UI hides the thinking, that is the wait the user feels, and the speed goal should be judged against it.`);
+  if(S.thinking) notes.push(S.seeThink
+    ? `Users see the thinking stream, so the speed goal's wait is judged to the first token, which for a thinking model is the start of its thinking. The answer starts once the thinking is done.`
+    : `Users don't see the thinking, so the speed goal's wait is judged to the start of the answer, after the thinking: within ${GOALS[S.goal].ans} s for this goal, a limit of the estimator's own.`);
   if(fits && notRecommended(a)) notes.push(`Not recommended: this splits one copy across cards with no ${fabric(a.g)}, so they coordinate over PCIe after every layer, slower than directly linked cards.`);
   // the layout row already says how copies are arranged, so there is no separate note for them
   // the link back sits beside the date, so it can never be the line that pushes the page onto a second sheet
@@ -2710,6 +2758,7 @@ const TIPS = {
   reply:"Tokens in each answer the user reads. Thinking, if the model does it, is set separately below. Prompt + thinking + reply is the most cache one user holds.",
   traffic:"Concurrent users are the requests being answered at the same moment, not everyone who has access. This turns daily traffic into that number: requests per second × how long each takes. It assumes replies stream at your speed goal's rate, the slowest the goal allows, so it errs on the high side.",
   think:"Many newer models reason step by step before they answer. Those thinking tokens are generated like any others, so they take cache memory and time even though users usually don't see them. The switch starts at the model's own default. About 4K tokens is typical; hard math or code can run past 10K. Earlier turns' thinking is normally dropped from the conversation, so it doesn't pile up in the prompt.",
+  seeThink:"Whether your chat UI shows users the model's thinking as it streams. On, the speed goal's wait is to the first token, which is the start of the thinking. Off, users see nothing until the answer starts, so the wait is to the answer: the first token plus the thinking at the per-user speed. That wait gets a longer limit, the estimator's own: 15 s for Fast, 30 s for Smooth chat and 60 s for Readable.",
   workload:"What each request looks like: how long the prompt is and how long the reply is. Presets cover common patterns and pick how prompts are read; move the prompt slider or type a reply length to set your own. Whether the model thinks before answering is set separately, under Reply length.",
   mix:"Other kinds of request the same model serves at the same time, each with its own number of concurrent users and its own lengths. They share the same copies of the model: memory adds up across them, and because one decode step serves the whole batch, every user streams at the same speed. What differs is the wait for a first token: each workload reads its own prompts, the headline shows the slowest, and the speed goal is checked against it. Every workload's prompts join one queue, so each waits the same for the prompts ahead of it. Typing a length makes a row Custom.",
   users:"How many requests are served at once — the batch. Each carries its own KV cache, so this scales cache memory linearly and is the main lever on serving capacity.",
@@ -2720,7 +2769,7 @@ const TIPS = {
   prefill:"How fast a new prompt is read, in tokens per second. Reading is limited by compute rather than memory speed, so faster chips and FP8 or FP4 help most. Optimize for, in Advanced settings, sets the piece size.",
   pcache:"Chat and agent prompts mostly repeat: the same system prompt for everyone, and each user's earlier turns. vLLM and SGLang keep that part cached by default, so only the new text is read before the first reply, and the shared system prompt is stored once per GPU rather than once per user. Each workload preset sets how much of its prompt is new and how much is shared; the workload hint says. Turn it off to size for prompts that never repeat.",
   ovpct:"Headroom for allocator fragmentation and framework buffers, as a percentage of weights + cache + activations. 5–10% is typical; raise it if you have hit OOM under load.",
-  goal:"How fast each user should see answers: at least this many tokens per second, and a first reply within the time limit. The suggestion is the setup that reaches it with the least GPU memory in total, judged at the cautious end of the estimate: speed at the low end of its likely range, first token at the slow end. Any speed just finds the smallest setup that fits.",
+  goal:"How fast each user should see answers: at least this many tokens per second, and a first reply within the time limit. When users don't see a thinking model's thinking, the limit is on when the answer starts instead: 15 s for Fast, 30 s for Smooth chat, 60 s for Readable. The suggestion is the setup that reaches it with the least GPU memory in total, judged at the cautious end of the estimate: speed at the low end of its likely range, first token at the slow end. Any speed just finds the smallest setup that fits.",
   capacity:"The most users this node holds at the current prompt and reply lengths, across all its copies. Either memory runs out, or each user's speed or first token, at the cautious end of the estimate, misses your goal, whichever comes first; when it is the speed, the sentence also says how many memory alone would hold. The gap to your user count is your room to grow. With several workloads, they grow together in the same proportions.",
   units:"GB is 1,000,000,000 bytes, the unit on spec sheets and download pages. GiB is 1,073,741,824 bytes, the unit nvidia-smi, PyTorch and vLLM report. Switching only relabels memory; the recommendation doesn't change. Board capacities are the size on the box, counted as GB: 80 GB is 74.5 GiB.",
   usable:"The dashed line marks how much memory the model may use: 90% of each GPU. That is vLLM's default limit (gpu_memory_utilization = 0.9); the other 10% is left for the driver and anything else on the card. A setup fits only if its memory stays to the left of the line.",
@@ -2740,7 +2789,8 @@ const TIPS = {
   tput:"An estimate from the board's memory bandwidth, compute and interconnect, with efficiency shares fitted to published benchmarks; not a measurement of this setup. It includes the work of reading the prompts that keep arriving, assuming each user sends a new request as soon as the last is answered. The likely range beside speed and first token is where measured results fell for 80% of benchmark points the fit did not see. Real results vary with the serving engine, its settings and the traffic. Use it to compare setups and choose what to load-test, not to promise an SLA.",
   tpsTotal:"Output tokens per second summed across every concurrent user — what the deployment produces. Adding users usually raises it, because the weights are read once per step no matter how many requests share that step.",
   tpsUser:"How fast one person sees text stream in, on average while new prompts keep arriving. Each step writes one new token for every active user, so everyone streams at the same rate, but a step that also reads a new prompt takes longer: the more of the time goes to reading prompts, the slower the average. When that costs much, the tile also gives the speed between prompt reads, 1 ÷ one decode step. More users make every step longer, since it must also read their KV caches. Around 20 tok/s or more feels smooth in chat; under 10 feels sluggish. An estimate, not a measurement. The likely range is where measured speed fell around the estimate for 80% of published benchmark points the fit did not see; the speed goal is judged at its low end.",
-  ttft:`Time to first token, on average: the engine taking the request in, the wait for prompts already queued ahead of this one, then reading the new part of its prompt (all of it with prompt caching off) in pieces, each sharing a step with everyone else's next token. The wait assumes each user sends a new request as soon as the last is answered, at random moments; bursts of traffic make it longer, and the tile says how much of the time it is when that is noticeable. Faster chips, FP8 and Fast first reply shorten the reading; fewer users per copy shorten the wait. With several workloads this is the one that waits longest, and the others' times are listed under it. For a thinking model the first token is a thinking token, so this is when the thinking starts; the answer starts after the thinking, and the tile says when. If your UI streams the thinking, the user sees text at the first token; if it hides the thinking, the answer time is the wait they feel, and the tile turns orange when that misses the goal. It includes the ${Math.round(CAL.request*1000)} ms an engine takes to take a request in (HTTP, tokenization, scheduling), measured right next to the server: add your network round trip. The likely range comes from benchmarks with nothing queued, and the speed goal is judged at its slow end; the wait for other prompts is modelled, and no benchmark here tests it.`,
+  ttft:`Time to first token, on average: the engine taking the request in, the wait for prompts already queued ahead of this one, then reading the new part of its prompt (all of it with prompt caching off) in pieces, each sharing a step with everyone else's next token. The wait assumes each user sends a new request as soon as the last is answered, at random moments; bursts of traffic make it longer, and the tile says how much of the time it is when that is noticeable. Faster chips, FP8 and Fast first reply shorten the reading; fewer users per copy shorten the wait. With several workloads this is the one that waits longest, and the others' times are listed under it. For a thinking model the first token is a thinking token, so this is when the thinking starts; the answer starts after the thinking, and the tile says when. If your UI streams the thinking, the user sees text at the first token; if it hides the thinking, the answer is the wait they feel: switch Users see the thinking off and the goal is judged on that instead. It includes the ${Math.round(CAL.request*1000)} ms an engine takes to take a request in (HTTP, tokenization, scheduling), measured right next to the server: add your network round trip. The likely range comes from benchmarks with nothing queued, and the speed goal is judged at its slow end; the wait for other prompts is modelled, and no benchmark here tests it.`,
+  answer:"When the answer starts, on average, with the thinking hidden from users: the first token (the engine taking the request in, any queue, reading the prompt), then the thinking at the per-user speed. This is the wait users feel, so the speed goal is judged on it, at the cautious end: the first token at the slow end of its range and the thinking at the low end of the speed range. The likely range under it is where that lands. Shorter thinking budgets and faster setups start answers sooner.",
   step:"Everything needed to produce one token for every active user, when no new prompt is being read. Memory read and compute use the fitted shares of the board's datasheet figures; the scheduler segment is vLLM's fitted fixed cost per step. The largest segment is the bottleneck. A big blue interconnect segment means tensor parallelism is costing you real speed.",
   bneck:"What limits token generation right now. Memory-bound is normal for decode: the GPU waits on reading weights and cache. Compute-bound appears at very large batches. Interconnect-bound means the GPUs spend more time talking than working. Prompt-bound means reading new prompts takes half the engine's time or more, so faster compute, FP8, prompt caching or shorter prompts help more than memory bandwidth.",
 };
