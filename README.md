@@ -5,7 +5,7 @@ Single-node sizing estimate: how many GPUs one server needs for your model and u
 A single-page tool for estimating what LLM inference needs. Pick a model, the number of concurrent users, a workload and a speed goal, and it recommends the node estimated to meet the goal with the least GPU memory in total:
 
 - **Memory:** model weights, KV cache, activations and overhead, per GPU and in total, in GB or GiB.
-- **Speed:** estimated tokens per second per user and time to first reply while new prompts keep arriving, including thinking time for models that reason before answering.
+- **Speed:** estimated tokens per second per user and time to first reply while new prompts keep arriving, each with a likely range measured against published benchmarks, including thinking time for models that reason before answering.
 - **Capacity:** how many GPUs of each board one node takes, and how many users it can handle: what fits in memory, and what also reaches the speed goal on the estimate.
 
 It covers 40+ popular open models (Qwen, Gemma, Llama, DeepSeek, gpt-oss, GLM, Kimi, Mistral and others) on NVIDIA L4, L40S, H200 NVL, HGX H200, HGX B200, HGX B300, RTX PRO 4500/6000 Blackwell, and AMD MI350P.
@@ -76,12 +76,17 @@ When a release changes what the figures come to, bump `VERSION` in `index.html`,
 
 ## Accuracy
 
-Model and board data as of October 2026. These are planning estimates, not benchmarks. Memory figures follow each model's published architecture, and board memory is the size on the box, with 90% treated as usable (vLLM's default limit). Speed and first-token times are estimates from a simple roofline model of each board, with efficiency constants that have not been fitted to measurements, so a speed goal is met on the estimate only. They are averages over steady traffic at the server: they leave out the network round trip and tokenization, which can outweigh a short first token, and bursts of traffic make the wait for a first token longer. Real results vary with the serving engine and its settings. Before committing to hardware, confirm with a load test at your request rate (for example `vllm bench serve` against vLLM or SGLang).
+Model and board data as of October 2026. These are planning estimates, not benchmarks. Memory figures follow each model's published architecture, and board memory is the size on the box, with 90% treated as usable (vLLM's default limit).
 
-**Measured error.** Against published benchmarks (295 points the page would size, of 315, from NVIDIA NIM and SemiAnalysis InferenceX: Llama 3.1 8B, Llama 3.3 70B and gpt-oss-120b on H200, B200 and L40S), the estimates err on the slow side:
+Speed and first-token times come from a roofline model: each board's datasheet memory bandwidth and dense compute, times the shares of them serving reaches, plus vLLM's fixed costs per step and per request. Those shares and costs are fitted to 295 published benchmark points (NVIDIA NIM and SemiAnalysis InferenceX: Llama 3.1 8B, Llama 3.3 70B and gpt-oss-120b on H200, B200 and L40S), with a further factor for AMD's software stack fitted to MI355X runs. The figures are averages over steady traffic at the server: they leave out the network round trip, and bursts of traffic make the wait for a first token longer.
 
-- **Speed per user** comes out at 0.80 × measured (80% of points between 0.65 and 0.97). It is slowest with long prompts (0.73) and with one copy split across GPUs serving few users (about 0.6–0.75), so a setup the page says meets a speed goal usually does.
-- **Prompt reading** is up to 2.5 × too slow, so first tokens for long prompts come out too long. Short first tokens come out too short, since the page leaves out the request's fixed costs.
+**Measured error.** Every figure here comes from benchmarks the fit did not see: each group of benchmarks was predicted by a fit made without it.
+
+- **Speed per user** lands at 1.02 × measured (80% of points between 0.80 and 1.31, 77% within ±25%). The page shows that spread as the **likely** range, and judges the speed goal at its low end, so a setup it passes over-promised by more than 25% on 3 of 295 benchmark points.
+- **First token** with nothing queued lands at 1.02 × measured (80% between 0.66 and 1.49), and the goal is judged at the slow end of that range. The wait for other prompts under load is modelled; no benchmark here tests it.
+- **AMD:** with the ROCm factor fitted on one model's MI355X runs, the other model's land at 1.01 × measured (80% between 0.77 and 1.29).
 - **Memory:** where the page says a load won't fit, the engine held requests back for want of cache space in 18 of 20 cases.
 
-Method, sources, caveats and every point: [validation](validation/README.md). Rerun with `node validation/compare.mjs` after any change to the model.
+Boards with no benchmark of their own (L4, the RTX PRO cards, H200 NVL, B300, MI350P) rest on the same fitted shares applied to their datasheets. Real results vary with the serving engine and its settings: before committing to hardware, confirm with a load test at your request rate (for example `vllm bench serve` against vLLM or SGLang).
+
+Method, the fitted constants, sources, caveats and every point: [validation](validation/README.md). After a change to the model, refit with `node validation/fit.mjs --apply` and recheck with `node validation/compare.mjs --write`.
