@@ -77,3 +77,11 @@ When a release changes what the figures come to, bump `VERSION` in `index.html`,
 ## Accuracy
 
 Model and board data as of October 2026. These are planning estimates, not benchmarks. Memory figures follow each model's published architecture, and board memory is the size on the box, with 90% treated as usable (vLLM's default limit). Speed and first-token times are estimates from a simple roofline model of each board, with efficiency constants that have not been fitted to measurements, so a speed goal is met on the estimate only. They are averages over steady traffic at the server: they leave out the network round trip and tokenization, which can outweigh a short first token, and bursts of traffic make the wait for a first token longer. Real results vary with the serving engine and its settings. Before committing to hardware, confirm with a load test at your request rate (for example `vllm bench serve` against vLLM or SGLang).
+
+**Measured error.** Against published benchmarks (295 points the page would size, of 315, from NVIDIA NIM and SemiAnalysis InferenceX: Llama 3.1 8B, Llama 3.3 70B and gpt-oss-120b on H200, B200 and L40S), the estimates err on the slow side:
+
+- **Speed per user** comes out at 0.80 × measured (80% of points between 0.65 and 0.97). It is slowest with long prompts (0.73) and with one copy split across GPUs serving few users (about 0.6–0.75), so a setup the page says meets a speed goal usually does.
+- **Prompt reading** is up to 2.5 × too slow, so first tokens for long prompts come out too long. Short first tokens come out too short, since the page leaves out the request's fixed costs.
+- **Memory:** where the page says a load won't fit, the engine held requests back for want of cache space in 18 of 20 cases.
+
+Method, sources, caveats and every point: [validation](validation/README.md). Rerun with `node validation/compare.mjs` after any change to the model.
