@@ -7,7 +7,7 @@ A single-page tool for estimating what LLM inference needs. Pick a model, the nu
 - **Memory:** model weights, KV cache, activations and overhead, per GPU and in total, in GB or GiB.
 - **Speed:** estimated tokens per second per user and time to first reply while new prompts keep arriving, each with a likely range measured against published benchmarks, including thinking time for models that reason before answering.
 - **Capacity:** how many GPUs of each board one node takes, and how many users it can handle: what fits in memory, and what also reaches the speed goal on the estimate.
-- **Server (optional):** the CPUs, system memory and local storage around those GPUs, following NVIDIA's recommendations for certified inference servers.
+- **Server (optional, beta):** the CPUs, system memory and local storage around those GPUs, following NVIDIA's recommendations for certified inference servers.
 
 It covers 40+ popular open models (Qwen, Gemma, Llama, DeepSeek, gpt-oss, GLM, Kimi, Mistral and others) on NVIDIA L4, L40S, H200 NVL, HGX H200, HGX B200, HGX B300, RTX PRO 4500/6000 Blackwell, and AMD MI350P.
 
@@ -31,7 +31,9 @@ Separately, one copy of a model is split across 1, 2, 4 or 8 GPUs. Serving engin
 
 Not sure how many concurrent users to plan for? **Estimate from daily traffic** turns people, requests per day and hours of use into a concurrent-user count.
 
-## Server, by NVIDIA's guidance
+## Server, by NVIDIA's guidance (beta)
+
+This part is in beta: its rules and figures are still being worked on and may change.
 
 Set **Server** to **NVIDIA guidance** in Advanced settings to size the whole server, following the inference server table in NVIDIA's [Certified Systems Configuration Guide](https://docs.nvidia.com/certification-programs/latest/nvidia-certified-configuration-guide.html). GPU counts then round up to 2, 4 or 8 per server, split evenly across two CPU sockets (2 or 4 for the RTX PRO 4500). That can change which board is suggested: 56 chat users on Llama 3.1 8B move from 1 × RTX PRO 6000 to 2 × L40S. A Server panel under the answer gives what goes around those GPUs:
 
