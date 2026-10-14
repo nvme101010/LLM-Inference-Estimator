@@ -44,6 +44,17 @@ By source, model and board, and every point, in [results.md](results.md).
 
 **Memory: where the page says it won't fit, the engine mostly ran out of room.** Of the 20 points the page would not size onto that many GPUs, 18 show first tokens of 2.8 s to 18 minutes, most of them 10–300 × the page's estimate: the engine holding requests back for want of cache space. The other two, Llama 3.3 70B on one H200 or one B200 with 64 requests of 1K in and 8K out, ran normally, so the page was cautious there.
 
+## Before and after 1.1.0
+
+Version 1.1.0 added the work of reading prompts that keep arriving. The same comparison run on 1.0.3's model (speed per user, the same 295 points):
+
+| | Median, middle 80% | Within ±25% | Over-promises by more than 10% / 25% / 50% | Typical error |
+|---|---|---|---|---|
+| 1.0.3 | 0.92 (0.72–1.34) | 62% | 75 / 43 / 20 points | × 1.18 |
+| 1.1.0 | 0.80 (0.65–0.97) | 51% | 5 / 0 / 0 points | × 1.24 |
+
+1.0.3's median looks closer because two errors cancelled: decode constants that run slow, and prompt load left out, which runs fast. With 5K–8K-token prompts it promised up to 1.9 × the measured speed (90th percentile), so a setup it passed could miss the goal badly. 1.1.0's error is about as large but one-sided: it almost never promises more speed than was measured. Most of what remains is prompt reading being too slow, which 1.1.0 also charges against everyone's streaming, so fixing the compute constants is the next step.
+
 ## What this doesn't cover
 
 - **Engines.** NIM runs TensorRT-LLM; the page assumes vLLM's defaults. Some of the NIM error is the engine, not the model.
