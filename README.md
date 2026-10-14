@@ -36,7 +36,7 @@ Set **Server** to **NVIDIA guidance** in Advanced settings to size the whole ser
 - **CPUs:** two sockets with PCIe Gen5 and a base clock of 2.0 GHz or more. Cores follow the AI worker nodes HPE builds for [HPE Private Cloud AI](https://www.hpe.com/us/en/collaterals/collateral.a50009216enw.html): 32 physical cores per GPU in a 2- or 4-GPU server and 16 per GPU in an 8-GPU one (2 × 32-core CPUs for 2 GPUs, 2 × 64-core for 4 or 8). NVIDIA's own floor, 6 per GPU, is shown beside it.
 - **System memory:** at least twice the GPU memory, filling every memory channel; the page suggests a layout of modules that does.
 - **Slots and switches:** each GPU in an x16 slot of its own PCIe generation, behind PCIe Gen5 switches when there are 8.
-- **Drives:** one NVMe drive per socket, at least 1 TB, and each big enough for the model's weights so a new version can download beside the one serving.
+- **Local storage, as usable capacity** (drives and RAID are the vendor's choice): NVIDIA's 1 TB of NVMe per socket for data, or more if the model needs it, plus a separate 1 TB boot volume from NVIDIA's reference architectures. The model needs two copies of its weights (the version serving and the next one downloading) and 100 GB for images, caches and logs, kept under 80% full, which NVIDIA's 2 TB covers for every model a PCIe server here holds. Offloading KV cache to disk (NVIDIA Dynamo) is given as an addition: at least the larger of 100 GB and the GPUs' KV cache.
 - **Network:** 200 Gb/s or more, up to 400 Gb/s per GPU, once one copy of a model spans servers; for one server the guide sets no minimum.
 - **Management and security:** a BMC with Redfish 1.0 or later, and TPM 2.0 with Secure Boot.
 
