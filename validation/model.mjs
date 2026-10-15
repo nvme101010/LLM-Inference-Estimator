@@ -10,6 +10,10 @@ export const INDEX = new URL("../index.html", import.meta.url);
 /* a run on AMD's software stack (ROCm): kept out of the fit on NVIDIA boards, it fits CAL.rocm instead */
 export const onRocm = (P, p) => P.GPUS.find(b=> b.n===p.board)?.stack==="rocm";
 
+/* what sweep.mjs also takes from the page: the layout search and what it reads. A page from before one
+   of them existed gives null for it. */
+const LAYOUT = ["MODELS", "WORKLOADS", "thinksOf", "boardsInPlay", "deploymentFor", "suggestDeployment", "serverFor"];
+
 export function load(path = INDEX){
   const html = readFileSync(path, "utf8").split(/\r?\n/);
   const from = html.findIndex(l => l.startsWith("<script>")) + 1, to = html.findIndex(l => l.startsWith("const fmtTps"));
@@ -19,7 +23,8 @@ export function load(path = INDEX){
   globalThis.localStorage = { getItem: ()=> null, setItem: ()=> {} };
   const P = new Function(html.slice(from, to).join("\n")
     + ";return {S, GPUS, GB, USABLE, compute, throughput, findModel, setModel: m=>{ M = m; },"
-    + " VERSION: typeof VERSION==='undefined' ? '1.0.3 or earlier' : VERSION, CAL: typeof CAL==='undefined' ? null : CAL};")();
+    + " VERSION: typeof VERSION==='undefined' ? '1.0.3 or earlier' : VERSION, CAL: typeof CAL==='undefined' ? null : CAL"
+    + LAYOUT.map(n=> `, ${n}: typeof ${n}==='undefined' ? null : ${n}`).join("") + "};")();
   return P;
 }
 

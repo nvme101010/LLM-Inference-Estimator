@@ -105,4 +105,4 @@ Speed and first-token times come from a roofline model: each board's datasheet m
 
 Boards with no benchmark of their own (L4, the RTX PRO cards, H200 NVL, B300, MI350P) rest on the same fitted shares applied to their datasheets. The page marks their speed and first-token figures **extrapolated**, in the headline and the board table, and the summary stars them. Real results vary with the serving engine and its settings: before committing to hardware, confirm with a load test at your request rate (for example `vllm bench serve` against vLLM or SGLang).
 
-Method, the fitted constants, sources, caveats and every point: [validation](validation/README.md). After a change to the model, refit with `node validation/fit.mjs --apply` and recheck with `node validation/compare.mjs --write`.
+Method, the fitted constants, sources, caveats and every point: [validation](validation/README.md). After a change to the model, refit with `node validation/fit.mjs --apply` and recheck with `node validation/compare.mjs --write`. `node validation/sweep.mjs` lists which sizings changed since the last release.
