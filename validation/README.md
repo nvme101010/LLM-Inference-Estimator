@@ -6,9 +6,12 @@ The page's speed figures come from a roofline model: each board's published memo
 node validation/fetch-benchmarks.mjs   # rebuild benchmarks.json from the sources (optional)
 node validation/fit.mjs --apply        # fit, cross-validate, and write CAL and RANGE into index.html (about 2 minutes)
 node validation/compare.mjs --write    # compare the page as it stands and rewrite results.md
+node validation/sweep.mjs              # size 9,850 scenarios on every board, against the last release (about 30 seconds)
 ```
 
 Node 18 or later, no dependencies. `compare.mjs --index <file>` checks another copy of the page, such as an earlier release.
+
+`sweep.mjs` runs the page's own layout search on every model × 5 workloads × 5 user counts × 4 speed goals × both Server settings, plus FP8, hidden thinking, 2 GPUs per copy and prompt caching off at 32 users. It reports every scenario whose layout, fit, speed, first token, suggestion or server differs from a release (`--base <git ref>`, by default the latest tag), and exits 1 if any does. A change meant to leave the figures alone should report none.
 
 ## Sources
 
