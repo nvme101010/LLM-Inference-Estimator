@@ -928,6 +928,9 @@ const GPUS = [
 ];
 /* the vendor's direct GPU-to-GPU link, named when saying a board lacks it: NVLink on NVIDIA, Infinity Fabric on AMD */
 const fabric = g => g.fab || "NVLink";
+/* the boards with native FP8 or FP4 cores (f = "fp8" or "fp4"), in words, so the precision notes follow the table */
+const nativeOn = f => { const on = GPUS.filter(g=> g[f]).map(g=> g.n);
+  return on.length===GPUS.length ? "every board here" : on.length>1 ? `${on.slice(0, -1).join(", ")} and ${on[on.length-1]}` : on[0] || "none of these boards"; };
 /* a board sold only as one size of system: that size, else 0 */
 const systemOf = g => g.pop && g.pop.length===1 ? g.pop[0] : 0;
 /* the GPU counts a server of this board is bought with, or undefined for any count up to its max.
@@ -2094,9 +2097,9 @@ function updateCfgNote(){
 const WQ_NOTES = {
   FP32:"Full precision — training / reference only.",
   BF16:"2 bytes per parameter — the usual starting point before quantizing.",
-  FP8:"1 byte — halves weights vs BF16 with native tensor cores on Hopper and newer.",
+  FP8:`1 byte — halves weights vs BF16, with native FP8 tensor cores on ${nativeOn("fp8")}.`,
   INT8:"1 byte — GPTQ / AWQ; same footprint as FP8, needs dequant on older cards.",
-  FP4:"About 0.56 byte including scales — roughly 3.6× smaller than BF16. Native on NVIDIA Blackwell (HGX B200, HGX B300, RTX PRO 6000) and AMD MI350P; older boards unpack it on the fly.",
+  FP4:`About 0.56 byte including scales — roughly 3.6× smaller than BF16. Native on ${nativeOn("fp4")}; the other boards unpack it on the fly.`,
   INT4:"0.5 byte — 4× smaller than BF16; the go-to for single-GPU large models.",
   INT3:"0.375 byte — aggressive; quality starts to degrade.",
   INT2:"0.25 byte — experimental; expect real accuracy loss.",
@@ -2534,7 +2537,7 @@ function applyHash(){
     if(w==="custom" && CHUNK_NAME[+q.get("cb")]) S.chunkBase = +q.get("cb");
     setChunk(CHUNK_NAME[+q.get("ck")] ? +q.get("ck") : S.chunkBase);
     const u = Math.round(+q.get("u"));
-    if(u>=1){ setUsers(Math.min(USERS_MAX, u)); usersNum.value = S.users; }
+    setUsers(u>=1 ? Math.min(USERS_MAX, u) : 16); usersNum.value = S.users;
     S.goal = GOALS[q.get("g")] ? q.get("g") : "smooth"; $('goal').value = S.goal; updateGoalHint();
     pressSeg('kq', 'kq', q.get("kv") || "FP16");
     pressSeg('tp', 'tpo', q.get("tp") || "auto");
@@ -2792,7 +2795,7 @@ const TIPS = {
   act:"Short-lived tensors inside one forward pass: hidden states and the MLP intermediates. Freed after each pass, so it scales with how many tokens run at once — not with context length.",
   tpov:"What splitting across GPUs adds. Every GPU carries its own CUDA context, plus NCCL buffers for the all-reduce that runs after each layer. It is added memory, not saved memory.",
   overhead:"CUDA/driver context, allocator fragmentation, framework workspaces and CUDA graphs. Real but hard to predict — the slider sets how conservative you want to be.",
-  wq:"Bytes per weight. As released uses the checkpoint exactly as published; many new models ship in FP8 or FP4. BF16 is 2 bytes; FP8 and INT8 halve it; FP4 and INT4 cut it about 4×. FP8 runs natively on Hopper (H200), MI350P and newer; FP4 on Blackwell and MI350P.",
+  wq:`Bytes per weight. As released uses the checkpoint exactly as published; many new models ship in FP8 or FP4. BF16 is 2 bytes; FP8 and INT8 halve it; FP4 and INT4 cut it about 4×. FP8 runs natively on ${nativeOn("fp8")}; FP4 on ${nativeOn("fp4")}.`,
   model:"The most-used open models on Hugging Face as of September 2026, grouped by lab. Layer counts, attention types and cache sizes come from each model's published config.json.",
   kq:"Precision of the cached keys and values. FP8 KV roughly halves cache size with little quality loss — often a better first move than quantizing the weights themselves.",
   ctx:"Tokens each request sends in: system prompt, conversation history, documents, code. Before the first reply the engine reads the new part of the prompt (all of it if prompt caching is off in Advanced settings), and the whole prompt stays in the user's cache while the reply is written.",
@@ -2870,12 +2873,12 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape') hideTip(); });
 window.addEventListener('scroll', hideTip, true);
 window.addEventListener('resize', hideTip);
 
-/* give every trigger an accessible name */
+/* give every trigger an accessible name; the "i" icons are also buttons, since a plain span's label isn't announced */
 function labelTips(){
   document.querySelectorAll('[data-tip]').forEach(el=>{
     const txt = TIPS[el.dataset.tip];
     if(!txt) return;
-    if(el.classList.contains('i')) el.setAttribute('aria-label', "Explain: " + txt);
+    if(el.classList.contains('i')){ el.setAttribute('role', 'button'); el.setAttribute('aria-label', "Explain: " + txt); }
     else el.setAttribute('aria-description', txt);
   });
 }
