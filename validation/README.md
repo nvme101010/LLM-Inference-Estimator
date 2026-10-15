@@ -16,7 +16,7 @@ Node 18 or later, no dependencies. `compare.mjs --index <file>` checks another c
 |---|---|---|---|---|
 | [NVIDIA NIM benchmarks](https://docs.nvidia.com/nim/benchmarking/llm/1.0.0/performance.html), version 1.8.0 tables | Llama 3.1 8B, FP8 and BF16 | H200 (DGX H200, sized as HGX H200), L40S | NIM (TensorRT-LLM) | 88 |
 | [SemiAnalysis InferenceX](https://inferencex.semianalysis.com) (formerly InferenceMAX), [public API](https://inferencex.semianalysis.com/api), latest runs | Llama 3.3 70B FP8; gpt-oss-120b as released (MXFP4) | HGX H200, HGX B200, 1 to 8 GPUs per copy | vLLM 0.10.2 (Llama), 0.15–0.22 (gpt-oss) | 227 |
-| InferenceX, as above: a check only, never fitted | the same two | AMD MI355X, which the page doesn't size; its MI350P is half of one | vLLM on ROCm | 91 |
+| InferenceX, as above: a check only, never fitted | the same two | AMD MI355X, which the page doesn't size; its MI350X is the same chip at a lower power limit, and its MI350P half of one | vLLM on ROCm | 91 |
 
 Every source holds a fixed number of requests in flight, each sending the next as soon as the last is answered, with synthetic prompts that never repeat. That is the page's own load model with prompt caching off, so each point maps onto it directly: same model, board, weight and KV-cache precision, GPUs per copy, prompt and reply lengths, prefill piece size and requests in flight, all taken from the source's own settings. Each point in `benchmarks.json` names the table or the run it came from.
 
@@ -36,7 +36,7 @@ Every source holds a fixed number of requests in flight, each sending the next a
 | `linkLatency` | 23 µs | fixed time per all-reduce over NVLink, two per layer when a copy is split |
 | `step` | 1.4 ms | vLLM's fixed time per step (scheduling, sampling, launch) |
 | `request` | 37 ms | vLLM's time to take a request in (HTTP, tokenization, scheduling), part of every first token |
-| `rocm` | 0.68 | share of the bandwidth and compute shares reached on AMD's stack, fitted on MI355X runs |
+| `rocm` | 0.75 | share of the bandwidth and compute shares reached on AMD's stack, fitted on MI355X runs (since 1.5.0; 0.68 before, see AMD below) |
 
 Not fitted, since no benchmark here exercises them: the PCIe all-reduce latency (150 µs) and the precisions other than FP8 and the gpt-oss checkpoint's own.
 
@@ -58,7 +58,7 @@ Each cell is predicted ÷ measured: the median, the middle 80% in brackets, and 
 
 **The likely range.** For the middle 80% of held-out points, measured speed per user came to between 0.77 and 1.3 times the estimate, and the first token with nothing queued between 0.67 and 1.5 times. `fit.mjs --apply` writes these into `RANGE`. The page shows them as the likely range beside each figure, and judges the speed goal at the cautious end: speed at the low end, first token at the slow end. Held out, the central estimate promises more than 25% too much speed on 37 of 295 points; the cautious end does so on 3 (and by more than 10% on 19).
 
-**AMD.** The constants fitted on NVIDIA boards promise 21% too much speed on the MI355X (1.21, 1.01–1.45). With one factor for AMD's stack, the estimate is checked by fitting that factor on one model's MI355X runs and predicting the other's: 1.01 (0.77–1.29), 77% within ±25%, as good as the NVIDIA held-out figures. The factor comes to 0.64 fitted on Llama 3.3 70B (vLLM 0.10, October 2025) and 0.77 fitted on gpt-oss (vLLM 0.22, 2026), so ROCm has been catching up. The page ships 0.68, fitted on both, for the MI350P.
+**AMD.** The MI355X's 8 GPUs are wired to each other with no switch, one Infinity Fabric link per pair (76.8 GB/s each way), so a run split across 2 or 4 of them uses only 1 or 3 links. Since 1.5.0 the model counts that (`mesh` in `GPUS`); before, every split got all 7 links' 538 GB/s. The constants fitted on NVIDIA boards promise 14% too much speed on the MI355X (1.14, 1.00–1.43). With one factor for AMD's stack, the estimate is checked by fitting that factor on one model's MI355X runs and predicting the other's: 0.99 (0.85–1.25), 81% within ±25%, as good as the NVIDIA held-out figures. The factor comes to 0.73 fitted on Llama 3.3 70B (vLLM 0.10, October 2025) and 0.78 fitted on gpt-oss (vLLM 0.22, 2026). With every split given all 7 links, those were 0.64 and 0.77, read at the time as ROCm catching up; most of that gap was the 70B runs' 2- and 4-GPU splits, which the gpt-oss runs barely use. The page ships 0.75, fitted on both, for the MI350P and MI350X.
 
 **Recommendations.** Over 48 scenarios (four models × four presets × 8, 32 and 128 users), 23 get the same answer from 1.0.3, 1.1.0 and 1.2.0. Of the other 25, 1.2.0 gives 1.1.0's answer in 15 and lands between the two in 6. The cautious end (× 0.77) is close to the 20% that 1.1.0 ran slow by accident, so the sizes mostly match 1.1.0's, but now the margin is measured and the figures shown are central. Four need more than either version asked for:
 
