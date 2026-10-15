@@ -19,13 +19,13 @@
 // held-out errors are the ones to quote. The constants shipped are then fitted on every group.
 
 import { readFileSync, writeFileSync } from "node:fs";
-import { load, predict, markIdle, group, checkOnly, INDEX } from "./model.mjs";
+import { load, predict, markIdle, group, onRocm, INDEX } from "./model.mjs";
 
 const P = load();
 const { points: all } = JSON.parse(readFileSync(new URL("./benchmarks.json", import.meta.url), "utf8"));
 const fitting = markIdle(all).filter(p=> predict(P, p).fits);      // memory doesn't depend on CAL
-const points = fitting.filter(p=> !checkOnly(p));                    // the page's boards: fitted and cross-validated
-const amd = fitting.filter(checkOnly);                               // MI355X: never fitted, only predicted
+const points = fitting.filter(p=> !onRocm(P, p));                   // NVIDIA boards: fitted and cross-validated
+const amd = fitting.filter(p=> onRocm(P, p));                        // MI355X: kept out of that fit, and fits CAL.rocm
 const groups = [...new Set(points.map(group))];
 
 /* fitted constants, each mapped into a plausible range so the search can't wander outside it */

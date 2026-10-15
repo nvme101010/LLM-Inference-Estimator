@@ -56,14 +56,14 @@ async function nim(){
    KV cache is FP8 except gpt-oss on H200 and MI355X, which keep vLLM's default (BF16), and Llama on
    MI355X reads prompts 131,072 tokens at a time: see benchmarks/70b_fp8_*.sh at 9596d23 and
    benchmarks/single_node/gptoss_fp4_*.sh at f6de379 in its repository.
-   The MI355X isn't a board the page sizes. Its runs (vLLM on ROCm) check whether constants fitted on
-   NVIDIA boards carry over to AMD's, which the page's MI350P (half an MI355X) relies on; validation/
-   model.mjs gives it the vendor's figures, and the fit leaves it out. */
+   The MI355X runs (vLLM on ROCm) are kept out of the fit on NVIDIA boards: they check whether those
+   constants carry over to AMD's stack, and fit the factor for it that the page's MI355X and MI350P
+   (half of its chip) carry. */
 const IX_MODELS = { "Llama-3.3-70B-Instruct-FP8": {id: "l33-70b", precision: "fp8", weights: "FP8",
                       kv: {h200: "FP8", b200: "FP8", mi355x: "FP8"}, chunk: {mi355x: 131072}},
                     "gpt-oss-120b": {id: "gptoss-120b", precision: "fp4", weights: "NATIVE",   // MXFP4, as released
                       kv: {h200: "FP16", b200: "FP8", mi355x: "FP16"}, chunk: {}} };
-const IX_BOARDS = { h200: "HGX H200", b200: "HGX B200", mi355x: "MI355X" };
+const IX_BOARDS = { h200: "HGX H200", b200: "HGX B200", mi355x: "AMD MI355X" };
 async function inferencex(){
   const points = [];
   for(const [name, m] of Object.entries(IX_MODELS)){
