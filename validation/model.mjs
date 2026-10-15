@@ -8,10 +8,12 @@ import { readFileSync } from "node:fs";
 export const INDEX = new URL("../index.html", import.meta.url);
 
 /* Boards the page doesn't size but benchmarks cover, used only to check the model: AMD's MI355X (vLLM on
-   ROCm), as the page's MI350P is half of one. Figures from AMD's MI355X brochure: 288 GB HBM3E at 8 TB/s,
-   2.5 PFLOPS dense BF16; Infinity Fabric at 538 GB/s per chip (SemiAnalysis). */
+   ROCm). The page's MI350X is the same chip at a lower power limit, and its MI350P half of one. Figures
+   from AMD's MI355X brochure: 288 GB HBM3E at 8 TB/s, 2.5 PFLOPS dense BF16. Its 8 GPUs are wired to each
+   other directly (no switch), one Infinity Fabric link per pair at 76.8 GB/s each way (AMD: 153.6 GB/s
+   per link), so a copy on tp of them uses tp − 1 links (mesh). */
 export const CHECK_ONLY = [
-  {n:"MI355X", cap:288, mem:"HBM3E", bw:8000, flops:2500, fp8:true, fp4:true, link:true, lbw:538, lname:"Infinity Fabric", stack:"rocm", checkOnly:true},
+  {n:"MI355X", cap:288, mem:"HBM3E", bw:8000, flops:2500, fp8:true, fp4:true, link:true, lbw:76.8, mesh:true, lname:"Infinity Fabric", stack:"rocm", checkOnly:true},
 ];
 export const checkOnly = p => CHECK_ONLY.some(b=> b.n===p.board);
 
