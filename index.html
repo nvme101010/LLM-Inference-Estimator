@@ -1060,9 +1060,30 @@ const S = { wq:2, wqLbl:"NATIVE", kq:2, tp:1, tpo:"auto", chunk:512, ovpct:7, us
             trafficApplied:null,                               // those inputs and the users they gave, once used
             chunkBase:512,     // the Optimize-for choice the last preset made, so Advanced can flag your own change
             extra:[],          // workloads added to the first: {workload, users, prompt, reply, wantPrompt, wantReply, shared, fresh}
+            custom:{c_params:7, c_layers:32, c_hidden:4096, c_kv:8, c_hd:128, c_ctx:32},   // the custom model's fields as typed (customNum clamps them)
+            models:[], edit:0, // each model's settings (specs, see below) and which one the controls show
             unit:loadUnit() };
 let M = findModel("l31-8b");
 let LAST = null;   // what the last render showed, for the downloadable summary
+
+/* ---------------- one model's settings ----------------
+   The settings that belong to a model (PER_MODEL) sit on S while it is the model the controls show, so
+   everything that sizes it reads S and M as it always has. A spec is one model's own copy of them, with
+   its model's id (m); S.models keeps one per model, the shown one saved from S by saveSpec. withSpec
+   puts another spec on S for as long as fn runs, to size that model without touching the page, and
+   puts S back as it was. The rest of S (Server, overhead, prompt caching, the board picked, the unit)
+   belongs to the page, whatever the model. */
+const PER_MODEL = ["custom", "wq", "wqLbl", "kq", "tp", "tpo", "chunk", "chunkBase", "users", "goal", "workload",
+  "prompt", "reply", "wantPrompt", "wantReply", "think", "thinkTok", "thinking", "seeThink", "shared", "fresh",
+  "traffic", "trafficApplied", "extra"];
+const specOf   = () => structuredClone({m: M.id, ...Object.fromEntries(PER_MODEL.map(k=> [k, S[k]]))});
+const saveSpec = () => { S.models[S.edit] = specOf(); };
+function useSpec(spec){ M = findModel(spec.m); PER_MODEL.forEach(k=> S[k] = structuredClone(spec[k])); }
+function withSpec(spec, fn){
+  const was = M, vals = PER_MODEL.map(k=> S[k]);
+  useSpec(spec);
+  try { return fn(); } finally { M = was; PER_MODEL.forEach((k, i)=> S[k] = vals[i]); }
+}
 
 /* ---------------- several workloads on one model ----------------
    One model often serves more than one kind of request at once: chat users alongside a RAG app, say.
@@ -1135,7 +1156,7 @@ const commas = x => x.toLocaleString('en-US');
    layers, sizes and heads (a fractional KV-head count would divide the cache by less than 1). */
 const CUSTOM_FIELDS = ['c_params','c_layers','c_hidden','c_kv','c_hd','c_ctx'];
 function customNum(id){
-  const v = +document.getElementById(id).value;
+  const v = +S.custom[id];
   if(id==="c_params") return Number.isFinite(v) && v>=0.01 ? v : 0.01;
   return Number.isFinite(v) ? Math.max(1, Math.round(v)) : 1;
 }
@@ -2133,26 +2154,32 @@ const thinkOn=$('thinkOn'), thinkNum=$('thinkNum'), seeOn=$('seeOn');
    reply at what's left after 512 prompt tokens, and the prompt slider runs up to the remainder */
 const promptStops = () => ctxStops(Math.max(512, activeModel().ctx - S.thinking - S.reply));
 const nearestStop = (stops, v) => stops.reduce((best, s, i) => Math.abs(Math.log(s/v)) < Math.abs(Math.log(stops[best]/v)) ? i : best, 0);
-function setLengths(){                   // fit the wanted lengths to this model and re-range the slider
+/* Each control below has a part that sets S and a part that shows S (show…), so a link or another
+   model's settings can be worked out on S alone and shown once. */
+function fitLengths(){                   // fit the wanted lengths to this model; the prompt is a slider stop
   const ctx = activeModel().ctx;
   S.thinking = S.think ? Math.min(S.thinkTok, Math.floor(ctx/2)) : 0;
   S.reply = Math.max(1, Math.min(S.wantReply, ctx - 512 - S.thinking));
   const stops = promptStops();
-  ctxSlider.max = stops.length-1;
-  ctxSlider.value = nearestStop(stops, Math.min(S.wantPrompt, stops[stops.length-1]));
-  $('ctxMaxTick').textContent = fmtCtx(stops[stops.length-1]);
+  S.prompt = stops[nearestStop(stops, Math.min(S.wantPrompt, stops[stops.length-1]))];
   S.extra.forEach(fitExtra);
-  syncPrompt();
 }
+function showLengths(){                  // re-range the prompt slider to this model, then show the lengths
+  const stops = promptStops();
+  ctxSlider.max = stops.length-1;
+  ctxSlider.value = stops.indexOf(S.prompt);
+  $('ctxMaxTick').textContent = fmtCtx(stops[stops.length-1]);
+  showPrompt();
+}
+function setLengths(){ fitLengths(); showLengths(); }
 /* an added workload's lengths, trimmed to the model's context the same way (its prompt is typed, not on the slider) */
 function fitExtra(w){
   const ctx = activeModel().ctx;
   w.reply  = Math.max(1, Math.min(w.wantReply, ctx - 512 - S.thinking));
   w.prompt = Math.max(1, Math.min(w.wantPrompt, Math.max(512, ctx - S.thinking - w.reply)));
 }
-function syncPrompt(){                   // slider → state, then everything that shows the lengths
+function showPrompt(){                   // everything that shows the lengths
   const stops = promptStops();
-  S.prompt = stops[+ctxSlider.value] ?? stops[stops.length-1];
   $('ctxVal').textContent = commas(S.prompt);
   ctxSlider.setAttribute('aria-valuetext', `${commas(S.prompt)} tokens`);
   if(document.activeElement!==replyNum) replyNum.value = S.reply;   // don't fight someone typing
@@ -2175,22 +2202,15 @@ function syncThink(){
   $('seeRow').hidden = mode==="none" || !S.think;   // only matters while the model thinks
   seeOn.checked = S.seeThink;
 }
-function resetThink(){                   // a newly picked model starts at its own default
-  const mode = thinksOf(activeModel());
-  S.think = mode==="always" || mode==="default";
-  syncThink();
-}
-function setChunk(v){
-  S.chunk = v;
-  document.querySelectorAll('#chunk button').forEach(b=> b.setAttribute('aria-pressed', +b.dataset.v===v));
-}
-function applyWorkload(key){             // a preset sets both lengths and how prompts are read
+const thinkDefault = () => ["always", "default"].includes(thinksOf(activeModel()));
+function resetThink(){ S.think = thinkDefault(); syncThink(); }   // a newly picked model starts at its own default
+function presetWorkload(key){            // a preset sets both lengths and how prompts are read
   S.workload = key;
-  workloadSel.value = key;
   const w = WORKLOADS[key];
-  if(key!=="custom"){ S.wantPrompt = w.prompt; S.wantReply = w.reply; setChunk(w.chunk); S.chunkBase = w.chunk; S.shared = w.shared; S.fresh = w.fresh; }
-  setLengths();
+  if(key!=="custom"){ S.wantPrompt = w.prompt; S.wantReply = w.reply; S.chunk = S.chunkBase = w.chunk; S.shared = w.shared; S.fresh = w.fresh; }
+  fitLengths();
 }
+function applyWorkload(key){ presetWorkload(key); workloadSel.value = key; showSeg('chunk', S.chunk); showLengths(); }
 function markCustom(){ S.workload = "custom"; workloadSel.value = "custom"; }
 thinkOn.addEventListener('change', ()=>{ S.think = thinkOn.checked; syncThink(); setLengths(); updateGoalHint(); render(); });
 seeOn.addEventListener('change', ()=>{ S.seeThink = seeOn.checked; updateGoalHint(); render(); });
@@ -2216,10 +2236,10 @@ function syncUsers(){                    // slider → state
   usersNum.value = S.users;
   usersSlider.setAttribute('aria-valuetext', `${commas(S.users)} users`);
 }
-function setUsers(n){                    // typed → state; exact value kept, thumb sits at nearest stop ≤ n
-  S.users = n;
-  usersSlider.value = stopIndex(USER_STOPS, n);
-  usersSlider.setAttribute('aria-valuetext', `${commas(n)} users`);
+function setUsers(n){ S.users = n; showUsers(); }   // typed → state; exact value kept
+function showUsers(){                    // the thumb sits at the nearest stop ≤ the users
+  usersSlider.value = stopIndex(USER_STOPS, S.users);
+  usersSlider.setAttribute('aria-valuetext', `${commas(S.users)} users`);
 }
 usersNum.addEventListener('input', ()=>{
   const n = Math.round(+usersNum.value);
@@ -2233,12 +2253,19 @@ function syncOv(){
 }
 
 ctxSlider.addEventListener('input', ()=>{
-  markCustom(); S.wantPrompt = promptStops()[+ctxSlider.value]; syncPrompt(); render();
+  markCustom(); S.wantPrompt = S.prompt = promptStops()[+ctxSlider.value]; showPrompt(); render();
 });
 usersSlider.addEventListener('input', ()=>{ syncUsers(); render(); });
 ovSlider.addEventListener('input', ()=>{ syncOv(); render(); });
 
-/* segmented controls — data-v is a number, or "auto" for TP */
+/* segmented controls — data-v is a number, or "auto" for TP. segValue finds a button's value by its
+   value or label (undefined if none has it); showSeg presses the button with that value. */
+function segValue(id, v){
+  const b = [...$(id).children].find(x=> x.dataset.v===String(v) || x.dataset.lbl===v);
+  return b && (b.dataset.v==="auto" ? "auto" : +b.dataset.v);
+}
+function showSeg(id, v){ [...$(id).children].forEach(x=> x.setAttribute('aria-pressed', x.dataset.v===String(v))); }
+function pressSeg(id, key, v){ const x = segValue(id, v); if(x!==undefined){ S[key] = x; showSeg(id, x); } }
 function wireSeg(id, key){
   const box=$(id);
   box.addEventListener('click', e=>{
@@ -2252,17 +2279,19 @@ wireSeg('kq','kq');
 wireSeg('chunk','chunk');
 wireSeg('tp','tpo');
 wireSeg('srv','srv');
-function kqLabel(){ return document.querySelector('#kq button[aria-pressed=true]').dataset.lbl; }
+function kqLabel(){ return $('kq').querySelector(`[data-v="${S.kq}"]`).dataset.lbl; }
 
-/* weight precision select */
+/* weight precision select: "As released" follows the model; the rest are fixed bytes/param (WQ_BYTES) */
 const wqSel=$('wq');
-function syncWq(){                          // "As released" follows the selected model; the rest are fixed bytes/param
-  const m = activeModel(), o = wqSel.selectedOptions[0];
+const WQ_BYTES = Object.fromEntries([...wqSel.options].map(o=> [o.dataset.lbl, +o.value]));
+function fitWq(){ const m = activeModel(); S.wq = S.wqLbl==="NATIVE" ? m.nat.gb/m.p : WQ_BYTES[S.wqLbl]; }
+function showWq(){
+  const m = activeModel();
+  [...wqSel.options].forEach(o=> o.selected = o.dataset.lbl===S.wqLbl);
   wqSel.options[0].textContent = `As released — ${m.nat.f} (${fmtBytes(m.nat.gb*1e9)})`;
-  S.wqLbl = o.dataset.lbl;
-  S.wq = S.wqLbl==="NATIVE" ? m.nat.gb/m.p : +o.value;
   updateWqNote();
 }
+function syncWq(){ S.wqLbl = wqSel.selectedOptions[0].dataset.lbl; fitWq(); showWq(); }   // the select → state
 wqSel.addEventListener('change', ()=>{ syncWq(); render(); });
 
 /* boards: click, Enter or Space on a row picks it; picking it again goes back to the suggestion.
@@ -2309,8 +2338,8 @@ modelSel.addEventListener('change', ()=>{
 });
 CUSTOM_FIELDS.forEach(id=>{
   const f = $(id);
-  f.addEventListener('input', ()=>{ updateCfgNote(); syncWq(); setLengths(); render(); });
-  f.addEventListener('change', ()=>{ f.value = customNum(id); });   // show the value actually used
+  f.addEventListener('input', ()=>{ S.custom[id] = +f.value; updateCfgNote(); syncWq(); setLengths(); render(); });
+  f.addEventListener('change', ()=>{ f.value = S.custom[id] = customNum(id); });   // show the value actually used
 });
 
 /* ---------------- more workloads on the same model ----------------
@@ -2475,37 +2504,42 @@ const TOP = (()=>{ try { return window.top===window.self; } catch(e) { return fa
 const CAN_LINK = TOP && /^https?:$/.test(location.protocol);
 let DL = null;   // claude.ai's downloads capability, when this page runs there
 
+/* The address holds only what differs from the defaults: the version first, then the page's settings and
+   each model's. Model 1's keys are as they have always been; model k's are the same keys with k appended
+   (m2, u2…). KEY_ORDER keeps a one-model link exactly as earlier versions wrote it. */
+const KEY_ORDER = ["v","m","c","u","w","p","r","cb","x","th","tv","wq","g","kv","tp","ck","ov","pc","sv","sh","fr","b","tf"];
 function stateToHash(){
-  const m = activeModel(), q = new URLSearchParams();
-  q.set("v", VERSION);                        // the estimator the link was made with, first so it reads at a glance
-  q.set("m", m.custom ? "custom" : m.id);
-  if(m.custom) q.set("c", CUSTOM_FIELDS.map(customNum).join("_"));   // separators chosen so the address needs no escapes
-  q.set("u", S.users);
-  q.set("w", S.workload);
-  if(S.workload==="custom"){ q.set("p", S.wantPrompt); q.set("r", S.wantReply); q.set("cb", S.chunkBase); }
-  // added workloads: preset_users, or custom_users_prompt_reply_shared_fresh, joined by dots
-  if(mixed()) q.set("x", S.extra.map(w=> [w.workload, w.users,
-    ...(w.workload==="custom" ? [w.wantPrompt, w.wantReply, w.shared, w.fresh==null ? "rest" : w.fresh] : [])].join("_")).join("."));
-  if(thinksOf(m)!=="none") q.set("th", S.think ? S.thinkTok : "off");
-  if(thinksOf(m)!=="none" && S.think && !S.seeThink) q.set("tv", "hidden");
-  if(S.wqLbl!=="NATIVE") q.set("wq", S.wqLbl);
-  if(S.goal!=="smooth") q.set("g", S.goal);
-  if(S.kq!==2) q.set("kv", kqLabel());
-  if(S.tpo!=="auto") q.set("tp", S.tpo);
-  if(S.chunk!==S.chunkBase) q.set("ck", S.chunk);
-  if(S.ovpct!==7) q.set("ov", S.ovpct);
-  if(!S.cache) q.set("pc", "off");
-  if(S.srv) q.set("sv", "nv");
-  if(S.workload==="custom"){ q.set("sh", S.shared); q.set("fr", S.fresh==null ? "rest" : S.fresh); }
-  if(S.board!=="auto") q.set("b", S.board);
-  if(trafficInUse()){ const t = S.trafficApplied; q.set("tf", [t.people, t.req, t.hours, t.peak].join("_")); }
-  return q.toString();
+  saveSpec();
+  const out = [["v", VERSION]];               // the estimator the link was made with, first so it reads at a glance
+  S.models.forEach((spec, i)=> out.push(...specToParams(spec).map(([k, v])=> [k + (i ? i + 1 : ""), v])));
+  if(S.ovpct!==7) out.push(["ov", S.ovpct]);
+  if(!S.cache) out.push(["pc", "off"]);
+  if(S.srv) out.push(["sv", "nv"]);
+  if(S.board!=="auto") out.push(["b", S.board]);
+  const rank = ([k])=> { const [, key, n] = k.match(/^([a-z]+)(\d*)$/); return (+n || 1)*100 + KEY_ORDER.indexOf(key); };
+  return new URLSearchParams(out.sort((a, b)=> rank(a) - rank(b))).toString();
 }
-function pressSeg(id, key, v){               // select a segmented button by its value or label
-  const kids = [...$(id).children], b = kids.find(x=> x.dataset.v===String(v) || x.dataset.lbl===v);
-  if(!b) return;
-  kids.forEach(x=> x.setAttribute('aria-pressed', x===b));
-  S[key] = b.dataset.v==="auto" ? "auto" : +b.dataset.v;
+/* one model's keys and values, from its spec */
+function specToParams(spec){
+  return withSpec(spec, ()=>{
+    const m = activeModel(), p = [["m", m.custom ? "custom" : m.id]];
+    if(m.custom) p.push(["c", CUSTOM_FIELDS.map(customNum).join("_")]);   // separators chosen so the address needs no escapes
+    p.push(["u", S.users], ["w", S.workload]);
+    if(S.workload==="custom") p.push(["p", S.wantPrompt], ["r", S.wantReply], ["cb", S.chunkBase]);
+    // added workloads: preset_users, or custom_users_prompt_reply_shared_fresh, joined by dots
+    if(mixed()) p.push(["x", S.extra.map(w=> [w.workload, w.users,
+      ...(w.workload==="custom" ? [w.wantPrompt, w.wantReply, w.shared, w.fresh==null ? "rest" : w.fresh] : [])].join("_")).join(".")]);
+    if(thinksOf(m)!=="none") p.push(["th", S.think ? S.thinkTok : "off"]);
+    if(thinksOf(m)!=="none" && S.think && !S.seeThink) p.push(["tv", "hidden"]);
+    if(S.wqLbl!=="NATIVE") p.push(["wq", S.wqLbl]);
+    if(S.goal!=="smooth") p.push(["g", S.goal]);
+    if(S.kq!==2) p.push(["kv", kqLabel()]);
+    if(S.tpo!=="auto") p.push(["tp", S.tpo]);
+    if(S.chunk!==S.chunkBase) p.push(["ck", S.chunk]);
+    if(S.workload==="custom") p.push(["sh", S.shared], ["fr", S.fresh==null ? "rest" : S.fresh]);
+    if(trafficInUse()){ const t = S.trafficApplied; p.push(["tf", [t.people, t.req, t.hours, t.peak].join("_")]); }
+    return p;
+  });
 }
 /* A link made under another version of the estimator: say so, and what has changed since, so an old
    sizing never comes out different without a word. The release it was made with can still be run from
@@ -2523,7 +2557,62 @@ function noteVersion(v, recorded){
       + `To see the figures as they were, run that version: <code>docker run --rm -p 8080:8080 ghcr.io/nvme101010/llm-inference-estimator:${esc(v)}</code>`)
     + `<br><button type="button" class="linkbtn" data-act="vnote">Dismiss</button>`;
 }
-/* settings from the address; anything missing takes its default. Returns false when there are none. */
+/* One model's settings from a link, worked out on S without touching the page: get(key) reads that
+   model's keys, and base is the spec it starts from. Anything missing takes its default. */
+function parseSpec(get, base){
+  return withSpec({...base, m: findModel(get("m")).id}, ()=>{
+    if(M.custom && get("c")) get("c").split("_").forEach((v, i)=>{ if(CUSTOM_FIELDS[i] && +v>0) S.custom[CUSTOM_FIELDS[i]] = +v; });
+    const wq = get("wq") || "NATIVE";
+    if(wq in WQ_BYTES) S.wqLbl = wq;
+    fitWq();
+    S.think = thinkDefault();
+    const th = get("th"), mode = thinksOf(activeModel());
+    if(th && mode!=="none"){
+      if(th==="off"){ if(mode!=="always") S.think = false; }
+      else if(+th>=0){ S.think = true; S.thinkTok = Math.min(131072, Math.round(+th)); }
+    }
+    S.seeThink = get("tv")!=="hidden";
+    const w = WORKLOADS[get("w")] ? get("w") : "chat";
+    if(w==="custom"){ S.wantPrompt = Math.max(1, Math.round(+get("p")) || 2048); S.wantReply = Math.max(1, Math.round(+get("r")) || 512); }
+    presetWorkload(w);
+    if(w==="custom" && CHUNK_NAME[+get("cb")]) S.chunkBase = +get("cb");
+    S.chunk = CHUNK_NAME[+get("ck")] ? +get("ck") : S.chunkBase;
+    const u = Math.round(+get("u"));
+    S.users = u>=1 ? Math.min(USERS_MAX, u) : 16;
+    S.goal = GOALS[get("g")] ? get("g") : "smooth";
+    S.kq = segValue('kq', get("kv") || "FP16") ?? S.kq;
+    S.tpo = segValue('tp', get("tp") || "auto") ?? S.tpo;
+    if(w==="custom" && get("sh")!==null){ S.shared = Math.max(0, Math.round(+get("sh")) || 0); S.fresh = get("fr")==="rest" || get("fr")===null ? null : Math.max(1, Math.round(+get("fr")) || 1); }
+    S.extra = (get("x") || "").split(".").map(s=>{
+      const [key, u, p, r, sh, fr] = s.split("_"), n = Math.round(+u);
+      if(!WORKLOADS[key] || !(n>=1)) return null;
+      const x = presetInto({users: Math.min(USERS_MAX, n)}, key);
+      if(key==="custom") Object.assign(x, {wantPrompt: Math.min(1048576, Math.max(1, Math.round(+p) || 2048)), wantReply: Math.min(1048576, Math.max(1, Math.round(+r) || 512)),
+        shared: Math.max(0, Math.round(+sh) || 0), fresh: fr===undefined || fr==="rest" ? null : Math.max(1, Math.round(+fr) || 1)});
+      return x;
+    }).filter(Boolean).slice(0, MIX_MAX);
+    fitLengths();
+    const tf = (get("tf") || "").split("_").map(Number);
+    if(tf.length===4 && tf.every(x=> x>0)){
+      Object.assign(S.traffic, {people:tf[0], req:tf[1], hours:Math.min(24, tf[2]), peak:[1,2,3].includes(tf[3]) ? tf[3] : 2});
+      S.trafficApplied = {...S.traffic, users:S.users};
+    } else S.trafficApplied = null;
+    return specOf();
+  });
+}
+/* every control from S: after opening a link */
+function showSpec(){
+  modelSel.value = M.id; $('customWrap').hidden = !M.custom;
+  CUSTOM_FIELDS.forEach(id=> $(id).value = S.custom[id]);
+  updateCfgNote(); showWq(); syncThink();
+  workloadSel.value = S.workload; showSeg('chunk', S.chunk); showLengths();
+  showUsers(); usersNum.value = S.users;
+  $('goal').value = S.goal; updateGoalHint();
+  showSeg('kq', S.kq); showSeg('tp', S.tpo); showSeg('pcache', S.cache); showSeg('srv', S.srv);
+  ovSlider.value = S.ovpct; syncOv();
+  renderMix(); syncTrafficInputs();
+}
+/* settings from the address, on top of those in use. Returns false when there are none. */
 function applyHash(){
   let q;
   try { q = new URLSearchParams(location.hash.replace(/^#/, "")); } catch(e) { return false; }
@@ -2532,51 +2621,14 @@ function applyHash(){
   const v = /^\d+\.\d+\.\d+$/.test(q.get("v") || "") ? q.get("v") : null;
   noteVersion(v || LINK_BEFORE, !!v);
   try {
-    M = m; modelSel.value = m.id; $('customWrap').hidden = !m.custom;
-    if(m.custom && q.get("c")) q.get("c").split("_").forEach((v, i)=>{ if(CUSTOM_FIELDS[i] && +v>0) $(CUSTOM_FIELDS[i]).value = +v; });
-    updateCfgNote();
-    const wq = [...wqSel.options].find(o=> o.dataset.lbl===(q.get("wq") || "NATIVE"));
-    if(wq) wq.selected = true;
-    syncWq(); resetThink();
-    const th = q.get("th"), mode = thinksOf(activeModel());
-    if(th && mode!=="none"){
-      if(th==="off"){ if(mode!=="always") S.think = false; }
-      else if(+th>=0){ S.think = true; S.thinkTok = Math.min(131072, Math.round(+th)); }
-    }
-    S.seeThink = q.get("tv")!=="hidden";
-    syncThink();
-    const w = WORKLOADS[q.get("w")] ? q.get("w") : "chat";
-    if(w==="custom"){ S.wantPrompt = Math.max(1, Math.round(+q.get("p")) || 2048); S.wantReply = Math.max(1, Math.round(+q.get("r")) || 512); }
-    applyWorkload(w);
-    if(w==="custom" && CHUNK_NAME[+q.get("cb")]) S.chunkBase = +q.get("cb");
-    setChunk(CHUNK_NAME[+q.get("ck")] ? +q.get("ck") : S.chunkBase);
-    const u = Math.round(+q.get("u"));
-    setUsers(u>=1 ? Math.min(USERS_MAX, u) : 16); usersNum.value = S.users;
-    S.goal = GOALS[q.get("g")] ? q.get("g") : "smooth"; $('goal').value = S.goal; updateGoalHint();
-    pressSeg('kq', 'kq', q.get("kv") || "FP16");
-    pressSeg('tp', 'tpo', q.get("tp") || "auto");
+    useSpec(parseSpec(k=> q.get(k), specOf()));
     const ov = Math.round(+q.get("ov"));
-    ovSlider.value = q.has("ov") && ov>=0 && ov<=25 ? ov : 7; syncOv();
-    pressSeg('pcache', 'cache', q.get("pc")==="off" ? "0" : "1");
-    pressSeg('srv', 'srv', q.get("sv")==="nv" ? "1" : "0");
-    if(w==="custom" && q.has("sh")){ S.shared = Math.max(0, Math.round(+q.get("sh")) || 0); S.fresh = q.get("fr")==="rest" || !q.has("fr") ? null : Math.max(1, Math.round(+q.get("fr")) || 1); }
-    S.extra = (q.get("x") || "").split(".").map(s=>{
-      const [key, u, p, r, sh, fr] = s.split("_"), n = Math.round(+u);
-      if(!WORKLOADS[key] || !(n>=1)) return null;
-      const x = presetInto({users: Math.min(USERS_MAX, n)}, key);
-      if(key==="custom") Object.assign(x, {wantPrompt: Math.min(1048576, Math.max(1, Math.round(+p) || 2048)), wantReply: Math.min(1048576, Math.max(1, Math.round(+r) || 512)),
-        shared: Math.max(0, Math.round(+sh) || 0), fresh: fr===undefined || fr==="rest" ? null : Math.max(1, Math.round(+fr) || 1)});
-      return x;
-    }).filter(Boolean).slice(0, MIX_MAX);
-    setLengths(); renderMix();
+    S.ovpct = q.has("ov") && ov>=0 && ov<=25 ? ov : 7;
+    S.cache = q.get("pc")==="off" ? 0 : 1;
+    S.srv = q.get("sv")==="nv" ? 1 : 0;
     const bq = {"H200":"H200 NVL", "B200":"HGX B200", "B300":"HGX B300", "AMD MI350X":"AMD MI355X"}[q.get("b")] || q.get("b");   // rows renamed: when the HGX H200 was added, and the MI350X became the MI355X
     S.board = GPUS.some(g=> g.n===bq) ? bq : "auto";
-    const tf = (q.get("tf") || "").split("_").map(Number);
-    if(tf.length===4 && tf.every(x=> x>0)){
-      Object.assign(S.traffic, {people:tf[0], req:tf[1], hours:Math.min(24, tf[2]), peak:[1,2,3].includes(tf[3]) ? tf[3] : 2});
-      syncTrafficInputs();
-      S.trafficApplied = {...S.traffic, users:S.users};
-    } else S.trafficApplied = null;
+    showSpec();
   } catch(e) { return false; }
   return true;
 }
