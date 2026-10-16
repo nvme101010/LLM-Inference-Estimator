@@ -1,8 +1,8 @@
 # LLM Inference Estimator
 
-Single-node sizing estimate: how many GPUs one server needs for your model and users. Does not cover multi-node or NVL rack-scale systems.
+Sizing estimate: how many GPUs your models and users need, with each model on one node at most. Does not cover models spread over several nodes, or NVL rack-scale systems.
 
-A single-page tool for estimating what LLM inference needs. Pick a model, the number of concurrent users, a workload and a speed goal, and it recommends the node estimated to meet the goal with the least GPU memory in total:
+A single-page tool for estimating what LLM inference needs. Pick a model, the number of concurrent users, a workload and a speed goal, and it recommends the node estimated to meet the goal with the least GPU memory in total. Add up to four models and it sizes them together on one kind of board:
 
 - **Memory:** model weights, KV cache, activations and overhead, per GPU and in total, in GB or GiB.
 - **Speed:** estimated tokens per second per user and time to first reply while new prompts keep arriving, each with a likely range measured against published benchmarks, including thinking time for models that reason before answering.
@@ -23,7 +23,9 @@ Separately, one copy of a model is split across 1, 2, 4 or 8 GPUs. Serving engin
 
 **Prompt caching** is modelled the way vLLM and SGLang run by default: the repeated part of each prompt (a shared system prompt, earlier turns) is reused, so only the new part is read before the first reply, and the shared part is stored once per GPU. It can be turned off in Advanced settings.
 
-**Several workloads:** one model often serves more than one kind of request at once, such as 16 chat users alongside 10 RAG users. **Add another workload** gives each its own number of concurrent users and its own prompt and reply lengths, up to four in all. They share the same copies of the model: memory adds up across them, and because one decode step serves the whole batch, every user streams at the same speed. Each workload has its own first-token time: the headline shows the slowest, and the speed goal is checked against it. Every workload's prompts join one queue, so each first token is the same average wait for prompts ahead plus the time to read that workload's own prompt. Workloads that need a different model are not covered.
+**Several workloads:** one model often serves more than one kind of request at once, such as 16 chat users alongside 10 RAG users. **Add another workload** gives each its own number of concurrent users and its own prompt and reply lengths, up to four in all. They share the same copies of the model: memory adds up across them, and because one decode step serves the whole batch, every user streams at the same speed. Each workload has its own first-token time: the headline shows the slowest, and the speed goal is checked against it. Every workload's prompts join one queue, so each first token is the same average wait for prompts ahead plus the time to read that workload's own prompt. Workloads that need a different model are a second model (below).
+
+**Several models:** **Add another model** sizes up to four models together, each with its own users, workloads, precision and speed goal. Tabs above the controls switch between them; overhead, prompt caching and Server apply to all. Each model runs as copies of its own on GPUs of its own, sized as it would be alone but before rounding up to a server size. The copies of every model are then packed into servers of one kind of board, the widest first, so every server but the last is full; a server that isn't full shrinks to the smallest size the board comes in, and its spare GPUs run extra copies of the models closest to their goals. Each model then uses the fewest GPUs per copy that still meet its goal, and still gets at most one node. The suggestion is the board where every model meets its goal with the least GPU memory in all. A Models panel shows how each model runs and the GPUs of every server; with Server set to NVIDIA guidance, each server is sized for the models on it, its storage holding each one's weights once.
 
 **Thinking models:** the Thinking switch under Reply length sets how many tokens a model thinks before answering. **Users see the thinking** says which wait the speed goal is judged on. On (the default), the UI streams the thinking, so it's the first token. Off, users wait for the answer, so the tile becomes **Answer starts** and the goal's limit applies to that: within 15 s for Fast, 30 s for Smooth chat and 60 s for Readable, limits of the estimator's own, since a first reply in 1 to 5 s is out of reach once thousands of thinking tokens come first.
 
@@ -84,7 +86,7 @@ Then port-forward to try it (`kubectl port-forward svc/llm-inference-estimator 8
 ## Share a sizing
 
 - **Download summary** saves a one-page report of the recommendation, the inputs, every board compared and the assumptions. Open it and choose Print to save it as a PDF.
-- **Copy link** appears when the page is served from the web, for example GitHub Pages. The address holds every setting, so the link opens the same scenario.
+- **Copy link** appears when the page is served from the web, for example GitHub Pages. The address holds every setting, so the link opens the same scenario. With several models, model 1's settings keep their keys, models 2 to 4 use the same keys with the model's number appended (`m2`, `u2`, …), and `e` says which model's tab is open; a one-model link is as it always was.
 
 Both record the estimator's version (`v=` in the link). A link made with an older version opens with a note listing what has changed in the figures since, and the image tag to run to see them as they were (`ghcr.io/nvme101010/llm-inference-estimator:<version>`). Links made before versions were recorded are treated as 1.0.3.
 
