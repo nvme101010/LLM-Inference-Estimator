@@ -286,6 +286,16 @@
   .gpu{width:22px; height:22px; border-radius:5px; display:inline-flex; align-items:center; justify-content:center; font-family:"IBM Plex Mono",monospace; font-size:10.5px; font-weight:600; color:#06110f}
   .gpu.spare{border:1px dashed var(--line-2); background:repeating-linear-gradient(135deg, transparent 0 4px, var(--line-2) 4px 5px)}
   .legend[hidden], .bar-shell[hidden]{display:none}
+  /* a model opened in the Models panel: its memory, as the main bar shows one model's */
+  .mdetail{padding:2px 0 4px}
+  .mdetail .mline{font-size:12.5px; color:var(--ink-2); margin-bottom:8px}
+  .mdetail .mline b{color:var(--ink); font-weight:600}
+  .mdetail .mline .linkbtn{margin:0 0 0 6px}
+  .bar.mini{height:26px; border-radius:7px}
+  .mdetail .legend{margin-top:6px; gap:8px 22px}
+  .mdetail .legend .v{font-size:13.5px}
+  .boards tr[aria-expanded=true] .whybtn::before{transform:rotate(-135deg) translate(-1px,-1px)}
+  @media (max-width:640px){ .mdetail{width:calc(100vw - 80px)} }   /* stays on screen while the table scrolls sideways */
 
   /* breakdown table */
   table{width:100%; border-collapse:collapse; font-size:13px}
@@ -1863,32 +1873,13 @@ function render(){
 }
 /* one copy's memory, part by part: the legend under the bar and the breakdown table. Returns the parts. */
 function renderBreakdown(r, tp, reps, active){
-  const m = r.m, tot = r.total, totGB = tot/GB;
-  const comps=[
-    {k:"Model weights", v:r.weights, c:"var(--w)", bar:"bw", tip:"weights",
-     f:`${fmtB(m.p)} params × ${+S.wq.toFixed(3)} B/param (${S.wqLbl==="NATIVE" ? m.nat.f+", as released" : S.wqLbl})`
-       + (tp>1?`<br>÷ TP ${tp} = <b>${fmtMem(r.w_pg/GB)}/GPU</b>`:``)},
-    {k:"KV cache", v:r.kv, c:"var(--kv)", bar:"bkv", tip:"kv", f:kvFormula(r),
-     // split across more GPUs than a layer has KV heads, each GPU keeps that layer's cache: say how much that adds
-     extra: r.cache.dp ? `data-parallel attention: each GPU holds its own users' cache`
-          : r.cache.replicated ? `incl. ${fmtMem((r.kv + r.kv_saved - r.kvReq)/GB)} repeated across ${tp} GPUs` : ""},
-    {k:"Activations", v:r.act, c:"var(--act)", bar:"bact", tip:"act",
-     f:`${commas(r.T)} tokens per step × (${commas(m.h)}h × 4 + ${commas(r.ffn)}ffn × 2) × 2 B = ${fmtMem(r.actBuf/GB)}`
-       + `<br>+ ${commas(r.users)} × ${commas(r.vocab)} vocab × 4 B fp32 logits = ${fmtMem(r.actLogit/GB)}`
-       + (tp>1?`<br>÷ TP ${tp} = <b>${fmtMem(r.act_pg/GB)}/GPU</b>`:``)},
-    {k:"Tensor-parallel overhead", v:r.tpov, c:"var(--tp)", bar:"btp", tponly:true, tip:"tpov",
-     f:`${tp-1} extra CUDA context${tp-1>1?"s":""} + NCCL / comm buffers<br>${fmtMem(r.tpcomm_pg/GB)}/GPU comm × ${tp} GPUs`},
-    {k:"Overhead", v:r.overhead, c:"var(--ov)", bar:"bov", tip:"overhead",
-     f:`${fmtMem(1)} CUDA ctx + ${S.ovpct}% fragmentation<br>framework & allocator`},
-  ];
+  const tot = r.total, totGB = tot/GB, comps = memoryParts(r, tp);
   const shown = comps.filter(c=> !(c.tponly && tp<=1));
 
   const leg=$('legend'); leg.innerHTML="";
   shown.forEach(c=>{
     const d=document.createElement('div'); d.className="item";
-    d.innerHTML=`<span class="dot" style="background:${c.c}"></span>
-      <span class="k">${c.k}${c.tip==="weights" || c.tip==="act" ? "" : ` <span class="i" data-tip="${c.tip}" tabindex="0">i</span>`}</span>
-      <span class="v">${fmtMemN(c.v/GB)} <span style="font-size:11px;color:var(--muted);font-weight:500">${S.unit}</span></span>${c.extra ? `<div class="p">${c.extra}</div>` : ""}`;
+    d.innerHTML=legendItem(c);
     leg.appendChild(d);
   });
 
@@ -1905,6 +1896,31 @@ function renderBreakdown(r, tp, reps, active){
   $('bkScope').textContent = reps>1 ? `for one of ${reps} copies: ${tp} GPU${tp>1?"s":""}, ${commas(active.upr)} users` : "";
   return {comps, shown};
 }
+/* the parts of one copy's memory, each with its color, the bar segment that shows it, and how it's computed */
+function memoryParts(r, tp){
+  const m = r.m;
+  return [
+    {k:"Model weights", v:r.weights, c:"var(--w)", bar:"bw", tip:"weights",
+     f:`${fmtB(m.p)} params × ${+S.wq.toFixed(3)} B/param (${S.wqLbl==="NATIVE" ? m.nat.f+", as released" : S.wqLbl})`
+       + (tp>1?`<br>÷ TP ${tp} = <b>${fmtMem(r.w_pg/GB)}/GPU</b>`:``)},
+    {k:"KV cache", v:r.kv, c:"var(--kv)", bar:"bkv", tip:"kv", f:kvFormula(r),
+     // split across more GPUs than a layer has KV heads, each GPU keeps that layer's cache: say how much that adds
+     extra: r.cache.dp ? `data-parallel attention: each GPU holds its own users' cache`
+          : r.cache.replicated ? `incl. ${fmtMem((r.kv + r.kv_saved - r.kvReq)/GB)} repeated across ${tp} GPUs` : ""},
+    {k:"Activations", v:r.act, c:"var(--act)", bar:"bact", tip:"act",
+     f:`${commas(r.T)} tokens per step × (${commas(m.h)}h × 4 + ${commas(r.ffn)}ffn × 2) × 2 B = ${fmtMem(r.actBuf/GB)}`
+       + `<br>+ ${commas(r.users)} × ${commas(r.vocab)} vocab × 4 B fp32 logits = ${fmtMem(r.actLogit/GB)}`
+       + (tp>1?`<br>÷ TP ${tp} = <b>${fmtMem(r.act_pg/GB)}/GPU</b>`:``)},
+    {k:"Tensor-parallel overhead", v:r.tpov, c:"var(--tp)", bar:"btp", tponly:true, tip:"tpov",
+     f:`${tp-1} extra CUDA context${tp-1>1?"s":""} + NCCL / comm buffers<br>${fmtMem(r.tpcomm_pg/GB)}/GPU comm × ${tp} GPUs`},
+    {k:"Overhead", v:r.overhead, c:"var(--ov)", bar:"bov", tip:"overhead",
+     f:`${fmtMem(1)} CUDA ctx + ${S.ovpct}% fragmentation<br>framework & allocator`},
+  ];
+}
+/* one part's entry in a legend: its color, name, size in all, and any note */
+const legendItem = c => `<span class="dot" style="background:${c.c}"></span>
+      <span class="k">${c.k}${c.tip==="weights" || c.tip==="act" ? "" : ` <span class="i" data-tip="${c.tip}" tabindex="0">i</span>`}</span>
+      <span class="v">${fmtMemN(c.v/GB)} <span style="font-size:11px;color:var(--muted);font-weight:500">${S.unit}</span></span>${c.extra ? `<div class="p">${c.extra}</div>` : ""}`;
 const MATH_STATE = $('mathState').textContent;     // what Show the math says it holds, for one model
 const showGauge = on => { document.querySelector('.bar-shell').hidden = !on; $('legend').hidden = !on; };
 
@@ -2281,7 +2297,7 @@ function renderTabs(){
 /* the controls show model i: save the one they showed, put i's settings on S and show them */
 function selectModel(i){ saveSpec(); S.edit = i; useSpec(S.models[i]); showSpec(); render(); }
 function removeModel(i){
-  saveSpec(); S.models.splice(i, 1);
+  saveSpec(); S.models.splice(i, 1); OPEN_MODELS.clear();
   S.edit = i < S.edit ? S.edit - 1 : Math.min(S.edit, S.models.length - 1);
   useSpec(S.models[S.edit]); showSpec(); render();
 }
@@ -2301,11 +2317,21 @@ $('mtabs').addEventListener('keydown', e=>{   // the arrow keys move between tab
   const n = S.models.length, i = (S.edit + (e.key==="ArrowRight" ? 1 : n - 1)) % n;
   e.preventDefault(); selectModel(i); $('mtabs').querySelector(`[data-m="${i}"]`).focus();
 });
-/* a model's row in the Models panel shows that model's settings */
-const pickModelRow = row => { if(row && +row.dataset.model!==S.edit){ selectModel(+row.dataset.model); $('fleetbody').querySelector(`[data-model="${row.dataset.model}"]`)?.focus(); } };
-$('fleetbody').addEventListener('click', e=>{ if(!e.target.closest('[data-tip]')) pickModelRow(e.target.closest('tr[data-model]')); });
+/* a model's row in the Models panel opens or closes how one copy uses its GPUs' memory; the link inside
+   shows the model's settings in the controls */
+const OPEN_MODELS = new Set();   // the models whose memory is open, by position
+function toggleModel(row){
+  const i = +row.dataset.model, det = row.nextElementSibling, open = det.hidden;
+  det.hidden = !open; row.setAttribute('aria-expanded', open);
+  if(open) OPEN_MODELS.add(i); else OPEN_MODELS.delete(i);
+}
+$('fleetbody').addEventListener('click', e=>{
+  const ed = e.target.closest('[data-edit]'), row = e.target.closest('tr[data-model]');
+  if(ed) selectModel(+ed.dataset.edit);
+  else if(row && !e.target.closest('[data-tip]')) toggleModel(row);
+});
 $('fleetbody').addEventListener('keydown', e=>{
-  if((e.key==="Enter" || e.key===" ") && e.target.matches('tr[data-model]')){ e.preventDefault(); pickModelRow(e.target); }
+  if((e.key==="Enter" || e.key===" ") && e.target.matches('tr[data-model]')){ e.preventDefault(); toggleModel(e.target); }
 });
 
 /* a deployment of several models by name: "1 × 8-GPU HGX H200 system", "6 × L40S", "9 × H200 NVL in 2 servers" */
@@ -2412,17 +2438,20 @@ function renderFleetModels(f){
   $('fleetPanel').hidden = false;
   const cap = $('fleetcap'), body = $('fleetbody');
   if(!f){ cap.textContent = ""; body.innerHTML = `<div class="empty">Each model's layout appears once one kind of board holds them all.</div>`; return; }
-  cap.innerHTML = `On <b>${fleetName(f)}</b>. Click a model to change its settings above.`;
+  cap.innerHTML = `On <b>${fleetName(f)}</b>. Click a model to see how it uses its GPUs' memory.`;
   const rows = f.models.map((m, i)=> withSpec(m.spec, ()=>{   // each model's own goal, thinking and workloads
     const d = m.d, t = d.t;
     const wait = !t ? "—" : hideThink() ? `<b>${fmtWait(answerStart(t))}</b> <small>to answer</small>` : `<b>${fmtTime(t.ttft)[0]}</b> <small>${fmtTime(t.ttft)[1]}</small>`;
-    return `<tr class="brow${i===S.edit ? " sel" : ""}" data-model="${i}" role="button" tabindex="0" aria-pressed="${i===S.edit}">
+    const open = OPEN_MODELS.has(i);
+    return `<tr class="brow${i===S.edit ? " sel" : ""}" data-model="${i}" role="button" tabindex="0" aria-expanded="${open}" aria-controls="mdet${i}">
       <td class="board"><div class="gname">${modelDot(i)}${esc(specName(m.spec))}</div>
         <div class="gcap">${plural(m.users, "user")} · ${esc(groupNames().join(" + "))} · ${GOAL_SHORT[S.goal]}</div></td>
       <td class="layout">${modelPill(m) || (d.fits ? layoutText(d) : "—")}</td>
       <td class="num"><b>${d.fits ? d.gpus : "—"}</b> <small>× GPU</small></td>
       <td class="num">${t ? `<b>${fmtTps(t.perUser)}</b> <small>tok/s</small>` : "—"}</td>
-      <td class="num">${wait}</td></tr>`;
+      <td class="num">${wait}</td>
+      <td class="ctl"><span class="whybtn" aria-hidden="true"></span></td></tr>
+      <tr class="bwhy${i===S.edit ? " sel" : ""}" id="mdet${i}"${open ? "" : " hidden"}><td colspan="6">${d.fits ? memoryDetail(m, i, f.g) : "Doesn't fit."}</td></tr>`;
   }));
   const label = (s, k)=> `${systemOf(f.g) ? "System" : "Server"} ${k + 1} · ${plural(s.n, "GPU")}`;
   const strip = f.servers.map((s, k)=> `<div class="srvbox"><div class="lbl">${label(s, k)}</div><div class="gpus">`
@@ -2431,9 +2460,33 @@ function renderFleetModels(f){
   const said = f.servers.map((s, k)=> `${label(s, k)}: ` + f.models.map((m, i)=> [m, s.slots.filter(x=> x===i).length]).filter(([, c])=> c)
     .map(([m, c])=> `${specName(m.spec)} on ${plural(c, "GPU")}`).join(", ")).join("; ");
   body.innerHTML = `<div class="boards"><table>
-    <thead><tr><th>Model</th><th>Layout</th><th class="num">GPUs</th><th class="num">Per user</th><th class="num">First token</th></tr></thead>
+    <thead><tr><th>Model</th><th>Layout</th><th class="num">GPUs</th><th class="num">Per user</th><th class="num">First token</th><th></th></tr></thead>
     <tbody>${rows.join("")}</tbody></table></div>
     <div class="pack" role="img" aria-label="${esc(said)}">${strip}</div>`;
+}
+
+/* how one copy of a model uses its GPUs' memory, as the bar and legend show it for one model: run under
+   withSpec(m.spec), for that model's precision and overhead */
+function memoryDetail(m, i, g){
+  return withSpec(m.spec, ()=>{
+    const d = m.d, r = d.r, tp = d.tp, perGB = r.perGPU/GB;
+    const parts = memoryParts(r, tp).filter(c=> !(c.tponly && tp<=1));
+    return `<div class="mdetail"><div class="mline">${d.reps>1 ? `One of ${d.reps} copies` : "One copy"}: ${plural(tp, "GPU")}, ${plural(d.upr, "user")}`
+      + ` · <b>${fmtMem(perGB)}</b> per GPU of ${boxMem(g)}, ${Math.round(perGB/g.cap*100)}% full`
+      + (i!==S.edit ? ` <button type="button" class="linkbtn" data-edit="${i}">Change its settings</button>` : "") + `</div>`
+      + gaugeHtml(parts, r.total/GB, g.cap*tp, g, tp, d.reps)
+      + `<div class="legend">${parts.map(c=> `<div class="item">${legendItem(c)}</div>`).join("")}</div></div>`;
+  });
+}
+/* one copy's memory against its GPUs, drawn as renderBar draws the main bar */
+function gaugeHtml(parts, totGB, capGB, g, tp, reps){
+  const usableGB = capGB*USABLE, span = Math.max(totGB, capGB), at = usableGB/span*100, pct = gb => `${gb/span*100}%`;
+  return `<div class="bar mini" role="img" aria-label="${esc(`One copy uses ${fmtMem(totGB)} of ${fmtMem(usableGB)} usable`)}">`
+    + parts.map(c=> `<div style="width:${pct(c.v/GB)};background:${c.c}"></div>`).join("")
+    + `<div class="seg-free" style="width:${pct(Math.max(0, capGB - totGB))}"></div>`
+    + (totGB > usableGB ? `<div class="cap-over" style="left:${at}%;width:${pct(totGB - usableGB)}"></div>` : "")
+    + `<div class="cap-line" style="left:${at}%"></div></div>`
+    + `<div class="barscale"><div class="gpuline picked${at>55 ? " flip" : ""}" style="left:${at}%"><span>${reps>1 ? "one copy: " : ""}${tp>1 ? tp + " × " : ""}${g.n} · <em>${fmtMem(usableGB)} usable</em></span></div></div>`;
 }
 
 /* the servers of a deployment of several models, by NVIDIA's guidance: one row each */
