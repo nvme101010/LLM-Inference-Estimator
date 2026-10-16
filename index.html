@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<meta name="description" content="Single-node sizing estimate: how many GPUs one server needs to serve an open LLM to your users, on NVIDIA and AMD boards.">
+<meta name="description" content="Sizing estimate: how many GPUs it takes to serve open LLMs to your users, one node per model at most, on NVIDIA and AMD boards.">
 <title>LLM Inference Estimator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,6 +22,7 @@
     --good-bg:#e7f4ec; --warn-bg:#f8eed7; --bad-bg:#f8e4e1;
     --shadow:0 1px 2px rgba(28,30,40,.05), 0 8px 24px rgba(28,30,40,.06);
     --radius:12px;
+    --m1:var(--accent); --m2:var(--kv); --m3:var(--act); --m4:var(--tp);   /* several models: one color each */
   }
   :root:not([data-theme="light"]){}
   @media (prefers-color-scheme: dark){
@@ -124,6 +125,22 @@
   /* ---- the question ---- */
   .ask{padding:16px 20px 18px}
   .ask .eyebrow{margin-bottom:12px}
+  /* several models: a tab for each above the controls, which set the selected one */
+  .ask-head{display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:12px}
+  .ask .ask-head .eyebrow{margin:0}
+  .ask-head .linkbtn{margin:0}
+  .mtabs{display:flex; flex-wrap:wrap; gap:6px; margin:0 0 16px}
+  .mtabs[hidden]{display:none}
+  .mtab{display:inline-flex; align-items:center; max-width:100%; border:1px solid var(--line-2); border-radius:9px; background:var(--panel-2)}
+  .mtab.on{border-color:var(--accent); background:var(--panel); box-shadow:inset 0 -2px 0 var(--accent)}
+  .mtab button[role=tab]{display:inline-flex; align-items:center; gap:7px; min-width:0; border:none; background:none; color:var(--ink-2); font:inherit; font-size:12.5px; text-align:left; padding:6px 4px 6px 10px; cursor:pointer}
+  .mtab.on button[role=tab]{color:var(--ink); font-weight:600}
+  .mtab button[role=tab] small{color:var(--muted); font-weight:400; font-size:11.5px}
+  .mtab .mt-x{border:none; background:none; color:var(--muted); font:inherit; font-size:15px; line-height:1; padding:6px 9px 6px 5px; cursor:pointer}
+  .mtab .mt-x:hover{color:var(--bad)}
+  .mtab button:focus-visible{outline:2px solid var(--accent); outline-offset:-2px; border-radius:8px}
+  .mt-dot{display:inline-block; flex:none; width:9px; height:9px; border-radius:3px; margin-right:7px}
+  .mtab .mt-dot{margin-right:0}
   /* row 1: model · users · workload; row 2: precision · speed goal · prompt and reply lengths,
      so each column pairs up: what runs, how many and how fast, how much text */
   .ask-grid{display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:16px 26px; align-items:start}
@@ -257,7 +274,28 @@
   @media (max-width:900px){ .srv .srvgrid{grid-template-columns:repeat(2,minmax(0,1fr))} }
   @media (max-width:440px){ .srv .srvgrid{grid-template-columns:1fr} }
   .srv .hint{padding:0 18px 16px; margin-top:12px}
-  .srv .empty{margin:10px 18px 18px; padding:12px 14px; border:1px dashed var(--line-2); border-radius:9px; font-size:12.5px; color:var(--ink-2); line-height:1.5}
+  .srv .empty, .fleet .empty{margin:10px 18px 18px; padding:12px 14px; border:1px dashed var(--line-2); border-radius:9px; font-size:12.5px; color:var(--ink-2); line-height:1.5}
+
+  /* several models: each as it runs, and the GPUs of each server */
+  .fleet h2{font-size:14px; margin:0; padding:16px 18px 4px; font-weight:600; letter-spacing:-.01em}
+  .fleet .cap{padding:0 18px 10px; color:var(--muted); font-size:12.5px}
+  .fleet .cap b{color:var(--ink-2); font-weight:600}
+  .pack{display:flex; flex-wrap:wrap; gap:12px 24px; padding:12px 18px 18px; border-top:1px solid var(--line)}
+  .srvbox .lbl{font-family:"IBM Plex Mono",monospace; font-size:10.5px; color:var(--muted); margin-bottom:5px}
+  .srvbox .gpus{display:flex; gap:3px}
+  .gpu{width:22px; height:22px; border-radius:5px; display:inline-flex; align-items:center; justify-content:center; font-family:"IBM Plex Mono",monospace; font-size:10.5px; font-weight:600; color:#06110f}
+  .gpu.spare{border:1px dashed var(--line-2); background:repeating-linear-gradient(135deg, transparent 0 4px, var(--line-2) 4px 5px)}
+  .legend[hidden], .bar-shell[hidden]{display:none}
+  /* a model opened in the Models panel: its memory, as the main bar shows one model's */
+  .mdetail{padding:2px 0 4px}
+  .mdetail .mline{font-size:12.5px; color:var(--ink-2); margin-bottom:8px}
+  .mdetail .mline b{color:var(--ink); font-weight:600}
+  .mdetail .mline .linkbtn{margin:0 0 0 6px}
+  .bar.mini{height:26px; border-radius:7px}
+  .mdetail .legend{margin-top:6px; gap:8px 22px}
+  .mdetail .legend .v{font-size:13.5px}
+  .boards tr[aria-expanded=true] .whybtn::before{transform:rotate(-135deg) translate(-1px,-1px)}
+  @media (max-width:640px){ .mdetail{width:calc(100vw - 80px)} }   /* stays on screen while the table scrolls sideways */
 
   /* breakdown table */
   table{width:100%; border-collapse:collapse; font-size:13px}
@@ -283,6 +321,8 @@
   .boards thead th:last-child, .boards tbody td:last-child{padding-right:18px}
   .boards tbody td{padding:10px 12px; border-bottom:none; font-size:13px; font-variant-numeric:tabular-nums}
   .boards tbody tr.brow{border-top:1px solid var(--line); cursor:pointer; transition:background .12s}
+  .boards tbody tr.flat{border-top:1px solid var(--line)}
+  .boards td.models{color:var(--ink-2); line-height:1.6}
   .boards tbody tr.brow:hover{background:var(--panel-2)}
   .boards tbody tr.brow:focus-visible{outline:2px solid var(--accent); outline-offset:-2px}
   .boards tbody tr.brow.nr{background:var(--bad-bg)}
@@ -427,7 +467,7 @@
       <div class="glyph" aria-hidden="true"></div>
       <div>
         <h1>LLM Inference Estimator</h1>
-        <div class="sub">How many GPUs one server needs for your model and users. Single node only.</div>
+        <div class="sub">How many GPUs your models and users need. One node per model at most.</div>
       </div>
     </div>
     <div class="top-actions">
@@ -443,7 +483,11 @@
   <main class="stack">
     <!-- ============ THE QUESTION: four inputs ============ -->
     <section class="panel ask" aria-labelledby="askTitle">
-      <h2 class="eyebrow" id="askTitle">What do you want to run?</h2>
+      <div class="ask-head">
+        <h2 class="eyebrow" id="askTitle">What do you want to run?</h2>
+        <button type="button" class="linkbtn" id="modelAdd">Add another model</button>
+      </div>
+      <div class="mtabs" id="mtabs" role="tablist" aria-label="Models" hidden></div>
       <div class="ask-grid">
         <div class="field">
           <div class="sliderhead"><label class="fld" for="model">Model</label></div>
@@ -592,6 +636,12 @@
       <div class="legend" id="legend"></div>
     </section>
 
+    <section class="panel fleet" id="fleetPanel" aria-labelledby="fleetTitle" hidden>
+      <h2 id="fleetTitle">Models <span class="i" data-tip="fleet" tabindex="0">i</span></h2>
+      <div class="cap" id="fleetcap"></div>
+      <div id="fleetbody"></div>
+    </section>
+
     <section class="panel srv" id="srvPanel" aria-labelledby="srvTitle" hidden>
       <h2 id="srvTitle">Server, by NVIDIA's guidance <span class="pill beta" data-tip="beta" tabindex="0">Beta</span> <span class="i" data-tip="srv" tabindex="0">i</span></h2>
       <div class="cap" id="srvcap"></div>
@@ -669,7 +719,7 @@
     </details>
 
     <details class="panel more" id="math">
-      <summary><span class="sum-title">Show the math</span><span class="sum-state">Speed on this setup · model architecture · memory breakdown · how it's calculated</span></summary>
+      <summary><span class="sum-title">Show the math</span><span class="sum-state" id="mathState">Speed on this setup · model architecture · memory breakdown · how it's calculated</span></summary>
       <div class="math-body">
         <div class="tput">
           <h3>Speed on this setup <span class="i" data-tip="tput" tabindex="0">i</span></h3>
@@ -710,16 +760,17 @@
           </div>
           <div class="mgroup">
             <p class="mhead">Sizing</p>
-            <details class="mitem"><summary>Single node</summary><div class="mtext"><p>This estimates one server of up to 8 GPUs. Every result is a single node; multi-node deployments and NVL rack-scale systems are not covered. If one node of a board can't serve every user, its row says how many it does serve. For production, plan at least one more node (or replica) than this, so the service keeps running if one fails or is being updated.</p></div></details>
+            <details class="mitem"><summary>Single node</summary><div class="mtext"><p>This estimates one server of up to 8 GPUs for each model. Every model's result is at most a single node; multi-node deployments and NVL rack-scale systems are not covered. With several models, their copies share servers (see Several models). If one node of a board can't serve every user, its row says how many it does serve. For production, plan at least one more node (or replica) than this, so the service keeps running if one fails or is being updated.</p></div></details>
             <details class="mitem"><summary>Suggestion and capacity</summary><div class="mtext"><p>Every board is tried at 1, 2, 4 and 8 GPUs per copy (splitting a copy only across NVLink boards), with as many copies as the node's 8 GPUs allow. The suggestion is the node that serves every user within the speed goal at the cautious end of the estimate (speed per user at the low end of its likely range, first token at the slow end), with the least GPU memory in total (on any one board, the fewest GPUs). If no node serves everyone within the goal, it is the full node that serves the most users. GPU counts round up to what can be bought: H200 NVL servers take 1, 2, 4 or 8 cards, so 3 rounds up to 4 and 5 to 7 round up to 8; but an NVLink bridge joins at most 4 of them, so one copy of a model spans at most 4, and 8 cards run two copies.</p><p>The HGX H200, HGX B200 and HGX B300 ship only as 8-GPU systems, with all 8 GPUs joined through NVSwitch. RTX PRO 4500 servers hold any number of cards up to 5 (HPE's limit); because of the split rule above, one copy of a model uses at most 4 of them, and the fifth can run another copy. Spare GPUs run extra copies of the model. <b>Room for</b> (<b>Handles up to</b> in the summary) is the most users the node holds at the current prompt and reply lengths while fitting in memory and, with a goal, still reaching it on the estimate; when the goal is the limit, it also says how many memory alone would hold.</p></div></details>
             <details class="mitem"><summary>Copies (replicas)</summary><div class="mtext"><p>For more users, the page runs more copies of the model on the node's GPUs instead of splitting one copy wider. Each copy has its own GPUs and an even share of the users, so memory, the bar and the breakdown describe one copy, while GPU count, output and capacity add up across all of them. Copies don't exchange data while generating, so they need no direct GPU-to-GPU link between them; that's why PCIe boards run several copies well even though they split a single copy poorly. When two layouts use the same GPUs, the page takes more copies over splitting one wider, on every board: both reach the goal, and copies leave room for more users. A copy is split wider only when memory or the speed goal needs it. When a board needs more GPUs than memory alone calls for, the extra ones are there to reach the speed goal, and the page says so. This assumes requests are spread evenly across the copies.</p></div></details>
+            <details class="mitem"><summary>Several models</summary><div class="mtext"><p>Add up to four models, each with its own users, workloads, precision and speed goal; the controls above set the model whose tab is selected, while overhead, prompt caching and Server apply to all. Every model runs as copies of its own on GPUs of its own, sized as it would be alone but before rounding up to a server size. All the copies are then packed into servers of the board, the widest first, and a server that isn't full shrinks to the smallest size the board comes in; a copy of 4 on H200 NVL cards stays within one bridged group. Spare GPUs run extra copies of the models closest to missing their goals, and each model then uses the fewest GPUs per copy that still meet its goal. A model that one node can't serve keeps a node of its own.</p><p>The suggestion is the board where every model meets its goal with the least GPU memory in all, then the fewest servers; every model runs on the same kind of board. Models don't share GPUs, so each one's speed is its own; they share the servers' CPUs, memory and storage, and each server's storage holds the weights of every model it runs, once each.</p></div></details>
             <details class="mitem"><summary>Server (beta)</summary><div class="mtext"><p>The server sizing is in beta: its rules and figures are still being worked on and may change. Set <b>Server</b> to NVIDIA guidance in Advanced settings and the page follows the inference server recommendations in NVIDIA's Certified Systems Configuration Guide. GPU counts round up to <code>2, 4 or 8</code> per server, split evenly across two CPU sockets (2 or 4 for the RTX PRO 4500, whose servers hold 5), which can change which board is suggested; the HGX systems stay whole 8-GPU systems. Around the GPUs the guide asks for CPUs with PCIe Gen5 and a base clock of 2.0 GHz or more and at least 6 physical cores per GPU, but the page sizes cores as HPE builds the AI worker nodes of HPE Private Cloud AI, its inference platform with NVIDIA: <code>32 physical cores per GPU</code> in a 2- or 4-GPU server and <code>16 per GPU</code> in an 8-GPU one (2 × 32-core CPUs for 2 GPUs, 2 × 64-core for 4 or 8).</p><p>The guide also asks for system memory of at least <code>2 × the GPU memory</code> spread over every memory channel of both sockets, each GPU in an x16 slot of its own PCIe generation, PCIe Gen5 switches with 8 GPUs (with one or two per socket the CPUs' own lanes may be enough), one NVMe drive of at least 1 TB per socket and, in NVIDIA's reference architectures, a 1 TB NVMe boot drive, with drives under the same switch or root complex as the GPUs. The guide also covers network cards, remote management and TPM; the page leaves those to the conversation with the customer. The storage figure is the page's own: the <b>usable capacity</b> the model needs, <code>(2 × weights + 100 GB) ÷ 0.8</code>, rounded up (to 10 GB, or a tenth of a TB above 1 TB).</p><p>That is two copies of the weights (the version serving and the next one downloading) and 100 GB for container images, compile caches and logs, kept under 80% full, beside a separate boot volume for the OS. How it is made from drives and RAID is the vendor's choice, so the page doesn't size drives. KV cache offloaded to disk, as NVIDIA Dynamo's KV block manager does, needs a disk tier at least as large as its CPU tier, which should be 100 GB or more and larger than the GPUs' KV cache; the page gives that figure in the storage tooltip only, since few single servers offload to disk. Server amounts are in GB as sold, whatever unit is picked at the top.</p><p>All of these are minimums for planning, and the guide adds that LLM servers should aim above them. An HGX system's CPUs, memory and storage come with it from its manufacturer, so the page leaves them to its spec sheet. The AMD boards are left out of the comparison while Server is set to NVIDIA guidance, since the guide is written for NVIDIA GPUs. A server is NVIDIA-Certified only if it is on NVIDIA's list of certified systems.</p></div></details>
             <details class="mitem"><summary>Concurrent users from traffic</summary><div class="mtext"><p>Requests in progress at once = requests per second × seconds each one takes. A request takes the wait before its first token plus its thinking and reply, streamed at your speed goal's rate; the goal is a minimum speed, so this errs on the high side. The busiest-hour multiple covers traffic that isn't spread evenly through the day; 2× suits a typical workday.</p></div></details>
           </div>
           <div class="mgroup">
             <p class="mhead">Also</p>
             <details class="mitem"><summary>RAG pipelines</summary><div class="mtext"><p>The estimate covers the LLM only. RAG also needs an embedding model and usually a reranker. Small ones (under ~1B parameters) add a few GB and can share a GPU or run on CPU at low traffic. A 4–8B reranker, or heavy traffic, needs its own GPU. The reranker is the larger of the two: it reads the question against every retrieved chunk, often tens of thousands of tokens per query.</p></div></details>
-            <details class="mitem"><summary>Sharing</summary><div class="mtext"><p>On a hosted copy of this page, the address always holds the current settings, so Copy link sends the exact scenario. Download summary saves a one-page report of the recommendation, the inputs and every board, which prints to PDF. Both record the estimator's version; a link made with an older version opens with what has changed in the figures since then, and the image of that version to run to see them as they were.</p></div></details>
+            <details class="mitem"><summary>Sharing</summary><div class="mtext"><p>On a hosted copy of this page, the address always holds the current settings, so Copy link sends the exact scenario, every model's settings included. Download summary saves a one-page report of the recommendation, the inputs and every board, which prints to PDF. Both record the estimator's version; a link made with an older version opens with what has changed in the figures since then, and the image of that version to run to see them as they were.</p></div></details>
           </div>
           </div>
           <div class="disc">Estimates for planning, not a guarantee. Real usage varies with the serving framework (vLLM, TensorRT-LLM, SGLang), paged-attention block sizing, speculative decoding, and MoE routing. MoE models load <i>all</i> expert weights even though only a few activate per token. The newest attention designs (DeepSeek V4's compressed sparse attention, sparse-attention index keys) are modeled from their configs, so treat those cache figures as ±25%. Model list and architectures checked against Hugging Face in September 2026.</div>
@@ -1017,7 +1068,7 @@ const DATA_AS_OF = "October 2026";   // when the model and board figures were la
 /* The estimator's version, carried in every shared link and summary. A link made under an older
    version opens with the changes since then listed, so a sizing never shifts without saying so.
    Bump it with each release tag; add to CHANGES whenever a release changes what the figures come to. */
-const VERSION = "1.5.0";
+const VERSION = "1.6.0";
 const CHANGES = [
   {v:"1.5.0", what:"The AMD MI355X joins the boards: 288 GB per GPU, sold only as 8-GPU systems, with published benchmarks of its own. Its GPUs are wired to each other with no switch, one Infinity Fabric link per pair, so a copy split across 2 or 4 of them uses only the links among them. Counting AMD's MI355X benchmark runs the same way, AMD's software reaches 0.75 of the hardware shares rather than 0.68, so the MI350P's figures come out up to 10% faster."},
   {v:"1.4.0", what:"When two layouts use the same GPUs, the suggestion runs more copies of the model rather than splitting one copy wider, on NVLink boards too, since both reach the goal and copies leave room for more users. A small model on an 8-GPU HGX system now runs as 8 copies, not one copy across all 8: speed per user comes out lower but still within the goal. The number of GPUs is unchanged."},
@@ -1661,7 +1712,7 @@ function serverRows(s){
    For one model that is exactly the layout deploymentFor gives (validation/fleet.mjs checks it). */
 const FLEET_MEMO = new Map();   // planFor's results, by the model's settings, the page's and the board
 function planFor(g, spec){      // run under withSpec(spec)
-  const key = JSON.stringify([spec, S.srv, S.ovpct, S.cache, CAL, g.n]);
+  const key = JSON.stringify([{...spec, tp: null}, S.srv, S.ovpct, S.cache, CAL, g.n]);   // the split on screen doesn't change the search
   if(!FLEET_MEMO.has(key)){
     if(FLEET_MEMO.size >= 2000) FLEET_MEMO.clear();
     const alone = deploymentFor(g), best = (alone.options || []).slice().sort((a, b)=> a.need - b.need || a.tp - b.tp)[0];
@@ -1686,7 +1737,7 @@ function packServers(g, copies){
 }
 function fleetFor(g, specs){
   const ms = specs.map(spec=> withSpec(spec, ()=> ({spec, ...planFor(g, spec)})));
-  ms.forEach(m=> m.d = m.alone);
+  ms.forEach(m=> { m.d = m.alone; m.need = m.tp*m.copies; });   // need: its GPUs before any spare ones
   const fleet = {g, models: ms, servers: [], gpus: 0, memGB: 0, fits: ms.every(m=> m.alone.fits), meets: false, partial: false};
   if(!fleet.fits) return fleet;
   const run = m => withSpec(m.spec, ()=>{ m.d = evaluate(g, m.tp, m.copies); m.gap = m.d.t ? goalGap(m.d.t) : Infinity; });
@@ -1785,6 +1836,9 @@ const statCell = (tip, label, n, unit, sub, state) =>
   + `<div class="n">${n}${unit ? ` <small>${unit}</small>` : ""}</div><div class="sub">${sub}</div></div>`;
 
 function render(){
+  saveSpec(); renderTabs();
+  if(S.models.length > 1) return renderFleet();
+  $('fleetPanel').hidden = true; showGauge(true); $('mathState').textContent = MATH_STATE;
   const deps = new Map(boardsInPlay().map(g=>[g.n, deploymentFor(g)]));
   // a picked board is honoured only while it's pickable: one that no longer fits, or is left out, falls back to the suggestion
   const want = S.board!=="auto" ? boardsInPlay().find(g=>g.n===S.board) : null;
@@ -1798,8 +1852,54 @@ function render(){
   const g = active ? active.g : null, fits = !!(active && active.fits);
   const speed = active ? active.t : null;
   const cap = fits ? capacityFor(active) : null;
+  const {comps, shown} = renderBreakdown(r, tp, reps, active);
 
-  const comps=[
+  renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, speed, cap});
+  const gauge = g || BIGGEST;
+  renderBar(comps, totGB, gauge.cap*tp, gauge, tp, reps);
+
+  const server = renderServer(fits ? active : null);
+  renderCards(deps, active, suggested, picked);
+  renderChunkOptions(fits ? active : null);
+  renderThroughput(fits ? active : null);
+  renderTpNote(m, tp, active);
+  renderAdvState();
+  updateGoalHint();   // the goal's wait follows whether the model thinks and users see it
+  renderTraffic();
+  syncMix();
+  LAST = {m, r, tp, reps, g, fits, active, picked, suggested, deps, speed, cap, perGB, tot, shown, server};
+  syncHash();
+  labelTips();   // name the icons this pass just created
+}
+/* one copy's memory, part by part: the legend under the bar and the breakdown table. Returns the parts. */
+function renderBreakdown(r, tp, reps, active){
+  const tot = r.total, totGB = tot/GB, comps = memoryParts(r, tp);
+  const shown = comps.filter(c=> !(c.tponly && tp<=1));
+
+  const leg=$('legend'); leg.innerHTML="";
+  shown.forEach(c=>{
+    const d=document.createElement('div'); d.className="item";
+    d.innerHTML=legendItem(c);
+    leg.appendChild(d);
+  });
+
+  const tb=$('bkbody'); tb.innerHTML="";
+  shown.forEach(c=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td class="name"><span class="swatch" style="background:${c.c}"></span>${c.k} <span class="i" data-tip="${c.tip}" tabindex="0">i</span></td>
+      <td class="formula">${c.f}</td>
+      <td class="gb">${fmtMem(c.v/GB)}</td>
+      <td class="pct">${(c.v/tot*100).toFixed(1)}%</td>`;
+    tb.appendChild(tr);
+  });
+  $('bkTotal').textContent = fmtMem(totGB);
+  $('bkScope').textContent = reps>1 ? `for one of ${reps} copies: ${tp} GPU${tp>1?"s":""}, ${commas(active.upr)} users` : "";
+  return {comps, shown};
+}
+/* the parts of one copy's memory, each with its color, the bar segment that shows it, and how it's computed */
+function memoryParts(r, tp){
+  const m = r.m;
+  return [
     {k:"Model weights", v:r.weights, c:"var(--w)", bar:"bw", tip:"weights",
      f:`${fmtB(m.p)} params × ${+S.wq.toFixed(3)} B/param (${S.wqLbl==="NATIVE" ? m.nat.f+", as released" : S.wqLbl})`
        + (tp>1?`<br>÷ TP ${tp} = <b>${fmtMem(r.w_pg/GB)}/GPU</b>`:``)},
@@ -1816,46 +1916,13 @@ function render(){
     {k:"Overhead", v:r.overhead, c:"var(--ov)", bar:"bov", tip:"overhead",
      f:`${fmtMem(1)} CUDA ctx + ${S.ovpct}% fragmentation<br>framework & allocator`},
   ];
-  const shown = comps.filter(c=> !(c.tponly && tp<=1));
-
-  renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, speed, cap});
-  const gauge = g || BIGGEST;
-  renderBar(comps, totGB, gauge.cap*tp, gauge, tp, reps);
-
-  const leg=$('legend'); leg.innerHTML="";
-  shown.forEach(c=>{
-    const d=document.createElement('div'); d.className="item";
-    d.innerHTML=`<span class="dot" style="background:${c.c}"></span>
+}
+/* one part's entry in a legend: its color, name, size in all, and any note */
+const legendItem = c => `<span class="dot" style="background:${c.c}"></span>
       <span class="k">${c.k}${c.tip==="weights" || c.tip==="act" ? "" : ` <span class="i" data-tip="${c.tip}" tabindex="0">i</span>`}</span>
       <span class="v">${fmtMemN(c.v/GB)} <span style="font-size:11px;color:var(--muted);font-weight:500">${S.unit}</span></span>${c.extra ? `<div class="p">${c.extra}</div>` : ""}`;
-    leg.appendChild(d);
-  });
-
-  const tb=$('bkbody'); tb.innerHTML="";
-  shown.forEach(c=>{
-    const tr=document.createElement('tr');
-    tr.innerHTML=`<td class="name"><span class="swatch" style="background:${c.c}"></span>${c.k} <span class="i" data-tip="${c.tip}" tabindex="0">i</span></td>
-      <td class="formula">${c.f}</td>
-      <td class="gb">${fmtMem(c.v/GB)}</td>
-      <td class="pct">${(c.v/tot*100).toFixed(1)}%</td>`;
-    tb.appendChild(tr);
-  });
-  $('bkTotal').textContent = fmtMem(totGB);
-  $('bkScope').textContent = reps>1 ? `for one of ${reps} copies: ${tp} GPU${tp>1?"s":""}, ${commas(active.upr)} users` : "";
-
-  const server = renderServer(fits ? active : null);
-  renderCards(deps, active, suggested, picked);
-  renderChunkOptions(fits ? active : null);
-  renderThroughput(fits ? active : null);
-  renderTpNote(m, tp, active);
-  renderAdvState();
-  updateGoalHint();   // the goal's wait follows whether the model thinks and users see it
-  renderTraffic();
-  syncMix();
-  LAST = {m, r, tp, reps, g, fits, active, picked, suggested, deps, speed, cap, perGB, tot, shown, server};
-  syncHash();
-  labelTips();   // name the icons this pass just created
-}
+const MATH_STATE = $('mathState').textContent;     // what Show the math says it holds, for one model
+const showGauge = on => { document.querySelector('.bar-shell').hidden = !on; $('legend').hidden = !on; };
 
 
 /* the headline: which deployment, why, and the five numbers behind it */
@@ -2197,9 +2264,297 @@ function renderTpNote(m, tp, active){
 /* the collapsed Advanced header still says what's set, and how much differs from the defaults */
 function renderAdvState(){
   const changed = [S.kq!==2, S.tpo!=="auto", S.chunk!==S.chunkBase, S.ovpct!==7, !S.cache, S.srv].filter(Boolean).length;
-  $('advState').innerHTML = (changed ? `<b>${changed} changed</b> · ` : "")
-    + `KV ${kqLabel()} · TP ${S.tpo==="auto" ? "auto" : S.tpo} · ${CHUNK_NAME[S.chunk]} · ${S.ovpct}% overhead · prompt caching ${S.cache ? "on" : "off"}`
+  const many = S.models.length > 1;   // with several models, say which settings are the shown model's and which every model's
+  $('advState').innerHTML = (changed ? `<b>${changed} changed</b> · ` : "") + (many ? `${esc(specName(S.models[S.edit]))}: ` : "")
+    + `KV ${kqLabel()} · TP ${S.tpo==="auto" ? "auto" : S.tpo} · ${CHUNK_NAME[S.chunk]} · ${many ? "all models: " : ""}${S.ovpct}% overhead · prompt caching ${S.cache ? "on" : "off"}`
     + ` · ${S.srv ? "server by NVIDIA guidance (beta)" : "GPUs only"}`;
+}
+
+/* ---------------- several models on the page ----------------
+   With two models or more the answer is one deployment for all of them on one kind of board (fleetFor):
+   the headline and its tiles count the whole deployment, the Models panel shows each model as it runs
+   there and the GPUs of every server, the Server panel sizes each server, and the board table counts
+   every model. The controls, Show the math, Optimize for and the TP note follow the model whose tab is
+   selected (S.edit). With one model none of this shows, only the button that adds another. */
+const MODEL_MAX = 4;
+const MODEL_COLORS = ["var(--m1)", "var(--m2)", "var(--m3)", "var(--m4)"];
+let DEFAULT_SPEC = null;   // what a model added with the button starts as: the page's own defaults, kept at start-up
+const specName  = s => s.m==="custom" ? "Custom model" : findModel(s.m).n;
+const specUsers = s => s.extra.reduce((n, w)=> n + w.users, s.users);
+const plural    = (n, what) => `${commas(n)} ${what}${n===1 ? "" : "s"}`;
+const modelDot  = i => `<i class="mt-dot" style="background:${MODEL_COLORS[i]}" aria-hidden="true"></i>`;
+const GOAL_SHORT = {any:"any speed", read:"readable", smooth:"smooth chat", fast:"fast"};
+
+function renderTabs(){
+  const n = S.models.length, tabs = $('mtabs');
+  tabs.hidden = n < 2;
+  $('modelAdd').hidden = n >= MODEL_MAX;
+  $('modelAdd').textContent = n < 2 ? "Add another model" : "Add a model";
+  tabs.innerHTML = n < 2 ? "" : S.models.map((s, i)=> `<div class="mtab${i===S.edit ? " on" : ""}">`
+    + `<button type="button" role="tab" data-m="${i}" aria-selected="${i===S.edit}" tabindex="${i===S.edit ? 0 : -1}">${modelDot(i)}${esc(specName(s))} <small>${plural(specUsers(s), "user")}</small></button>`
+    + `<button type="button" class="mt-x" data-x="${i}" aria-label="Remove ${esc(specName(s))}">×</button></div>`).join("");
+}
+/* the controls show model i: save the one they showed, put i's settings on S and show them */
+function selectModel(i){ saveSpec(); S.edit = i; useSpec(S.models[i]); showSpec(); render(); }
+function removeModel(i){
+  saveSpec(); S.models.splice(i, 1); OPEN_MODELS.clear();
+  S.edit = i < S.edit ? S.edit - 1 : Math.min(S.edit, S.models.length - 1);
+  useSpec(S.models[S.edit]); showSpec(); render();
+}
+$('modelAdd').addEventListener('click', ()=>{
+  if(S.models.length >= MODEL_MAX) return;
+  saveSpec(); S.models.push(structuredClone(DEFAULT_SPEC));
+  selectModel(S.models.length - 1);
+  modelSel.focus();
+});
+$('mtabs').addEventListener('click', e=>{
+  const t = e.target.closest('[data-m]'), x = e.target.closest('[data-x]');
+  if(x){ removeModel(+x.dataset.x); ($('mtabs').querySelector('[aria-selected=true]') || $('modelAdd')).focus(); }
+  else if(t && +t.dataset.m!==S.edit) selectModel(+t.dataset.m);
+});
+$('mtabs').addEventListener('keydown', e=>{   // the arrow keys move between tabs
+  if(!["ArrowLeft", "ArrowRight"].includes(e.key) || !e.target.closest('[role=tab]')) return;
+  const n = S.models.length, i = (S.edit + (e.key==="ArrowRight" ? 1 : n - 1)) % n;
+  e.preventDefault(); selectModel(i); $('mtabs').querySelector(`[data-m="${i}"]`).focus();
+});
+/* a model's row in the Models panel opens or closes how one copy uses its GPUs' memory; the link inside
+   shows the model's settings in the controls */
+const OPEN_MODELS = new Set();   // the models whose memory is open, by position
+function toggleModel(row){
+  const i = +row.dataset.model, det = row.nextElementSibling, open = det.hidden;
+  det.hidden = !open; row.setAttribute('aria-expanded', open);
+  if(open) OPEN_MODELS.add(i); else OPEN_MODELS.delete(i);
+}
+$('fleetbody').addEventListener('click', e=>{
+  const ed = e.target.closest('[data-edit]'), row = e.target.closest('tr[data-model]');
+  if(ed) selectModel(+ed.dataset.edit);
+  else if(row && !e.target.closest('[data-tip]')) toggleModel(row);
+});
+$('fleetbody').addEventListener('keydown', e=>{
+  if((e.key==="Enter" || e.key===" ") && e.target.matches('tr[data-model]')){ e.preventDefault(); toggleModel(e.target); }
+});
+
+/* a deployment of several models by name: "1 × 8-GPU HGX H200 system", "6 × L40S", "9 × H200 NVL in 2 servers" */
+function fleetName(f){
+  const k = f.servers.length, big = systemOf(f.g);
+  return big ? `${k} × ${big}-GPU ${f.g.n} system${k===1 ? "" : "s"}` : `${f.gpus} × ${f.g.n}${k>1 ? ` in ${k} servers` : ""}`;
+}
+const fleetNeed = f => f.models.reduce((n, m)=> n + m.need, 0);
+const withinGoal = m => m.d.fits && m.d.meets && !m.d.partial;
+/* how a model fares in a deployment, as a pill: none when it's within its goal */
+function modelPill(m){
+  const d = m.d;
+  if(!d.fits) return `<span class="pill bad">Won't fit</span>`;
+  if(d.partial) return `<span class="pill warn">${d.meets ? "Serves" : "Holds"} ${commas(d.served)} of ${commas(m.users)}</span>`;
+  if(!d.meets) return `<span class="pill warn">Below goal</span>`;
+  if(notRecommended(d)) return `<span class="pill bad" data-tip="pcieSlow${d.g.fab ? "Amd" : ""}" tabindex="0">Not recommended</span>`;
+  return "";
+}
+
+function renderFleet(){
+  const fleets = new Map(boardsInPlay().map(g=> [g.n, fleetFor(g, S.models)]));
+  const want = S.board!=="auto" ? fleets.get(S.board) : null;
+  const picked = want && want.fits ? want : null;    // a picked board is honoured while it holds every model
+  const suggested = suggestFleet([...fleets.values()]), active = picked || suggested;
+  /* the model the controls show, as it runs in the deployment; with no deployment, as it would run alone */
+  const d = active ? active.models[S.edit].d
+          : suggestDeployment(new Map([...fleets.values()].map(f=> [f.g.n, f.models[S.edit].alone])));
+  const fits = !!(d && d.fits), tp = S.tp = d ? d.tp : (S.tpo==="auto" ? 8 : S.tpo);
+  const r = d ? d.r : compute(tp, 1);
+  showGauge(false);
+  $('mathState').textContent = `${specName(S.models[S.edit])}${fits ? ` on ${d.g.n}` : ""}: speed · model architecture · memory breakdown · how it's calculated`;
+  renderBreakdown(r, tp, d ? d.reps : 1, d);
+  renderFleetVerdict(fleets, active, picked);
+  renderFleetModels(active);
+  const servers = renderFleetServers(active);
+  renderFleetCards(fleets, active, suggested, picked);
+  renderChunkOptions(fits ? d : null);
+  renderThroughput(fits ? d : null);
+  renderTpNote(r.m, tp, fits ? d : null);
+  renderAdvState();
+  updateGoalHint();
+  renderTraffic();
+  syncMix();
+  LAST = {fleet:true, fleets, active, picked, suggested, servers};
+  syncHash();
+  labelTips();
+}
+
+/* the headline for several models: the deployment, what it's chosen for, and three tiles that count it */
+function renderFleetVerdict(fleets, f, picked){
+  const n = S.models.length, all = S.models.reduce((s, x)=> s + specUsers(x), 0);
+  const back = `<button type="button" class="linkbtn" data-act="auto">Back to the suggestion</button>`;
+  const sub = `${n} models, ${plural(all, "user")} in all: ` + S.models.map(s=> `${esc(specName(s))} (${commas(specUsers(s))})`).join(", ");
+  let lbl, main, facts = "", why = "", acts = "", tiles = "";
+  if(f){
+    const ms = f.models, ok = ms.filter(withinGoal), nr = ms.filter(m=> notRecommended(m.d)), need = fleetNeed(f);
+    const used = ms.reduce((s, m)=> s + m.d.gpus, 0), idle = f.gpus - used, big = systemOf(f.g), k = f.servers.length;
+    lbl = picked ? (nr.length ? "Your pick · split over PCIe" : "Your pick")
+        : f.meets ? "Suggested deployment · least GPU memory that meets every model's goal"
+        : "Closest deployment · the most models within their goals";
+    main = fleetName(f);
+    const hold = k===1 ? `the ${big ? "system" : "server"} holds` : `the ${big ? "systems" : "servers"} hold`;
+    if(need < f.gpus) facts = `Models need <b>${plural(need, "GPU")}</b> · ${hold} <b>${f.gpus}</b>${S.srv && !big ? ", by NVIDIA's guidance" : ""}`;
+    why = `Each model runs as copies of its own, and copies of different models share ${k>1 ? "servers" : `the ${big ? "system" : "server"}`}. `
+      + (used > need ? (used - need===1 ? `The spare GPU runs an extra copy of the model closest to its goal. ` : `The ${used - need} spare GPUs run extra copies of the models closest to their goals. `) : "")
+      + (idle ? `${plural(idle, "GPU")} ${idle===1 ? "is" : "are"} left free. ` : "");
+    for(const m of ms){
+      const name = esc(specName(m.spec));
+      if(m.d.partial) why += `<span class="warnx">${name}: one node ${m.d.meets ? "serves" : "holds"} up to ${commas(m.d.served)} of its ${commas(m.users)} users${m.d.meets ? "" : ", below its speed goal"}.</span> `;
+      else if(!m.d.meets) why += `<span class="warnx">${name} is below its speed goal.</span> `;
+    }
+    if(nr.length) why += `<span class="badx">Not recommended:</span> ${nr.map(m=> esc(specName(m.spec))).join(" and ")} split${nr.length===1 ? "s" : ""} a copy across cards with no ${fabric(f.g)}, so they coordinate over PCIe after every layer; the speed shown reflects that. `;
+    why += f.meets ? `Estimated to serve every model's users within its speed goal, even at the cautious end of the estimate, with ${boxTotal(f.memGB)} of GPU memory in all. Speed is estimated, not measured: confirm with a load test before buying.` : "";
+    acts = picked ? back : "";
+    const memN = S.unit==="GiB" ? fmtMemN(f.memGB) : commas(f.memGB);
+    tiles = statCell("fleetGpus", "GPUs", String(big ? k : f.gpus), big ? `× ${big}-GPU system${k===1 ? "" : "s"}` : `× ${f.g.n}`,
+              big ? `${f.gpus} GPUs` : k===1 ? "in one server" : `in ${k} servers: ${f.servers.map(s=> s.n).join(" + ")}`)
+      + statCell("fleetMem", "GPU memory", memN, S.unit, `${f.gpus} × ${boxMem(f.g)}`)
+      + statCell("fleetGoal", "Within goal", `${ok.length} of ${n}`, "models",
+          ok.length===n ? "every model, at the cautious end of the estimate" : `not ${ms.filter(m=> !withinGoal(m)).map(m=> esc(specName(m.spec))).join(" or ")}`, ok.length===n ? "" : "warn");
+  } else {
+    const fits = [...fleets.values()].filter(x=> x.fits);
+    const lost = S.models.map((s, i)=> i).filter(i=> ![...fleets.values()].some(x=> x.models[i].alone.fits));
+    lbl = "No board holds every model";
+    main = lost.length ? "Too big for one 8-GPU node" : "No board suits every model";
+    why = lost.length ? `${lost.map(i=> esc(specName(S.models[i]))).join(" and ")} need${lost.length===1 ? "s" : ""} more than one 8-GPU node on every board. Lower the precision or the prompt and reply lengths.`
+        : fits.length ? `Every board that holds them all splits a copy across cards with no direct GPU link. Pick one below to see it anyway.`
+        : `Each model fits on some board, but no one kind of board holds them all. The board table below says which model doesn't fit where.`;
+  }
+  $('vlbl').textContent = lbl;
+  $('vmain').textContent = main;
+  $('vmain').classList.toggle('bad', !f);
+  $('vfacts').innerHTML = facts;
+  $('vfacts').hidden = !facts;
+  $('vsub').innerHTML = sub;
+  $('vwhy').innerHTML = why.trimEnd();
+  $('vwhy').hidden = !why;
+  $('vactions').innerHTML = acts;
+  $('vstats').innerHTML = tiles;
+}
+
+/* each model as it runs in the deployment, and the GPUs of every server, colored by model */
+function renderFleetModels(f){
+  $('fleetPanel').hidden = false;
+  const cap = $('fleetcap'), body = $('fleetbody');
+  if(!f){ cap.textContent = ""; body.innerHTML = `<div class="empty">Each model's layout appears once one kind of board holds them all.</div>`; return; }
+  cap.innerHTML = `On <b>${fleetName(f)}</b>. Click a model to see how it uses its GPUs' memory.`;
+  const rows = f.models.map((m, i)=> withSpec(m.spec, ()=>{   // each model's own goal, thinking and workloads
+    const d = m.d, t = d.t;
+    const wait = !t ? "—" : hideThink() ? `<b>${fmtWait(answerStart(t))}</b> <small>to answer</small>` : `<b>${fmtTime(t.ttft)[0]}</b> <small>${fmtTime(t.ttft)[1]}</small>`;
+    const open = OPEN_MODELS.has(i);
+    return `<tr class="brow${i===S.edit ? " sel" : ""}" data-model="${i}" role="button" tabindex="0" aria-expanded="${open}" aria-controls="mdet${i}">
+      <td class="board"><div class="gname">${modelDot(i)}${esc(specName(m.spec))}</div>
+        <div class="gcap">${plural(m.users, "user")} · ${esc(groupNames().join(" + "))} · ${GOAL_SHORT[S.goal]}</div></td>
+      <td class="layout">${modelPill(m) || (d.fits ? layoutText(d) : "—")}</td>
+      <td class="num"><b>${d.fits ? d.gpus : "—"}</b> <small>× GPU</small></td>
+      <td class="num">${t ? `<b>${fmtTps(t.perUser)}</b> <small>tok/s</small>` : "—"}</td>
+      <td class="num">${wait}</td>
+      <td class="ctl"><span class="whybtn" aria-hidden="true"></span></td></tr>
+      <tr class="bwhy${i===S.edit ? " sel" : ""}" id="mdet${i}"${open ? "" : " hidden"}><td colspan="6">${d.fits ? memoryDetail(m, i, f.g) : "Doesn't fit."}</td></tr>`;
+  }));
+  const label = (s, k)=> `${systemOf(f.g) ? "System" : "Server"} ${k + 1} · ${plural(s.n, "GPU")}`;
+  const strip = f.servers.map((s, k)=> `<div class="srvbox"><div class="lbl">${label(s, k)}</div><div class="gpus">`
+    + s.slots.map(i=> i<0 ? `<span class="gpu spare" title="Free"></span>` : `<span class="gpu" style="background:${MODEL_COLORS[i]}" title="${esc(specName(f.models[i].spec))}">${i + 1}</span>`).join("")
+    + `</div></div>`).join("");
+  const said = f.servers.map((s, k)=> `${label(s, k)}: ` + f.models.map((m, i)=> [m, s.slots.filter(x=> x===i).length]).filter(([, c])=> c)
+    .map(([m, c])=> `${specName(m.spec)} on ${plural(c, "GPU")}`).join(", ")).join("; ");
+  body.innerHTML = `<div class="boards"><table>
+    <thead><tr><th>Model</th><th>Layout</th><th class="num">GPUs</th><th class="num">Per user</th><th class="num">First token</th><th></th></tr></thead>
+    <tbody>${rows.join("")}</tbody></table></div>
+    <div class="pack" role="img" aria-label="${esc(said)}">${strip}</div>`;
+}
+
+/* how one copy of a model uses its GPUs' memory, as the bar and legend show it for one model: run under
+   withSpec(m.spec), for that model's precision and overhead */
+function memoryDetail(m, i, g){
+  return withSpec(m.spec, ()=>{
+    const d = m.d, r = d.r, tp = d.tp, perGB = r.perGPU/GB;
+    const parts = memoryParts(r, tp).filter(c=> !(c.tponly && tp<=1));
+    return `<div class="mdetail"><div class="mline">${d.reps>1 ? `One of ${d.reps} copies` : "One copy"}: ${plural(tp, "GPU")}, ${plural(d.upr, "user")}`
+      + ` · <b>${fmtMem(perGB)}</b> per GPU of ${boxMem(g)}, ${Math.round(perGB/g.cap*100)}% full`
+      + (i!==S.edit ? ` <button type="button" class="linkbtn" data-edit="${i}">Change its settings</button>` : "") + `</div>`
+      + gaugeHtml(parts, r.total/GB, g.cap*tp, g, tp, d.reps)
+      + `<div class="legend">${parts.map(c=> `<div class="item">${legendItem(c)}</div>`).join("")}</div></div>`;
+  });
+}
+/* one copy's memory against its GPUs, drawn as renderBar draws the main bar */
+function gaugeHtml(parts, totGB, capGB, g, tp, reps){
+  const usableGB = capGB*USABLE, span = Math.max(totGB, capGB), at = usableGB/span*100, pct = gb => `${gb/span*100}%`;
+  return `<div class="bar mini" role="img" aria-label="${esc(`One copy uses ${fmtMem(totGB)} of ${fmtMem(usableGB)} usable`)}">`
+    + parts.map(c=> `<div style="width:${pct(c.v/GB)};background:${c.c}"></div>`).join("")
+    + `<div class="seg-free" style="width:${pct(Math.max(0, capGB - totGB))}"></div>`
+    + (totGB > usableGB ? `<div class="cap-over" style="left:${at}%;width:${pct(totGB - usableGB)}"></div>` : "")
+    + `<div class="cap-line" style="left:${at}%"></div></div>`
+    + `<div class="barscale"><div class="gpuline picked${at>55 ? " flip" : ""}" style="left:${at}%"><span>${reps>1 ? "one copy: " : ""}${tp>1 ? tp + " × " : ""}${g.n} · <em>${fmtMem(usableGB)} usable</em></span></div></div>`;
+}
+
+/* the servers of a deployment of several models, by NVIDIA's guidance: one row each */
+function renderFleetServers(f){
+  $('srvPanel').hidden = !S.srv;
+  if(!S.srv) return null;
+  const cap = $('srvcap'), body = $('srvbody');
+  if(!f){ cap.textContent = ""; body.innerHTML = `<div class="empty">The servers are sized once one kind of board holds every model.</div>`; return null; }
+  const ss = fleetServers(f), g = f.g;
+  TIPS.srvDisk = srvDiskTip(null);
+  if(systemOf(g)){
+    cap.innerHTML = `Around <b>${fleetName(f)}</b>.`;
+    body.innerHTML = `<div class="empty">The ${g.n} is a whole ${systemOf(g)}-GPU system: its CPUs, memory and storage come from the manufacturer's spec sheet.</div>`;
+    return ss;
+  }
+  cap.innerHTML = `Around <b>${fleetName(f)}</b>, by ${guideLink}, with CPU cores as in ${pcaiLink}.`
+    + (g.fab ? ` They are written for NVIDIA GPUs, so for the ${g.n} they are a starting point.` : "");
+  body.innerHTML = `<div class="boards"><table>
+    <thead><tr><th>Server</th><th class="num">GPUs</th><th class="num tipl" data-tip="srvCpu">CPU cores</th><th class="num tipl" data-tip="srvRam">Min. system memory</th><th class="num tipl" data-tip="srvDisk">Workload storage</th><th>Models</th></tr></thead>
+    <tbody>${ss.map((s, k)=>{
+      const [dn, du] = capParts(s.diskGB), on = [...new Set(f.servers[k].slots.filter(i=> i>=0))];
+      return `<tr class="flat"><td class="board"><div class="gname">Server ${k + 1}</div><div class="gcap">${s.perSocket} per socket · PCIe Gen${g.slot} x16${s.pcieSwitch ? " · PCIe switches" : ""}</div></td>`
+        + `<td class="num"><b>${s.n}</b> <small>× ${g.n}</small></td><td class="num"><b>${commas(s.cores)}</b> <small>physical</small></td>`
+        + `<td class="num"><b>${commas(s.ram)}</b> <small>GB</small></td><td class="num"><b>${dn}</b> <small>${du} usable</small></td>`
+        + `<td class="models">${on.map(i=> modelDot(i) + esc(specName(f.models[i].spec))).join("<br>")}</td></tr>`;
+    }).join("")}</tbody></table></div>`
+    + `<div class="hint">CPUs: 2 sockets, ${GUIDE.ghz.toFixed(1)} GHz base or more. Memory: ${GUIDE.memX} × GPU memory. Storage: usable NVMe for the weights of every model on the server, beside a boot volume. A starting point for a server vendor, not a certification: see ${certLink}.</div>`;
+  return ss;
+}
+
+/* every board with every model on it: one row each, the reasoning behind its count under a chevron */
+function renderFleetCards(fleets, active, suggested, picked){
+  const n = S.models.length;
+  $('fitcap').innerHTML = `Each board with every model on it: up to one node per model, copies of different models sharing servers, sized to serve every model's users within its speed goal.`
+    + (S.srv ? ` GPU counts follow <b>NVIDIA's server guidance</b> (beta): 2, 4 or 8 per server.` : "")
+    + (leftOut().length ? ` The ${leftOut().map(b=> b.n).join(" and ")} ${leftOut().length>1 ? "are" : "is"} left out, since the guidance is written for NVIDIA GPUs.` : "")
+    + ` Boards marked <i>speed extrapolated</i> have no benchmark of their own (<a href="${VALIDATION_URL}" target="_blank" rel="noopener">validation</a>).`
+    + ` Click a row to plan on that board.`;
+  const rows = boardsInPlay().map(b=>{
+    const f = fleets.get(b.n), ms = f.models, big = systemOf(b), k = f.servers.length;
+    const nr = f.fits && ms.some(m=> notRecommended(m.d)), ok = f.fits ? ms.filter(withinGoal).length : 0;
+    let status = !f.fits ? `<span class="pill bad">${ms.filter(m=> !m.alone.fits).length>1 ? "Models won't fit" : "A model won't fit"}</span>`
+               : ok < n ? `<span class="pill warn">${ok} of ${n} within goal</span>` : "";
+    if(nr) status += status ? `<span class="lay nr">not recommended</span>` : `<span class="pill bad" data-tip="pcieSlow${b.fab ? "Amd" : ""}" tabindex="0">Not recommended</span>`;
+    const linkTxt = b.link ? (b.linkLbl || (big ? "NVLink via NVSwitch · all 8" : "NVLink · 2, 4 or 8")) : "PCIe only";
+    const linkTip = b.link ? (b.fab ? "fabricAmd" : "nvlink") : "pcie" + (b.fab ? "Amd" : "");
+    const why = !f.fits
+      ? ms.filter(m=> !m.alone.fits).map(m=> `${esc(specName(m.spec))} doesn't fit: one copy needs ${fmtMem(m.alone.perGB*m.alone.tp)}, and ${plural(m.alone.tp, "GPU")} can use only ${fmtMem(b.cap*USABLE*m.alone.tp)} (90% of capacity).`).join(" ")
+      : ms.map(m=> `${esc(specName(m.spec))}: ${layoutText(m.d).replace(/^Fits on one GPU$/, "1 copy on one GPU")}${m.d.gpus > m.need ? `, ${m.need} needed and the rest extra copies` : ""}.`).join(" ")
+        + (fleetNeed(f) < f.gpus ? ` ${plural(fleetNeed(f), "GPU")} needed in all; ${k===1 ? `the ${big ? "system" : "server"} holds` : `the ${k} ${big ? "systems" : "servers"} hold`} ${f.gpus}.` : "");
+    const isActive = !!active && active.g.n===b.n, isPicked = !!picked && picked.g.n===b.n, isSugg = !!suggested && suggested.g.n===b.n;
+    const off = !f.fits, open = isActive || OPEN_WHY.has(b.n);
+    const cls = `brow${nr ? " nr" : ""}${isActive ? " sel" : ""}${off ? " off" : ""}`;
+    return `<tr class="${cls}" data-gpu="${b.n}" role="button" tabindex="${off ? -1 : 0}" aria-pressed="${isPicked}"${off ? ' aria-disabled="true"' : ""}>
+      <td class="board"><div class="gname">${b.n}${isSugg ? `<span class="pill sugg">${suggested.meets ? "Suggested" : "Closest"}</span>` : ""}</div>
+        <div class="gcap">${boxMem(b)} ${b.mem}${big ? ` · ${big}-GPU systems only`
+          : S.srv ? ` · ${popText(b)} per server${b.split ? `, NVLink across ${b.split}` : ""}`
+          : b.split ? ` · up to ${nodeMax(b)} per server, NVLink across ${b.split}` : b.max ? ` · up to ${b.max} per server` : ""}${b.bench ? "" : ` · <span class="tipl" data-tip="extrap">speed extrapolated</span>`}</div></td>
+      <td class="link col-opt tipl" data-tip="${linkTip}">${linkTxt}</td>
+      <td class="num"><b>${!f.fits ? "—" : big ? k : f.gpus}</b> <small>× ${big ? `${big}-GPU system${k===1 ? "" : "s"}` : "GPU"}</small></td>
+      <td class="layout">${status || (f.fits ? (big ? plural(k, "system") : k===1 ? "1 server" : `${k} servers: ${f.servers.map(s=> s.n).join(" + ")}`) : "—")}</td>
+      <td class="num col-mem">${f.fits ? boxTotal(f.memGB) : "—"}</td>
+      <td class="ctl"><button type="button" class="whybtn" data-why="${b.n}" aria-expanded="${open}" aria-label="How every model runs on ${b.n}"></button></td>
+    </tr><tr class="bwhy${isActive ? " sel" : ""}"${open ? "" : " hidden"}><td colspan="6">${why}</td></tr>`;
+  });
+  $('gpucards').innerHTML = `<table>
+    <thead><tr><th>Board</th><th class="col-opt">Link</th><th class="num">GPUs</th><th>Layout</th><th class="num col-mem">GPU memory</th><th></th></tr></thead>
+    <tbody>${rows.join("")}</tbody></table>`;
 }
 
 
@@ -2598,7 +2953,7 @@ let DL = null;   // claude.ai's downloads capability, when this page runs there
 /* The address holds only what differs from the defaults: the version first, then the page's settings and
    each model's. Model 1's keys are as they have always been; model k's are the same keys with k appended
    (m2, u2…). KEY_ORDER keeps a one-model link exactly as earlier versions wrote it. */
-const KEY_ORDER = ["v","m","c","u","w","p","r","cb","x","th","tv","wq","g","kv","tp","ck","ov","pc","sv","sh","fr","b","tf"];
+const KEY_ORDER = ["v","m","c","u","w","p","r","cb","x","th","tv","wq","g","kv","tp","ck","ov","pc","sv","sh","fr","b","tf","e"];   // e: the model the controls show, when not the first
 function stateToHash(){
   saveSpec();
   const out = [["v", VERSION]];               // the estimator the link was made with, first so it reads at a glance
@@ -2607,6 +2962,7 @@ function stateToHash(){
   if(!S.cache) out.push(["pc", "off"]);
   if(S.srv) out.push(["sv", "nv"]);
   if(S.board!=="auto") out.push(["b", S.board]);
+  if(S.edit) out.push(["e", S.edit + 1]);
   const rank = ([k])=> { const [, key, n] = k.match(/^([a-z]+)(\d*)$/); return (+n || 1)*100 + KEY_ORDER.indexOf(key); };
   return new URLSearchParams(out.sort((a, b)=> rank(a) - rank(b))).toString();
 }
@@ -2712,7 +3068,14 @@ function applyHash(){
   const v = /^\d+\.\d+\.\d+$/.test(q.get("v") || "") ? q.get("v") : null;
   noteVersion(v || LINK_BEFORE, !!v);
   try {
-    useSpec(parseSpec(k=> q.get(k), specOf()));
+    /* model 1 from the bare keys, models 2 to 4 from the same keys with their number, each on top of its own
+       settings so far (a new one on the page's defaults), and e, the one to show */
+    saveSpec();
+    const specs = [parseSpec(k=> q.get(k), S.models[0])];
+    for(let k = 2; k <= MODEL_MAX && findModel(q.get("m" + k)); k++) specs.push(parseSpec(key=> q.get(key + k), S.models[k - 1] || DEFAULT_SPEC));
+    S.models = specs;
+    S.edit = Math.min(specs.length, Math.max(1, Math.round(+q.get("e")) || 1)) - 1;
+    useSpec(S.models[S.edit]);
     const ov = Math.round(+q.get("ov"));
     S.ovpct = q.has("ov") && ov>=0 && ov<=25 ? ov : 7;
     S.cache = q.get("pc")==="off" ? 0 : 1;
@@ -2755,8 +3118,50 @@ $('copyLinkBtn').addEventListener('click', async e=>{
 
 const esc = s => String(s).replace(/[&<>"]/g, c=> ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;"})[c]);
 const slug = s => String(s).toLowerCase().replace(/[^a-z0-9.]+/g, "-").replace(/^-+|-+$/g, "");
+/* the summaries' stylesheet: light, print-ready */
+const SUMMARY_CSS = `  :root{--ink:#1b1d26; --ink2:#4c515f; --muted:#767b8c; --line:#e4e2da; --accent:#0a6f62; --hl:#eef7f5}
+  *{box-sizing:border-box}
+  body{margin:0; background:#fff; color:var(--ink); font:13px/1.5 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+  main{max-width:780px; margin:0 auto; padding:28px 20px 36px}
+  .mono,td.n,.stat b{font-family:"IBM Plex Mono",ui-monospace,Consolas,monospace; font-variant-numeric:tabular-nums}
+  .eyebrow{font:500 10.5px/1 "IBM Plex Mono",ui-monospace,Consolas,monospace; letter-spacing:.12em; text-transform:uppercase; color:var(--muted)}
+  h1{font-size:26px; line-height:1.15; margin:8px 0 4px; font-family:"IBM Plex Mono",ui-monospace,Consolas,monospace}
+  h2{font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink2); margin:18px 0 6px}
+  .sub{color:var(--ink2); margin:0}
+  .date{color:var(--muted); font-size:12px; margin-top:2px}
+  .stats{display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; margin-top:16px}
+  .stat{border:1px solid var(--line); border-radius:8px; padding:9px 10px}
+  .stat span{display:block; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted)}
+  .stat b{display:block; font-size:16px; margin:3px 0 2px}
+  .stat small{display:block; color:var(--ink2); font-size:11px; line-height:1.35}
+  table{width:100%; border-collapse:collapse}
+  td,th{padding:4px 8px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top}
+  .short{margin:10px 0 0; font-weight:600; color:#9a5b00}
+  .memline{margin:12px 0 0; color:var(--ink2); font-size:12px}
+  .memline b{color:var(--ink)}
+  th{font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); font-weight:500}
+  td.n,th.n{text-align:right; white-space:nowrap}
+  .kv td:first-child{width:150px; color:var(--ink2)}
+  tr.hl td{background:var(--hl); font-weight:600}
+  tr.dim td{color:var(--muted)}
+  .boards td, .boards th{white-space:nowrap}
+  .boards td:nth-child(n+5), .boards th:nth-child(n+5){width:1%}
+  tr.tot td{font-weight:600; border-bottom:none}
+  .tag{font:500 9.5px/1 "IBM Plex Mono",ui-monospace,Consolas,monospace; text-transform:uppercase; letter-spacing:.06em; color:var(--accent); border:1px solid var(--accent); border-radius:9px; padding:2px 6px; margin-left:4px; vertical-align:1px}
+  ul{margin:0; padding-left:18px; color:var(--ink2)} li{margin:3px 0}
+  .foot{color:var(--muted); font-size:12px; margin-top:18px} a{color:var(--accent)}
+  .print{float:right; border:1px solid var(--line); background:#fff; border-radius:7px; padding:6px 12px; font:inherit; cursor:pointer}
+  section{break-inside:avoid}
+  section.notes{break-inside:auto}
+  @media (max-width:640px){ .stats{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  @media print{
+    .print{display:none} main{padding:0; max-width:none} body{font-size:11.5px} @page{margin:11mm}
+    h1{font-size:22px} h2{margin:10px 0 3px} td,th{padding:2px 8px} .stats{margin-top:9px} .stat{padding:5px 9px} .stat b{margin:2px 0 1px} li{margin:1px 0}
+    ul{line-height:1.4} .foot{margin-top:8px} .memline{margin-top:9px} .short{margin-top:8px}
+  }`;
 /* a self-contained report of what's on screen: light, print-ready, no scripts beyond Print */
 function buildSummary(){
+  if(LAST.fleet) return buildFleetSummary();
   const L = LAST, m = L.m, a = L.active, fits = L.fits, t = L.speed, goal = GOALS[S.goal], hasGoal = S.goal!=="any";
   const name = m.custom ? "Custom model" : m.n;
   const prec = S.wqLbl==="NATIVE" ? `${m.nat.f}, as released` : S.wqLbl;
@@ -2865,46 +3270,7 @@ function buildSummary(){
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title>
 <style>
-  :root{--ink:#1b1d26; --ink2:#4c515f; --muted:#767b8c; --line:#e4e2da; --accent:#0a6f62; --hl:#eef7f5}
-  *{box-sizing:border-box}
-  body{margin:0; background:#fff; color:var(--ink); font:13px/1.5 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
-  main{max-width:780px; margin:0 auto; padding:28px 20px 36px}
-  .mono,td.n,.stat b{font-family:"IBM Plex Mono",ui-monospace,Consolas,monospace; font-variant-numeric:tabular-nums}
-  .eyebrow{font:500 10.5px/1 "IBM Plex Mono",ui-monospace,Consolas,monospace; letter-spacing:.12em; text-transform:uppercase; color:var(--muted)}
-  h1{font-size:26px; line-height:1.15; margin:8px 0 4px; font-family:"IBM Plex Mono",ui-monospace,Consolas,monospace}
-  h2{font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink2); margin:18px 0 6px}
-  .sub{color:var(--ink2); margin:0}
-  .date{color:var(--muted); font-size:12px; margin-top:2px}
-  .stats{display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; margin-top:16px}
-  .stat{border:1px solid var(--line); border-radius:8px; padding:9px 10px}
-  .stat span{display:block; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted)}
-  .stat b{display:block; font-size:16px; margin:3px 0 2px}
-  .stat small{display:block; color:var(--ink2); font-size:11px; line-height:1.35}
-  table{width:100%; border-collapse:collapse}
-  td,th{padding:4px 8px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top}
-  .short{margin:10px 0 0; font-weight:600; color:#9a5b00}
-  .memline{margin:12px 0 0; color:var(--ink2); font-size:12px}
-  .memline b{color:var(--ink)}
-  th{font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); font-weight:500}
-  td.n,th.n{text-align:right; white-space:nowrap}
-  .kv td:first-child{width:150px; color:var(--ink2)}
-  tr.hl td{background:var(--hl); font-weight:600}
-  tr.dim td{color:var(--muted)}
-  .boards td, .boards th{white-space:nowrap}
-  .boards td:nth-child(n+5), .boards th:nth-child(n+5){width:1%}
-  tr.tot td{font-weight:600; border-bottom:none}
-  .tag{font:500 9.5px/1 "IBM Plex Mono",ui-monospace,Consolas,monospace; text-transform:uppercase; letter-spacing:.06em; color:var(--accent); border:1px solid var(--accent); border-radius:9px; padding:2px 6px; margin-left:4px; vertical-align:1px}
-  ul{margin:0; padding-left:18px; color:var(--ink2)} li{margin:3px 0}
-  .foot{color:var(--muted); font-size:12px; margin-top:18px} a{color:var(--accent)}
-  .print{float:right; border:1px solid var(--line); background:#fff; border-radius:7px; padding:6px 12px; font:inherit; cursor:pointer}
-  section{break-inside:avoid}
-  section.notes{break-inside:auto}
-  @media (max-width:640px){ .stats{grid-template-columns:repeat(2,minmax(0,1fr))} }
-  @media print{
-    .print{display:none} main{padding:0; max-width:none} body{font-size:11.5px} @page{margin:11mm}
-    h1{font-size:22px} h2{margin:10px 0 3px} td,th{padding:2px 8px} .stats{margin-top:9px} .stat{padding:5px 9px} .stat b{margin:2px 0 1px} li{margin:1px 0}
-    ul{line-height:1.4} .foot{margin-top:8px} .memline{margin-top:9px} .short{margin-top:8px}
-  }
+${SUMMARY_CSS}
 </style>
 <main>
   <button class="print" onclick="print()">Print or save as PDF</button>
@@ -2922,6 +3288,80 @@ function buildSummary(){
 </main>
 </html>`;
   return {filename: `llm-inference-estimate-${slug(name)}-${all}-users.html`, html};
+}
+/* the report for several models: the deployment, each model as it runs in it, its servers, every board */
+function buildFleetSummary(){
+  const L = LAST, f = L.active, n = S.models.length, all = S.models.reduce((s, x)=> s + specUsers(x), 0);
+  const date = new Date().toLocaleDateString('en-US', {year:'numeric', month:'long', day:'numeric'});
+  const head = f ? fleetName(f) : "No board holds every model";
+  const role = !f ? "No deployment fits" : L.picked ? "Selected deployment" : f.meets ? "Recommended deployment" : "Closest deployment";
+  const ok = f ? f.models.filter(withinGoal).length : 0, big = f && systemOf(f.g);
+  const stats = !f ? [] : [
+    ["GPUs", `${f.gpus} × ${f.g.n}`, big ? plural(f.servers.length, `${big}-GPU system`) : f.servers.length===1 ? "in one server" : `in ${f.servers.length} servers: ${f.servers.map(s=> s.n).join(" + ")}`],
+    ["GPU memory in all", boxTotal(f.memGB), `${f.gpus} × ${boxMem(f.g)}`],
+    ["Within goal", `${ok} of ${n} models`, ok===n ? "every model, at the cautious end of the estimate" : "see the models below"],
+    ["Users", commas(all), `across ${n} models`],
+  ];
+  const models = !f ? "" : f.models.map((m, i)=> withSpec(m.spec, ()=>{
+    const d = m.d, t = d.t, mm = activeModel();
+    const prec = S.wqLbl==="NATIVE" ? `${mm.nat.f}, as released` : S.wqLbl;
+    const status = !d.fits ? "Won't fit" : d.partial ? `${d.meets ? "Serves" : "Holds"} ${commas(d.served)} of ${commas(m.users)} users`
+                 : !d.meets ? "Below speed goal" : notRecommended(d) ? "Not recommended: PCIe split" : S.goal!=="any" ? "Meets goal (estimated)" : "Fits";
+    const wait = !t ? "—" : hideThink() ? `${fmtWait(answerStart(t))} to answer` : fmtTime(t.ttft).join(" ");
+    return `<tr><td>${i + 1}. ${esc(specName(m.spec))}<br><small>${esc(`${plural(m.users, "user")} · ${groupNames().join(" + ")} · ${prec} · ${GOAL_SHORT[S.goal]}`)}</small></td>`
+      + `<td>${d.fits ? esc(layoutText(d)) : "—"}</td><td class="n">${d.fits ? d.gpus : "—"}</td><td class="n">${t ? fmtTps(t.perUser) + (f.g.bench ? "" : "*") : "—"}</td>`
+      + `<td class="n">${wait}</td><td>${esc(status)}</td></tr>`;
+  })).join("");
+  const packing = !f ? "" : f.servers.map((s, k)=> `<li>${big ? "System" : "Server"} ${k + 1}, ${plural(s.n, "GPU")}: `
+    + esc(f.models.map((m, i)=> [m, s.slots.filter(x=> x===i).length]).filter(([, c])=> c).map(([m, c])=> `${specName(m.spec)} on ${c}`).join(", "))
+    + (s.slots.includes(-1) ? `, ${s.slots.filter(x=> x<0).length} free` : "") + `</li>`).join("");
+  const ss = L.servers, server = !ss ? ""
+    : `<section><h2>Servers, by NVIDIA's guidance (beta)</h2>`
+      + (big ? `<p class="memline">The ${esc(f.g.n)} is a whole ${big}-GPU system: its CPUs, memory and storage come from the manufacturer's spec sheet.</p>`
+        : `<table class="boards"><tr><th>Server</th><th class="n">GPUs</th><th class="n">CPU cores</th><th class="n">Min. system memory</th><th class="n">Workload storage</th></tr>`
+          + ss.map((s, k)=> `<tr><td>Server ${k + 1}</td><td class="n">${s.n}</td><td class="n">${commas(s.cores)}</td><td class="n">${commas(s.ram)} GB</td><td class="n">${capParts(s.diskGB).join(" ")} usable</td></tr>`).join("")
+          + `</table><p class="memline">By NVIDIA's Certified Systems Configuration Guide${f.g.fab ? " (written for NVIDIA GPUs, so a starting point for the " + esc(f.g.n) + ")" : ""}, with CPU cores as in HPE Private Cloud AI; storage holds the weights of every model on the server, beside a boot volume. A starting point for a server vendor, not a certification. In beta: the rules and figures may change.</p>`)
+      + `</section>`;
+  const boards = boardsInPlay().map(g=>{
+    const x = L.fleets.get(g.n), okx = x.fits ? x.models.filter(withinGoal).length : 0;
+    const status = !x.fits ? "A model won't fit on one node"
+      : [okx < n ? `${okx} of ${n} models within goal` : "Every model within goal (estimated)", x.models.some(m=> notRecommended(m.d)) ? "not recommended: PCIe split" : ""].filter(Boolean).join("; ");
+    return `<tr${f && f.g.n===g.n ? ' class="hl"' : !x.fits ? ' class="dim"' : ""}><td>${esc(g.n)}${L.suggested && L.suggested.g.n===g.n ? ` <span class="tag">${L.suggested.meets ? "suggested" : "closest"}</span>` : ""}</td>`
+      + `<td class="n">${x.fits ? x.gpus : "—"}</td><td class="n">${x.fits ? x.servers.length : "—"}</td><td>${status}</td><td class="n">${x.fits ? boxTotal(x.memGB) : "—"}</td></tr>`;
+  }).join("");
+  const extrap = boardsInPlay().filter(b=> !b.bench);
+  const notes = [
+    `Each model runs as copies of its own on GPUs of its own, at most one node per model; the copies of every model are packed into servers of the board, the widest first, and spare GPUs run extra copies of the models closest to their goals. Models don't share GPUs, so each one's speed is its own.`,
+    `For production, plan at least one more node (or replica) than this, so the service keeps running if one fails or is being updated.`,
+    `Board memory is the size on the box, with 90% treated as usable (vLLM's default limit). Amounts are in ${S.unit==="GiB" ? "GiB (2³⁰ bytes)" : "GB (10⁹ bytes)"}, sized for every concurrent user at full prompt and reply length.`,
+    `Speed and first-token times are estimates from a simple model of each board, not measurements, so a speed goal is met on the estimate only: confirm with a load test (for example vllm bench serve) before committing to hardware. They are averages while new prompts keep arriving, measured at the server.`,
+    `The recommendation is the board where every model reaches its speed goal at the cautious end of the estimate with the least GPU memory in all.`,
+    ...(extrap.length ? [`* Speed and first-token figures for boards with no benchmark of their own (${extrap.map(b=> b.n).join(", ")}) are extrapolated from the shares fitted on benchmarked boards. Validation: ${VALIDATION_URL}`] : []),
+  ];
+  const link = CAN_LINK ? ` · <a href="${esc(location.href.split("#")[0] + "#" + stateToHash())}">open this scenario</a>` : "";
+  const title = `GPU sizing estimate: ${n} models, ${commas(all)} users`;
+  const html = `<!DOCTYPE html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(title)}</title>
+<style>
+${SUMMARY_CSS}
+  .stats{grid-template-columns:repeat(4,minmax(0,1fr))}
+  td small{color:var(--muted)}
+</style>
+<main>
+  <button class="print" onclick="print()">Print or save as PDF</button>
+  <div class="eyebrow">LLM Inference Estimator · ${esc(role)}</div>
+  <h1>${esc(head)}</h1>
+  <p class="sub">${n} models · ${commas(all)} concurrent users</p>
+  <div class="date">Prepared ${esc(date)} · estimator ${esc(VERSION)} · model and board data as of ${esc(DATA_AS_OF)}${link}</div>
+  ${stats.length ? `<div class="stats">${stats.map(([k, v, s])=> `<div class="stat"><span>${esc(k)}</span><b>${esc(v)}</b><small>${esc(s)}</small></div>`).join("")}</div>` : ""}
+  ${models ? `<section><h2>Models</h2><table><tr><th>Model</th><th>Layout</th><th class="n">GPUs</th><th class="n">tok/s per user</th><th class="n">First token</th><th>Status</th></tr>${models}</table><ul class="memline">${packing}</ul></section>` : ""}
+  ${server}
+  <section><h2>Every board</h2><table class="boards"><tr><th>Board</th><th class="n">GPUs</th><th class="n">Servers</th><th>Status</th><th class="n">GPU memory</th></tr>${boards}</table></section>
+  <section class="notes"><h2>Assumptions</h2><ul>${notes.map(x=> `<li>${esc(x)}</li>`).join("")}</ul></section>
+</main>
+</html>`;
+  return {filename: `llm-inference-estimate-${n}-models-${all}-users.html`, html};
 }
 async function downloadSummary(btn){
   if(!LAST) return;
@@ -2967,6 +3407,10 @@ const TIPS = {
   pause:"While a new prompt is being read, everyone already mid-reply waits, whichever workload they belong to. This is the longest gap they would see between words. Under 0.1 s is unnoticeable; choose Smooth streaming to shorten it.",
   tp:"How many GPUs one copy of the model is split across (tensor parallelism). Every layer's weights are divided and the GPUs all-reduce after each layer, so splitting needs NVLink to be fast. A copy is split 1, 2, 4 or 8 ways because serving engines need the split to divide the model's attention heads evenly; that is a software rule and applies to every board. Auto picks the smallest layout; a fixed number applies to every board.",
   copies:"A copy (replica) is a full, independent instance of the model on its own GPUs within the node, serving its share of the users. More copies serve more users without slowing each other down, and unlike splitting one copy across GPUs, they need no direct GPU-to-GPU link between them.",
+  fleet:"Each model runs as copies of its own on GPUs of its own, sized as it would be alone; the copies of every model are then packed into the board's servers, widest first, and spare GPUs run extra copies of the models closest to their goals. Models don't share GPUs, so each one's speed is its own. The strip shows every server's GPUs, numbered by model.",
+  fleetGpus:"GPUs for every model together, in as few servers as the board's sizes allow. A server that isn't full is the smallest size the board comes in that holds its copies.",
+  fleetMem:"GPU memory bought in all: every GPU of every server, spare ones included, at the size on the box. The suggestion is the board where every model meets its goal with the least of it.",
+  fleetGoal:"How many models are estimated to serve all their users within their own speed goal, judged at the cautious end of the estimate as for one model.",
   prefill:"How fast a new prompt is read, in tokens per second. Reading is limited by compute rather than memory speed, so faster chips and FP8 or FP4 help most. Optimize for, in Advanced settings, sets the piece size.",
   pcache:"Chat and agent prompts mostly repeat: the same system prompt for everyone, and each user's earlier turns. vLLM and SGLang keep that part cached by default, so only the new text is read before the first reply, and the shared system prompt is stored once per GPU rather than once per user. Each workload preset sets how much of its prompt is new and how much is shared; the workload hint says. Turn it off to size for prompts that never repeat.",
   ovpct:"Headroom for allocator fragmentation and framework buffers, as a percentage of weights + cache + activations. 5–10% is typical; raise it if you have hit OOM under load.",
@@ -3059,6 +3503,7 @@ $('pcache').addEventListener('click', e=>{
   pressSeg('pcache', 'cache', b.dataset.v); setLengths(); render();
 });
 updateCfgNote(); syncWq(); resetThink(); updateGoalHint(); applyWorkload(S.workload); syncUsers(); syncOv(); renderMix();
+DEFAULT_SPEC = specOf();   // what a model added with the button starts as
 applyHash();   // a shared link's settings, if the address has any
 render();
 </script>
