@@ -7,11 +7,14 @@ node validation/fetch-benchmarks.mjs   # rebuild benchmarks.json from the source
 node validation/fit.mjs --apply        # fit, cross-validate, and write CAL and RANGE into index.html (about 2 minutes)
 node validation/compare.mjs --write    # compare the page as it stands and rewrite results.md
 node validation/sweep.mjs              # size 9,850 scenarios on every board, against the last release (about 30 seconds)
+node validation/fleet.mjs              # check the sizing of several models together (about 30 seconds; --quick, 5)
 ```
 
 Node 18 or later, no dependencies. `compare.mjs --index <file>` checks another copy of the page, such as an earlier release.
 
-`sweep.mjs` runs the page's own layout search on every model × 5 workloads × 5 user counts × 4 speed goals × both Server settings, plus FP8, hidden thinking, 2 GPUs per copy and prompt caching off at 32 users. It reports every scenario whose layout, fit, speed, first token, suggestion or server differs from a release (`--base <git ref>`, by default the latest tag), and exits 1 if any does. A change meant to leave the figures alone should report none.
+`sweep.mjs` runs the page's own layout search on every model × 5 workloads × 5 user counts × 4 speed goals × both Server settings, plus FP8, hidden thinking, 2 GPUs per copy and prompt caching off at 32 users (the scenarios are in `scenarios.mjs`). It reports every scenario whose layout, fit, speed, first token, suggestion or server differs from a release (`--base <git ref>`, by default the latest tag), and exits 1 if any does. A change meant to leave the figures alone should report none.
+
+`fleet.mjs` checks `fleetFor`, which sizes several models on one kind of board: each model on GPUs of its own, their copies packed into servers. With one model it must give exactly the page's layout, suggestion and server in every one of those scenarios. Random sets of copies must pack whole, at a multiple of their width (within one bridged group on the H200 NVL), into servers of sizes the board is bought in, and into no more servers than needed. Random sets of 2 to 4 models must each meet the goal they meet alone, on at least the GPUs they need alone, whatever order they come in, with each server's storage counting each model on it once. It exits 1 if any check fails.
 
 ## Sources
 

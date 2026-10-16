@@ -10,10 +10,12 @@ export const INDEX = new URL("../index.html", import.meta.url);
 /* a run on AMD's software stack (ROCm): kept out of the fit on NVIDIA boards, it fits CAL.rocm instead */
 export const onRocm = (P, p) => P.GPUS.find(b=> b.n===p.board)?.stack==="rocm";
 
-/* what sweep.mjs also takes from the page: the layout search and what it reads, and one model's settings
-   as a spec (specOf, withSpec). A page from before one of them existed gives null for it. */
+/* what sweep.mjs and fleet.mjs also take from the page: the layout search and what it reads, one model's
+   settings as a spec (specOf, withSpec), and the sizing of several models together (fleetFor and the
+   rest). A page from before one of them existed gives null for it. */
 const LAYOUT = ["MODELS", "WORKLOADS", "thinksOf", "boardsInPlay", "deploymentFor", "suggestDeployment", "serverFor",
-  "PER_MODEL", "specOf", "useSpec", "withSpec"];
+  "PER_MODEL", "specOf", "useSpec", "withSpec",
+  "evaluate", "copyCapacity", "popOf", "nodeMax", "splitMax", "packServers", "fleetFor", "fleetServers", "suggestFleet", "serverOf"];
 
 export function load(path = INDEX){
   const html = readFileSync(path, "utf8").split(/\r?\n/);

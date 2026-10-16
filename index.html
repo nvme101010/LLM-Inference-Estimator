@@ -1509,6 +1509,7 @@ function deploymentFor(g){
   const pick = meeting.length ? smallest(meeting)
              : fullNode(false) || (fitting.length ? closest(fitting) : fullNode(true))
              || evaluate(g, tps[tps.length-1], 1, 1);
+  pick.options = meeting.map(d=> ({tp: d.tp, need: d.need}));   // what each split needs within the goal, unrounded (fleetFor)
   /* By NVIDIA's guidance, the fewest GPUs a layout of the same size needed before rounding up: when a
      split wins over copies on the same cards for speed, the count is still the rounding's doing */
   const same = (meeting.length ? meeting : fitting).filter(d=> d.need && d.gpus===pick.gpus);
@@ -1606,13 +1607,15 @@ const KV_TIER_MIN = 100;                          // GB: Dynamo's smallest CPU t
 const GUIDE_URL = "https://docs.nvidia.com/certification-programs/latest/nvidia-certified-configuration-guide.html";
 const HPE_PCAI_URL = "https://www.hpe.com/us/en/collaterals/collateral.a50009216enw.html";
 const CERTIFIED_URL = "https://docs.nvidia.com/certification-programs/latest/nvidia-certified-systems.html";
-function serverFor(d){
-  const g = d.g, n = d.gpus;
+function serverFor(d){ return serverOf(d.g, d.gpus, [[d, d.gpus]]); }
+/* An n-GPU server of board g running parts: [deployment, GPUs it takes here] for each model on it, one
+   for a single model. Its storage holds each model's weights once, however many copies run here. */
+function serverOf(g, n, parts){
   if(systemOf(g)) return {g, n, fixed:true};
-  const gpuGB = n*g.cap, ram = GUIDE.memX*gpuGB, wGB = d.r.weights/GB;
+  const gpuGB = n*g.cap, ram = GUIDE.memX*gpuGB, wGB = parts.reduce((s, [d])=> s + d.r.weights/GB, 0);
   /* the engine gives each GPU's spare usable memory to its KV cache: what's left after the weights,
      activations and overhead (the overhead on the cache itself goes with the cache) */
-  const r = d.r, kvPoolGB = n*(g.cap*USABLE - (r.perGPU - r.kv_pg*(1 + S.ovpct/100))/GB);
+  const kvPoolGB = parts.reduce((s, [{r}, k])=> s + k*(g.cap*USABLE - (r.perGPU - r.kv_pg*(1 + S.ovpct/100))/GB), 0);
   return {g, n, perSocket: n/GUIDE.sockets, cores: HPE_CORES(n), gpuGB, ram,
           wGB, diskGB: (2*wGB + DISK_ALLOW)/DISK_FILL,
           kvOffGB: Math.max(KV_TIER_MIN, kvPoolGB), pcieSwitch: n/GUIDE.sockets > 2};
@@ -1637,6 +1640,94 @@ function serverRows(s){
     {tip:"srvDisk", k:"Workload storage", n:diskN, unit:`${diskU} usable NVMe`,
      sub:`+ boot volume`},
   ];
+}
+
+/* ---------------- several models on one kind of board ----------------
+   Each model runs on GPUs of its own, as copies of itself, and copies of different models share
+   servers. fleetFor(g, specs) sizes the models together on board g:
+   1. What each model needs: the layout search as for one model (planFor), without rounding up to a
+      count a server is bought in: the fewest GPUs that serve all its users within its goal. A model the
+      search can't serve whole within its goal (one node serving only some of its users, or the layout
+      closest to the goal) keeps that layout as it is (fixed).
+   2. The copies are packed into servers of nodeMax GPUs, the widest first, each at the first free place
+      that is a multiple of its width. With copies of 1, 2, 4 or 8 GPUs in servers of 2, 4 or 8, every
+      server but the last ends up full, the fewest servers there can be (fleet.mjs checks the RTX PRO
+      4500's 5-card servers by brute force), and a copy of 4 on H200 NVL cards stays within one bridged
+      group of 4.
+   3. A server that isn't full shrinks to the smallest size the board is bought in that holds it.
+   4. Spare GPUs run extra copies, one at a time, of the model closest to missing its goal whose copy
+      fits, as one model's spare GPUs do.
+   5. On the GPUs it ends up with, each model takes the fewest GPUs per copy that still meet its goal.
+   For one model that is exactly the layout deploymentFor gives (validation/fleet.mjs checks it). */
+const FLEET_MEMO = new Map();   // planFor's results, by the model's settings, the page's and the board
+function planFor(g, spec){      // run under withSpec(spec)
+  const key = JSON.stringify([spec, S.srv, S.ovpct, S.cache, CAL, g.n]);
+  if(!FLEET_MEMO.has(key)){
+    if(FLEET_MEMO.size >= 2000) FLEET_MEMO.clear();
+    const alone = deploymentFor(g), best = (alone.options || []).slice().sort((a, b)=> a.need - b.need || a.tp - b.tp)[0];
+    FLEET_MEMO.set(key, {alone, users: allUsers(), fixed: !best, tp: best ? best.tp : alone.tp, copies: best ? best.need/best.tp : alone.reps});
+  }
+  return {...FLEET_MEMO.get(key)};
+}
+/* copies [{i (its model), tp}] packed into servers of board g: [{n, slots}], slots[k] = the model on GPU k, or -1 */
+const freeAt = (s, tp)=> { for(let k = 0; k + tp <= s.slots.length; k += tp) if(s.slots.slice(k, k + tp).every(x=> x<0)) return k; return -1; };
+function packServers(g, copies){
+  const servers = [];
+  for(const c of copies.slice().sort((a, b)=> b.tp - a.tp || a.i - b.i)){
+    let s = servers.find(x=> freeAt(x, c.tp) >= 0);
+    if(!s) servers.push(s = {slots: Array(nodeMax(g)).fill(-1)});
+    const k = freeAt(s, c.tp); s.slots.fill(c.i, k, k + c.tp);
+  }
+  for(const s of servers){
+    const used = s.slots.findLastIndex(x=> x>=0) + 1, pop = popOf(g);
+    s.n = s.slots.length = pop ? Math.min(...pop.filter(p=> p >= used)) : used;
+  }
+  return servers;
+}
+function fleetFor(g, specs){
+  const ms = specs.map(spec=> withSpec(spec, ()=> ({spec, ...planFor(g, spec)})));
+  ms.forEach(m=> m.d = m.alone);
+  const fleet = {g, models: ms, servers: [], gpus: 0, memGB: 0, fits: ms.every(m=> m.alone.fits), meets: false, partial: false};
+  if(!fleet.fits) return fleet;
+  const run = m => withSpec(m.spec, ()=>{ m.d = evaluate(g, m.tp, m.copies); m.gap = m.d.t ? goalGap(m.d.t) : Infinity; });
+  ms.forEach(m=> { if(!m.fixed) run(m); });
+  const servers = packServers(g, ms.flatMap((m, i)=> Array.from({length: m.copies}, ()=> ({i, tp: m.tp}))));
+  for(const s of servers) for(;;){
+    const open = ms.map((m, i)=> i).filter(i=> !ms[i].fixed && freeAt(s, ms[i].tp) >= 0);
+    if(!open.length) break;
+    const i = open.reduce((a, b)=> ms[b].gap > ms[a].gap ? b : a), m = ms[i], k = freeAt(s, m.tp);
+    s.slots.fill(i, k, k + m.tp); m.copies++; run(m);
+  }
+  for(const m of ms) if(!m.fixed) withSpec(m.spec, ()=>{
+    const gpus = m.tp*m.copies;
+    for(const tp of (S.tpo==="auto" ? TP_OPTIONS : [S.tpo]).filter(t=> t < m.tp)){
+      const d = evaluate(g, tp, gpus/tp);
+      if(d.meets){ Object.assign(m, {tp, copies: gpus/tp, d}); break; }
+    }
+  });
+  const gpus = servers.reduce((n, s)=> n + s.n, 0);
+  return Object.assign(fleet, {servers, gpus, memGB: gpus*g.cap,
+    meets: ms.every(m=> m.d.meets && !m.d.partial), partial: ms.some(m=> m.d.partial)});
+}
+/* each of a fleet's servers, sized by serverOf for the models on it */
+const fleetServers = f => f.servers.map(s=> serverOf(f.g, s.n,
+  f.models.map((m, i)=> [m.d, s.slots.filter(x=> x===i).length]).filter(([, k])=> k)));
+/* The board for several models, chosen as for one: every model served within its goal on the least GPU
+   memory (then fewer servers, fewer GPUs per copy, then faster); failing that, the most models within
+   their goals, then the most users served within them, then the least memory. Boards where a model
+   doesn't fit, or a copy is split over PCIe, are left out. With one model it is suggestDeployment's answer. */
+function suggestFleet(fleets){
+  if(fleets.length && fleets[0].models.length===1){
+    const s = suggestDeployment(new Map(fleets.map(f=> [f.g.n, f.models[0].d])));
+    return fleets.find(f=> f.models[0].d===s) || null;
+  }
+  const sum = (f, x)=> f.models.reduce((s, m)=> s + x(m), 0), slowest = f => Math.min(...f.models.map(m=> m.d.t.perUser));
+  const ok = fleets.filter(f=> f.fits && !f.models.some(m=> notRecommended(m.d)));
+  const whole = ok.filter(f=> f.meets).sort((a, b)=> a.memGB - b.memGB || a.servers.length - b.servers.length
+    || sum(a, m=> m.d.tp) - sum(b, m=> m.d.tp) || slowest(b) - slowest(a));
+  if(whole.length) return whole[0];
+  const served = m => !m.d.meets ? 0 : m.d.partial ? m.d.served : m.users;
+  return ok.sort((a, b)=> sum(b, m=> +m.d.meets) - sum(a, m=> +m.d.meets) || sum(b, served) - sum(a, served) || a.memGB - b.memGB)[0] || null;
 }
 
 
