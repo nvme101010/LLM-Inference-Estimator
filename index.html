@@ -2171,6 +2171,16 @@ function layoutWhy(c, d){
 }
 /* a layout with more cards, in words: "8 cards as 2 copies of TP 4" */
 const growText = d => `${d.gpus} cards as ` + (d.reps>1 ? (d.tpw===1 && d.pp===1 ? "one copy per card" : `${d.reps} copies of ${layoutName(d.L)}`) : `one copy, ${layoutName(d.L)}`);
+/* The bay picture, only where it shows something fixed: which cards an NVLink bridge joins. PCIe slots move with
+   risers, front GPU cages and enablement kits, and an NVSwitch joins every GPU alike, so those get words instead. */
+const bridgeBays = (c, d) => linkKind(c.x)==="bridge" ? `<div class="rec-bays"><span class="sublbl">NVLink groups</span>${baysHtml(c, d)}</div>` : "";
+/* how a configuration's cards talk to each other, in one sentence, where there's no bridge to draw */
+function wiringSentence(c){
+  const k = linkKind(c.x), n = `${c.max} × ${esc(c.x.board)}`;
+  return k==="nvswitch" ? `An NVSwitch joins all ${c.max} GPUs, each to every other at full NVLink speed, so any split runs at the same speed.`
+       : k==="fabric" ? `Infinity Fabric wires each GPU straight to each of the other ${c.max - 1}, one link per pair, with no switch: a copy split across fewer GPUs uses only the links among them.`
+       : `No GPU-to-GPU link: the cards reach each other over PCIe Gen5 through the host, so a copy split across cards waits on PCIe. Up to ${n} in this server; which slots they use depends on its risers and GPU enablement kits.`;
+}
 const openBtn = (id, txt) => `<button type="button" class="linkbtn" data-cfg="${esc(id)}">${txt}</button>`;
 
 function renderScope(A){
@@ -2221,7 +2231,7 @@ function configCard(c, eyebrow, cmp, back = ""){
     + `<span class="rec-spec">${esc(sv.form)} · ${sv.sockets} × ${esc(sv.cpu)}</span>`
     + `<p class="rec-cfg">Up to ${c.max} × ${esc(c.x.board)}, ${wiringShort(c)}</p>`
     + `<p class="rec-why">One copy needs about ${fmtMem(needGB())} of GPU memory; this server carries ${fmtMem(c.usable)} at most with this GPU.</p></div>`
-    + `<div class="rec-bays"><span class="sublbl">GPU bays</span>${baysHtml(c, null)}</div></div>`
+    + bridgeBays(c, null) + `</div>`
     + `<div class="rec-acts">${back}</div>`;
   return `<div class="rec-top"><div class="rec-main">${eyebrow}`
     + `<h2 class="rec-name">${hostLink(HPE_HOSTS.find(h=> h.id===sv.id))}</h2>`
@@ -2231,7 +2241,7 @@ function configCard(c, eyebrow, cmp, back = ""){
     + (grow ? `<p class="rec-grow">Room to grow in the same server: ${growText(grow)} serve up to ${commas(grow.room)} users.</p>` : "")
     + (cmp ? `<p class="rec-cmp">${cmp}</p>` : "")
     + `</div>`
-    + `<div class="rec-bays"><span class="sublbl">GPU bays</span>${baysHtml(c, d)}</div></div>`
+    + bridgeBays(c, d) + `</div>`
     + statsHtml(d)
     + (speedBasis(d).includes("extrapolated") ? `<p class="note-warn">Speed is extrapolated: the ${esc(d.g.n)} has no published benchmark here, so its figures apply the shares fitted on other boards' runs to its datasheet. Memory fit is not affected. Load-test before quoting speeds.</p>` : "")
     + `<div class="rec-foot"><div><span class="sublbl">Launch</span><code class="launch">${esc(launchText(d))}</code></div>`
@@ -2287,7 +2297,7 @@ function renderCfg(A, cfgs){
   if(!c) return null;
   const sv = c.sv, d = c.best, all = allUsers(), k = linkKind(c.x), siblings = cfgs.filter(o=> o.sv.id===sv.id);
   const size = k==="bridge" ? c.x.link.bridge : c.max, groups = Math.ceil(c.max/size), used = d ? d.gpus : 0;
-  const wire = `<div class="wiring">` + Array.from({length: groups}, (_, gi)=>{
+  const wire = k!=="bridge" ? `<p class="rec-why">${wiringSentence(c)}</p>` : `<div class="wiring">` + Array.from({length: groups}, (_, gi)=>{
       const from = gi*size, n = Math.min(size, c.max - from), on = Math.max(0, Math.min(n, used - from));
       const title = groups>1 ? `Group ${String.fromCharCode(65 + gi)} · bays ${from + 1}–${from + n}` : `Bays 1–${c.max}`;
       const link = k==="bridge" ? `${c.x.link.kit} ${c.x.link.bridge}-way bridge` : k==="nvswitch" ? "NVSwitch, every GPU to every GPU" : k==="fabric" ? "Infinity Fabric, one link per pair" : "PCIe Gen5 x16 per card";
