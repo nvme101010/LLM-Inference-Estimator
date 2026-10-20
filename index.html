@@ -469,9 +469,9 @@
   .sview{display:flex; flex-direction:column; gap:18px}
   .sview[hidden]{display:none}
   .sv{padding:20px 22px; display:flex; flex-direction:column; gap:14px}
-  .sv h2, .svtitle{margin:0; font-size:15px; font-weight:600}
+  .sv h2{margin:0; font-size:15px; font-weight:600}
   .sv h3{margin:0; font-size:13px; font-weight:600; color:var(--ink-2)}
-  .sv .cap, .svalt .cap{color:var(--muted); font-size:12.5px; margin:0}
+  .sv .cap{color:var(--muted); font-size:12.5px; margin:0}
   .svhead{display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 14px}
   .svhead .svacts{margin-left:auto; display:flex; gap:14px}
   .svhead .linkbtn{margin:0; font-size:13px; min-height:32px}
@@ -491,6 +491,8 @@
   .rec-spec{font-size:13px; color:var(--muted)}
   .rec-cfg{margin:6px 0 0; font-size:16.5px; font-weight:500}
   .rec-why{margin:0; font-size:14px; color:var(--ink-2); max-width:700px}
+  .rec-grow{margin:2px 0 0; font-size:13.5px; color:var(--ink-2)}
+  .rec-grow .linkbtn{margin:0 0 0 6px; font-size:13px}
   .rec-bays{display:flex; flex-direction:column; gap:7px}
   .sublbl{font-size:12px; font-weight:600; color:var(--ink-2)}
   .bays{display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap}
@@ -511,17 +513,6 @@
   .checks li{display:flex; gap:8px}
   .checks .ok{color:var(--good); font-weight:700} .checks .no{color:var(--warn); font-weight:700}
   .note-warn{margin:0; font-size:13px; color:var(--ink-2); background:var(--warn-bg); border:1px solid color-mix(in srgb, var(--warn) 40%, transparent); padding:9px 11px; border-radius:7px}
-  .svalt{display:flex; flex-direction:column; gap:12px}
-  .svalt[hidden]{display:none}
-  .alts{display:grid; grid-template-columns:repeat(auto-fit, minmax(290px, 1fr)); gap:14px}
-  .alt{padding:18px; display:flex; flex-direction:column; gap:8px}
-  .alt h3{margin:0; font-size:18px; font-weight:700}
-  .alt .opt-line{margin:0; font-size:14px; font-weight:500}
-  .alt .opt{border:1px solid var(--line); border-radius:8px; padding:9px 11px; display:flex; flex-direction:column; gap:2px; font-size:13px; color:var(--ink-2)}
-  .alt .opt b{font-weight:600; color:var(--ink)}
-  .alt dl{margin:0; display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px 14px; font-size:13px}
-  .alt dt{color:var(--muted)} .alt dd{margin:0; font-weight:600}
-  .alt .linkbtn{align-self:flex-start; margin-top:auto; font-size:13px}
   .tbl{overflow-x:auto; border:1px solid var(--line); border-radius:9px}
   .tbl table{width:100%; border-collapse:collapse; font-size:13.5px; min-width:860px}
   .tbl th, .tbl td{padding:10px 12px; text-align:left; border-top:1px solid var(--line); vertical-align:middle}
@@ -708,7 +699,6 @@
     <div class="sview" id="serverView">
       <section class="panel sv" id="svScope" aria-label="Servers in scope"></section>
       <section class="panel sv rec" id="svRec" aria-label="Recommended server"></section>
-      <section class="svalt" id="svAlt" aria-label="Alternatives"></section>
       <section class="panel sv" id="svAll" aria-label="Every server in scope"></section>
       <section class="panel sv" id="svCfg" aria-label="Configuration"></section>
     </div>
@@ -1364,7 +1354,7 @@ const DATA_AS_OF = "October 2026";   // when the model and board figures were la
    Bump it with each release tag; add to CHANGES whenever a release changes what the figures come to. */
 const VERSION = "1.7.0";
 const CHANGES = [
-  {v:"1.7.0", what:"The answer now opens by server: the Servers view sizes the model on every current GPU-capable HPE ProLiant server, recommends one configuration with a step down and step ups, and shows every layout its wiring allows, including pipelining across NVLink groups and over PCIe. The GPU view is one click away, and links made before 1.7.0 open in it. Pipeline across bridge groups, off by default, in Advanced settings: on H200 NVL servers one copy of a model may span both bridged groups of 4 as two pipeline stages, tensor-parallel within each, so a model or a KV cache too big for one group fits on 8 cards. With it off nothing changes. With it on, a board that could only run two copies of 4 can also be suggested as one copy of 8 when that is the only layout that holds everyone; speed per user is sized as one group's, since each stage still reads all of its weights per token, and the figures for pipelined copies are modeled, not yet fitted to a benchmark. Each board is now named with the HPE server it is sized in, and any of 13 current GPU-capable HPE ProLiant servers can be picked in Advanced settings to compare only the boards it takes, at its limits (on the DL385 Gen11, 4 double-wide cards and 2-way H200 NVL bridges; on the DL380 Gen12, H200 NVL with no bridge). On Auto the figures are unchanged, except the AMD MI350P: its only HPE server, the DL385 Gen11, holds 2, so it is now sized at 2 cards."},
+  {v:"1.7.0", what:"The answer now opens by server: the Servers view sizes the model on every current GPU-capable HPE ProLiant server, recommends one configuration, tags the smaller and bigger servers that also work, and shows every layout its wiring allows, including pipelining across NVLink groups and over PCIe. The GPU view is one click away, and links made before 1.7.0 open in it. Pipeline across bridge groups, off by default, in Advanced settings: on H200 NVL servers one copy of a model may span both bridged groups of 4 as two pipeline stages, tensor-parallel within each, so a model or a KV cache too big for one group fits on 8 cards. With it off nothing changes. With it on, a board that could only run two copies of 4 can also be suggested as one copy of 8 when that is the only layout that holds everyone; speed per user is sized as one group's, since each stage still reads all of its weights per token, and the figures for pipelined copies are modeled, not yet fitted to a benchmark. Each board is now named with the HPE server it is sized in, and any of 13 current GPU-capable HPE ProLiant servers can be picked in Advanced settings to compare only the boards it takes, at its limits (on the DL385 Gen11, 4 double-wide cards and 2-way H200 NVL bridges; on the DL380 Gen12, H200 NVL with no bridge). On Auto the figures are unchanged, except the AMD MI350P: its only HPE server, the DL385 Gen11, holds 2, so it is now sized at 2 cards."},
   {v:"1.5.0", what:"The AMD MI355X joins the boards: 288 GB per GPU, sold only as 8-GPU systems, with published benchmarks of its own. Its GPUs are wired to each other with no switch, one Infinity Fabric link per pair, so a copy split across 2 or 4 of them uses only the links among them. Counting AMD's MI355X benchmark runs the same way, AMD's software reaches 0.75 of the hardware shares rather than 0.68, so the MI350P's figures come out up to 10% faster."},
   {v:"1.4.0", what:"When two layouts use the same GPUs, the suggestion runs more copies of the model rather than splitting one copy wider, on NVLink boards too, since both reach the goal and copies leave room for more users. A small model on an 8-GPU HGX system now runs as 8 copies, not one copy across all 8: speed per user comes out lower but still within the goal. The number of GPUs is unchanged."},
   {v:"1.2.0", what:"Speed and first-token estimates are calibrated against 295 published benchmark points: board compute is now each datasheet's dense figure, and the shares of it serving reaches are fitted, as are vLLM's fixed costs per step and per request, with a further factor for AMD's software stack fitted to MI355X runs. Speed per user, which ran about 20% slow, now lands near the measured figures, prompts read about twice as fast, and a likely range sits beside both. The speed goal is judged at the cautious end of that range. The RTX PRO 6000's memory bandwidth is corrected to the Server Edition's 1,597 GB/s."},
@@ -2160,14 +2150,15 @@ function buildChecks(c, d){
 }
 /* the sentence under a configuration: how its copy is laid out, and what's left in the server */
 function layoutWhy(c, d){
-  const bridged = linkKind(c.x)==="bridge", open = c.max - d.gpus;
+  const bridged = linkKind(c.x)==="bridge";
   const how = d.pp>1 ? `One copy across ${d.pp} ${bridged ? "NVLink groups" : "cards"} as pipeline stages${d.tpw>1 ? `, tensor-parallel across the ${d.tpw} cards of each` : ""}.`
             : d.reps>1 ? `${d.reps} copies of the model${d.tpw>1 ? `, each tensor-parallel across ${d.tpw} ${bridged ? "bridged " : ""}cards` : ", one per card"}, sharing the users.`
             : d.tpw>1 ? `One copy, tensor-parallel across ${d.tpw} ${bridged ? "bridged " : ""}cards.` : `One copy on one card.`;
-  const room = !systemOf(d.g) && open > 0 ? ` ${open} bay${open===1 ? " stays" : "s stay"} open, so the same server grows without a new chassis.` : "";
   const pcie = d.nr ? ` The cards have no direct link, so an all-reduce crosses PCIe after every layer; the speed shown reflects that.` : "";
-  return how + room + pcie;
+  return how + pcie;
 }
+/* a layout with more cards, in words: "8 cards as 2 copies of TP 4" */
+const growText = d => `${d.gpus} cards as ` + (d.reps>1 ? (d.tpw===1 && d.pp===1 ? "one copy per card" : `${d.reps} copies of ${layoutName(d.L)}`) : `one copy, ${layoutName(d.L)}`);
 const openBtn = (id, txt) => `<button type="button" class="linkbtn" data-cfg="${esc(id)}">${txt}</button>`;
 
 function renderScope(A){
@@ -2196,7 +2187,9 @@ function renderRec(A){
     + `<h2 class="rec-name">${hostLink(HPE_HOSTS.find(h=> h.id===sv.id))}</h2>`
     + `<span class="rec-spec">${esc(sv.form)} · ${sv.sockets} × ${esc(sv.cpu)}</span>`
     + `<p class="rec-cfg">${d.gpus} × ${esc(d.g.n)}${d.gpus>1 ? `, ${wiringText(c, d)}` : ""}${flagPills(d)}</p>`
-    + `<p class="rec-why">${layoutWhy(c, d)}</p></div>`
+    + `<p class="rec-why">${layoutWhy(c, d)}</p>`
+    + (A.upSame ? `<p class="rec-grow">Room to grow in the same server: ${growText(A.upSame.roomy)} serve up to ${commas(A.upSame.roomy.room)} users. ${openBtn(c.id, "Every layout")}</p>` : "")
+    + `</div>`
     + `<div class="rec-bays"><span class="sublbl">GPU bays</span>${baysHtml(c, d)}</div></div>`
     + statsHtml(d)
     + (speedBasis(d).includes("extrapolated") ? `<p class="note-warn">Speed is extrapolated: the ${esc(d.g.n)} has no published benchmark here, so its figures apply the shares fitted on other boards' runs to its datasheet. Memory fit is not affected. Load-test before quoting speeds.</p>` : "")
@@ -2204,37 +2197,6 @@ function renderRec(A){
     + `<div><span class="sublbl">Build checks</span><ul class="checks">${buildChecks(c, d)}</ul>`
     + ((c.x.constraints || []).length ? `<ul class="svnotes">${c.x.constraints.map(t=> `<li>${esc(t)}</li>`).join("")}</ul>` : "") + `</div></div>`
     + `<div class="rec-acts">${openBtn(c.id, "Layouts and build for this configuration")}<button type="button" class="tool-btn" data-copylink>Copy link</button></div>`;
-}
-function altCard(cls, eyebrow, c, body){
-  return `<article class="panel alt"><span class="eyebrow-s ${cls}">${eyebrow}</span><h3>${esc(c.sv.short)}</h3>`
-    + `<span class="rec-spec">${esc(c.sv.form)} · ${c.sv.sockets} × ${esc(c.sv.cpu)}</span>${body}</article>`;
-}
-const optBox = (title, d) => `<div class="opt"><b>${title}</b><span>${fmtTps(d.t.perUser)} tok/s per user${star(d)} · room for ${commas(d.room)}${d.memRoom > d.room*1.5 ? ` · cache room for ${commas(d.memRoom)}` : ""} · ${boxTotal(d.memGB)}</span></div>`;
-function renderAlts(A){
-  const el = $('svAlt'), all = allUsers(), cards = [];
-  if(A.rec && A.down){
-    const c = A.down, d = c.best, head = d.room - all;
-    cards.push(altCard("warn", "Step down · smaller server", c,
-      `<p class="opt-line">${d.gpus} × ${esc(d.g.n)}, ${wiringText(c, d)}${flagPills(d)}</p><p class="cap">${layoutLine(d)}</p>`
-      + `<dl><div><dt>Speed per user</dt><dd>${fmtTps(d.t.perUser)} tok/s${star(d)}</dd></div><div><dt>${c.ok ? "Room for" : "Serves"}</dt><dd>${c.ok ? commas(d.room) : `${commas(d.served)} of ${commas(all)}`} users</dd></div></dl>`
-      + `<p class="note-warn">${c.ok ? `${c.sv.u}U instead of ${A.rec.sv.u}U${head < all ? `, with ${commas(head)} user${head===1 ? "" : "s"} of headroom over your ${commas(all)}` : ""}.` : `Doesn't serve everyone within your goal.`}</p>`
-      + openBtn(c.id, "Layouts and build")));
-  }
-  if(A.rec && A.upSame){
-    const c = A.rec, u = A.upSame;
-    cards.push(altCard("up", "Step up · fill the open bays", c,
-      `<p class="cap">same server</p>` + optBox(`${u.roomy.gpus} cards · ${layoutLine(u.roomy)} — more users`, u.roomy)
-      + (u.context ? optBox(`${u.context.gpus} cards · ${layoutLine(u.context)} — longer context`, u.context) : "")
-      + openBtn(c.id, "Every layout on this server")));
-  }
-  if(A.rec && A.upBig){
-    const b = A.upBig, c0 = b.configs[0];
-    cards.push(altCard("up", "Step up · bigger server", c0,
-      b.configs.map(c=> optBox(`${c.best.gpus} × ${esc(c.best.g.n)} · ${layoutLine(c.best)}`, c.best)).join("")
-      + openBtn(c0.id, "Layouts and build")));
-  }
-  el.hidden = !cards.length;
-  el.innerHTML = `<h2 class="svtitle">If the customer pushes back</h2><div class="alts">${cards.join("")}</div>`;
 }
 function renderAll(A, cfgs){
   const all = allUsers(), need = needGB(), sel = (cfgById(cfgs, S.cfg) || A.rec || {}).id;
@@ -2252,7 +2214,10 @@ function renderAll(A, cfgs){
     + (rows.length ? `<div class="tbl"><table><thead><tr><th scope="col">Server</th><th scope="col">GPUs</th><th scope="col">GPU link</th><th scope="col">Layout</th>`
       + `<th scope="col" class="num">Per user</th><th scope="col" class="num">Room for</th><th scope="col" class="num">GPU memory</th></tr></thead><tbody>`
       + rows.map(c=>{ const d = c.best, isRec = A.rec && c.id===A.rec.id;
-          return `<tr class="${c.id===sel ? "sel" : ""}${c.ok ? "" : " dim"}"><th scope="row"><button type="button" class="rowbtn" data-cfg="${esc(c.id)}">${esc(c.sv.short)}</button>${isRec ? ` <span class="pill sugg">Recommended</span>` : ""}</th>`
+          const tag = isRec ? ` <span class="pill sugg">Recommended</span>`
+                    : A.down && c.id===A.down.id ? ` <span class="pill neutral" data-tip="svSmaller" tabindex="0">Smaller server</span>`
+                    : A.upBig && A.upBig.configs.some(x=> x.id===c.id) ? ` <span class="pill neutral" data-tip="svMoreRoom" tabindex="0">More room</span>` : "";
+          return `<tr class="${c.id===sel ? "sel" : ""}${c.ok ? "" : " dim"}"><th scope="row"><button type="button" class="rowbtn" data-cfg="${esc(c.id)}">${esc(c.sv.short)}</button>${tag}</th>`
             + `<td>${d.gpus} × ${esc(d.g.n)}</td><td>${wiringShort(c)}</td><td class="mono-s">${layoutLine(d)}${flagPills(d)}</td>`
             + `<td class="num">${fmtTps(d.t.perUser)} tok/s${star(d)}</td>`
             + `<td class="num">${c.ok ? commas(d.room) : `<span class="warnx">${commas(d.served)} of ${commas(all)}</span>`}</td><td class="num">${boxTotal(d.memGB)}</td></tr>`; }).join("")
@@ -2302,7 +2267,7 @@ function renderCfg(A, cfgs){
 function renderServerView(){
   const cfgs = allConfigs(), A = serverAnswer(cfgs);
   if(S.cfg && !cfgById(cfgs, S.cfg)) S.cfg = null;
-  renderScope(A); renderRec(A); renderAlts(A); renderAll(A, cfgs);
+  renderScope(A); renderRec(A); renderAll(A, cfgs);
   const d = renderCfg(A, cfgs);
   const many = S.models.length > 1;
   $('viewhint').textContent = many ? `Sizing ${specName(S.models[S.edit])}: the Servers view sizes one model at a time. GPUs sizes them together.` : "";
@@ -4184,6 +4149,8 @@ const TIPS = {
   pause:"While a new prompt is being read, everyone already mid-reply waits, whichever workload they belong to. This is the longest gap they would see between words. Under 0.1 s is unnoticeable; choose Smooth streaming to shorten it.",
   tp:"How many GPUs one copy of the model is split across (tensor parallelism). Every layer's weights are divided and the GPUs all-reduce after each layer, so splitting needs NVLink to be fast. A copy is split 1, 2, 4 or 8 ways because serving engines need the split to divide the model's attention heads evenly; that is a software rule and applies to every board. Auto picks the smallest layout; a fixed number applies to every board. On a bridged board with Pipeline across bridge groups on, a copy wider than one bridge is tensor-parallel within each group and pipelined across them.",
   svScope:"The HPE servers the answer may use: every current HPE ProLiant server that takes one of these GPUs, from HPE's NVIDIA Accelerators for HPE QuickSpecs and each server's own configuration guide. Pick the customer's standard builds, or the servers you can sell, to size only those. Gen11 servers with a Gen12 successor that takes the same GPUs are left out.",
+  svSmaller:"The smallest server, by rack units, that also meets your goal (or comes closest), for a customer who wants a smaller footprint than the recommendation. Check its headroom: it may serve your users with little room to spare.",
+  svMoreRoom:"A bigger server with more room than the recommendation: its leanest configuration within your goal and its roomiest, for a customer who expects to grow.",
   svModeled:"This layout pipelines one copy across stages that hand each token's activations to the next over PCIe. The memory it needs is exact; its speed is modeled from the same fitted shares as the rest, with a PCIe hand-off per stage, but no pipelined run is in the benchmark set yet. Load-test it before quoting a speed.",
   pipe:"Pipeline parallelism between a server's NVLink bridge groups. An H200 NVL bridge joins at most 4 cards (HPE's S4A91C, in the DL380a Gen12), so a copy of a model normally spans at most 4 and 8 cards run two copies. In a DL385 Gen11 the bridge is 2-way, so there it is two groups of 2 in 4 cards. On, one copy may span both groups as two pipeline stages: each stage holds half the layers on its own bridged group, tensor-parallel within it, and hands each token's activations to the next stage over PCIe. It fits a model, or a KV cache, that one group can't hold. It does not raise speed per user: each stage still reads all of its weights for every token, and the engine runs the stages on alternating halves of the batch (vLLM --pipeline-parallel-size 2). Two copies of 4 serve more users when they fit, and the page still prefers them.",
   copies:"A copy (replica) is a full, independent instance of the model on its own GPUs within the node, serving its share of the users. More copies serve more users without slowing each other down, and unlike splitting one copy across GPUs, they need no direct GPU-to-GPU link between them.",

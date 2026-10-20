@@ -22,8 +22,8 @@ GPU counts round up to what can be bought. H200 NVL servers take 1, 2, 4 or 8 ca
 The answer opens by server. **Servers in scope** picks the HPE servers to consider (all by default; the customer's standard builds, say). The page sizes the model on every configuration of those servers — each server with each GPU it takes, at the count and wiring HPE supports — and shows:
 
 - **the recommendation**: the configuration that meets the speed goal with the least GPU memory (then not split over PCIe, not pipelined, the most room, the fewest rack units), with its GPU bays, figures, `vllm serve` line and build checks;
-- **step down / step up**: a smaller server that also works (or comes closest), the same server with its open bays filled, and a bigger server;
-- **every server in scope**: the configurations that hold the model, and for the rest the most GPU memory they carry against what the model needs;
+- **room to grow**: on the recommendation, what the same server serves with its open bays filled;
+- **every server in scope**: the configurations that hold the model, with the smallest server that also works tagged *Smaller server* and bigger ones with more room tagged *More room*; for the rest, the most GPU memory they carry against what the model needs;
 - **one configuration in detail**: how its cards are wired, every layout the wiring allows (TP within an NVLink group or NVSwitch; TP within groups × PP across them; on PCIe cards, TP over PCIe or PP over PCIe) at each number of copies, and its build.
 
 Pipelined layouts are modeled, not yet fitted to a benchmark, and say so. The server catalog is the JSON block `id="catalog-hpe"` in `index.html`; edit it when HPE revises its QuickSpecs. URL keys: `vw=gpu` opens the GPU view, `hs` lists the servers in scope (dot-separated ids), `cf` the configuration in detail.
