@@ -492,6 +492,7 @@
   .rec-cfg{margin:6px 0 0; font-size:16.5px; font-weight:500}
   .rec-why{margin:0; font-size:14px; color:var(--ink-2); max-width:700px}
   .rec-grow{margin:2px 0 0; font-size:13.5px; color:var(--ink-2)}
+  .rec-cmp{margin:4px 0 0; font-size:13px; color:var(--ink-2); background:var(--panel-2); border:1px solid var(--line); border-radius:7px; padding:8px 10px; max-width:720px}
   .rec-grow .linkbtn{margin:0 0 0 6px; font-size:13px}
   .rec-bays{display:flex; flex-direction:column; gap:7px}
   .sublbl{font-size:12px; font-weight:600; color:var(--ink-2)}
@@ -529,6 +530,7 @@
   .sv .warnx{color:var(--warn); font-weight:500}
   .holds{display:grid; grid-template-columns:minmax(120px, 160px) minmax(0, 1fr) minmax(180px, 260px); gap:8px 16px; align-items:center; font-size:13px}
   .holds .hname{font-weight:600}
+  .holds .hname.sel .rowbtn{color:var(--accent-ink); text-decoration:underline}
   .holds .rowbtn{font:inherit; font-weight:600; background:none; border:0; padding:4px 0; color:var(--ink); cursor:pointer; text-align:left}
   .holds .rowbtn:hover{color:var(--accent-ink); text-decoration:underline}
   .holds .rowbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:3px}
@@ -2180,23 +2182,52 @@ function renderScope(A){
             `<button type="button" class="chip" data-scope="${sv.id}" aria-pressed="${S.scope.has(sv.id)}">${esc(sv.short)}</button>`).join("")
         + `</div>`).join("") + `</div>`;
 }
-function renderRec(A){
-  const el = $('svRec'), all = allUsers();
+/* the same server with more cards: the option with the most room that meets the goal for everyone */
+const growOf = c => c.best ? c.opts.filter(d=> d.gpus > c.best.gpus && d.meets && !d.partial && !d.nr).sort((a, b)=> b.room - a.room || a.gpus - b.gpus)[0] || null : null;
+/* The main card: the configuration picked from the list (S.cfg), or else the recommendation. A pick is labelled
+   as such, with how it compares and the way back. */
+function renderRec(A, cfgs){
+  const el = $('svRec'), all = allUsers(), pick = cfgById(cfgs, S.cfg);
+  if(pick && (!A.rec || pick.id!==A.rec.id)) return renderPick(A, pick);
   if(!A.rec){
     el.innerHTML = `<span class="eyebrow-s warn">${S.scope.size ? "No server in scope holds it" : "No servers in scope"}</span>`
       + `<h2 class="rec-name">${S.scope.size ? "Too big for every server in scope" : "Pick at least one server"}</h2>`
       + (S.scope.size ? `<p class="rec-why">One copy of the model needs about ${fmtMem(needGB())} of GPU memory. Add a larger server to the scope, or lower the precision or the prompt and reply lengths.</p>` : "");
     return;
   }
-  const c = A.rec, d = c.best, sv = c.sv;
+  const c = A.rec;
   const eyebrow = c.ok ? `<span class="eyebrow-s">Recommended · least GPU memory that meets your goal</span>`
-                       : `<span class="eyebrow-s warn">Closest · serves ${commas(d.served)} of ${commas(all)} within your goal</span>`;
-  el.innerHTML = `<div class="rec-top"><div class="rec-main">${eyebrow}`
+                       : `<span class="eyebrow-s warn">Closest · serves ${commas(c.best.served)} of ${commas(all)} within your goal</span>`;
+  el.innerHTML = configCard(c, eyebrow, "");
+}
+/* a picked configuration: as the recommendation's card, labelled, with the comparison and the way back */
+function renderPick(A, c){
+  const all = allUsers(), back = `<button type="button" class="linkbtn" data-cfg="">Back to the recommendation</button>`;
+  const r = A.rec && A.rec.best, d = c.best;
+  const eyebrow = !d ? `<span class="eyebrow-s warn">Your pick · won't hold the model</span>`
+                : c.ok ? `<span class="eyebrow-s">Your pick · meets your goal</span>`
+                : `<span class="eyebrow-s warn">Your pick · ${d.served ? `serves ${commas(d.served)} of ${commas(all)} within your goal` : "too slow for your goal"}</span>`;
+  const cmp = !r || !d ? "" : `Against the recommended ${esc(A.rec.sv.short)} (${r.gpus} × ${esc(r.g.n)}): `
+    + `${fmtTps(d.t.perUser)} vs ${fmtTps(r.t.perUser)} tok/s per user, room for ${commas(d.room)} vs ${commas(r.room)}, ${boxTotal(d.memGB)} vs ${boxTotal(r.memGB)} of GPU memory${c.sv.u && A.rec.sv.u && c.sv.u!==A.rec.sv.u ? `, ${c.sv.u}U vs ${A.rec.sv.u}U` : ""}.`;
+  $('svRec').innerHTML = configCard(c, eyebrow, cmp, back);
+}
+/* one configuration's card: server, GPUs and wiring, bays, figures, launch line and build checks */
+function configCard(c, eyebrow, cmp, back = ""){
+  const d = c.best, sv = c.sv, grow = growOf(c);
+  if(!d) return `<div class="rec-top"><div class="rec-main">${eyebrow}`
+    + `<h2 class="rec-name">${hostLink(HPE_HOSTS.find(h=> h.id===sv.id))}</h2>`
+    + `<span class="rec-spec">${esc(sv.form)} · ${sv.sockets} × ${esc(sv.cpu)}</span>`
+    + `<p class="rec-cfg">Up to ${c.max} × ${esc(c.x.board)}, ${wiringShort(c)}</p>`
+    + `<p class="rec-why">One copy needs about ${fmtMem(needGB())} of GPU memory; this server carries ${fmtMem(c.usable)} at most with this GPU.</p></div>`
+    + `<div class="rec-bays"><span class="sublbl">GPU bays</span>${baysHtml(c, null)}</div></div>`
+    + `<div class="rec-acts">${back}</div>`;
+  return `<div class="rec-top"><div class="rec-main">${eyebrow}`
     + `<h2 class="rec-name">${hostLink(HPE_HOSTS.find(h=> h.id===sv.id))}</h2>`
     + `<span class="rec-spec">${esc(sv.form)} · ${sv.sockets} × ${esc(sv.cpu)}</span>`
     + `<p class="rec-cfg">${d.gpus} × ${esc(d.g.n)}${d.gpus>1 ? `, ${wiringText(c, d)}` : ""}${flagPills(d)}</p>`
     + `<p class="rec-why">${layoutWhy(c, d)}</p>`
-    + (A.upSame ? `<p class="rec-grow">Room to grow in the same server: ${growText(A.upSame.roomy)} serve up to ${commas(A.upSame.roomy.room)} users. ${openBtn(c.id, "Every layout")}</p>` : "")
+    + (grow ? `<p class="rec-grow">Room to grow in the same server: ${growText(grow)} serve up to ${commas(grow.room)} users.</p>` : "")
+    + (cmp ? `<p class="rec-cmp">${cmp}</p>` : "")
     + `</div>`
     + `<div class="rec-bays"><span class="sublbl">GPU bays</span>${baysHtml(c, d)}</div></div>`
     + statsHtml(d)
@@ -2204,7 +2235,7 @@ function renderRec(A){
     + `<div class="rec-foot"><div><span class="sublbl">Launch</span><code class="launch">${esc(launchText(d))}</code></div>`
     + `<div><span class="sublbl">Build checks</span><ul class="checks">${buildChecks(c, d)}</ul>`
     + ((c.x.constraints || []).length ? `<ul class="svnotes">${c.x.constraints.map(t=> `<li>${esc(t)}</li>`).join("")}</ul>` : "") + `</div></div>`
-    + `<div class="rec-acts">${openBtn(c.id, "Layouts and build for this configuration")}<button type="button" class="tool-btn" data-copylink>Copy link</button></div>`;
+    + `<div class="rec-acts">${back}<button type="button" class="tool-btn" data-copylink>Copy link</button></div>`;
 }
 /* Every server in scope, one line each: the servers that meet the goal, in the recommendation's order, each at
    its best configuration (its other GPUs are in its detail); then those that hold the model below the goal;
@@ -2227,9 +2258,11 @@ function renderAll(A, cfgs){
     : A.down && c.sv.id===A.down.sv.id ? ` <span class="pill neutral" data-tip="svSmaller" tabindex="0">Smaller server</span>`
     : A.upBig && c.sv.id===A.upBig.sv.id ? ` <span class="pill neutral" data-tip="svMoreRoom" tabindex="0">More room</span>` : "";
   const others = x => x.n > 1 ? `<span class="cap">${x.ok.length > 1 ? `${x.ok.length - 1} other GPU${x.ok.length===2 ? "" : "s"} also meet the goal` : `${x.n - 1} other GPU${x.n===2 ? "" : "s"} in this server`}</span>` : "";
-  const line = (x, body) => `<span class="hname"><button type="button" class="rowbtn" data-cfg="${esc(x.top ? x.top.id : x.mine[0].id)}">${esc(x.sv.short)}</button></span>${body}`;
+  const closestOf = mine => mine.slice().sort((a, b)=> b.usable - a.usable)[0];
+  const line = (x, body) => `<span class="hname${hl(x.sv.id)}"><button type="button" class="rowbtn" data-cfg="${esc(x.top ? x.top.id : closestOf(x.mine).id)}">${esc(x.sv.short)}</button></span>${body}`;
+  const hl = id => id===selSv ? " sel" : "";
   $('svAll').innerHTML = `<div class="svhead"><h2>Every server in scope</h2><span class="cap">${meet.length} meet${meet.length===1 ? "s" : ""} your goal`
-      + `${below.length ? ` · ${below.length} hold${below.length===1 ? "s" : ""} it below the goal` : ""}${cant.length ? ` · ${cant.length} can't hold it` : ""}${out ? ` · ${out} out of scope` : ""}. Click a server for its other GPUs and layouts.</span></div>`
+      + `${below.length ? ` · ${below.length} hold${below.length===1 ? "s" : ""} it below the goal` : ""}${cant.length ? ` · ${cant.length} can't hold it` : ""}${out ? ` · ${out} out of scope` : ""}. Click a server to see it in place of the recommendation.</span></div>`
     + (meet.length ? `<div class="tbl"><table><thead><tr><th scope="col">Server</th><th scope="col">Best configuration</th><th scope="col">Layout</th>`
       + `<th scope="col" class="num">Per user</th><th scope="col" class="num">Room for</th><th scope="col" class="num">GPU memory</th></tr></thead><tbody>`
       + meet.map(x=>{ const c = x.top, d = c.best;
@@ -2288,7 +2321,7 @@ function renderCfg(A, cfgs){
 function renderServerView(){
   const cfgs = allConfigs(), A = serverAnswer(cfgs);
   if(S.cfg && !cfgById(cfgs, S.cfg)) S.cfg = null;
-  renderScope(A); renderRec(A); renderAll(A, cfgs);
+  renderScope(A); renderRec(A, cfgs); renderAll(A, cfgs);
   const d = renderCfg(A, cfgs);
   const many = S.models.length > 1;
   $('viewhint').textContent = many ? `Sizing ${specName(S.models[S.edit])}: the Servers view sizes one model at a time. GPUs sizes them together.` : "";
@@ -2327,7 +2360,12 @@ $('serverView').addEventListener('click', e=>{
   if(t.hasAttribute('data-scope-all')) S.scope = new Set(CATALOG.servers.map(sv=> sv.id));
   else if(t.hasAttribute('data-scope-none')) S.scope = new Set();
   else if(t.dataset.scope){ const id = t.dataset.scope; S.scope.has(id) ? S.scope.delete(id) : S.scope.add(id); }
-  else if(t.dataset.cfg){ S.cfg = t.dataset.cfg; render(); $('svCfg').scrollIntoView({behavior: 'smooth', block: 'start'}); return; }
+  else if(t.hasAttribute('data-cfg')){
+    const inList = !!t.closest('#svAll');
+    S.cfg = t.dataset.cfg || null; render();
+    if(inList){ const r = $('svRec').getBoundingClientRect(); if(r.top < 0 || r.top > innerHeight*0.6) $('svRec').scrollIntoView({behavior: 'smooth', block: 'start'}); }
+    return;
+  }
   render();
 });
 }
