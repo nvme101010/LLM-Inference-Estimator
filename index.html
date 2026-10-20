@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <meta name="description" content="Sizing estimate: how many GPUs it takes to serve open LLMs to your users, one node per model at most, on NVIDIA and AMD boards.">
-<title>LLM Inference Estimator</title>
+<title>HPE Server Inference Estimator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
@@ -58,9 +58,7 @@
   /* ---- header ---- */
   header.top{display:flex; align-items:flex-end; justify-content:space-between; gap:18px; flex-wrap:wrap; margin-bottom:22px}
   .brand{display:flex; align-items:center; gap:13px; flex:1 1 320px; min-width:0}   /* a long subtitle wraps instead of pushing the controls down */
-  .glyph{width:40px; height:40px; border-radius:10px; background:linear-gradient(150deg,var(--w),var(--accent)); position:relative; flex:none; box-shadow:var(--shadow)}
-  .glyph::before,.glyph::after{content:""; position:absolute; left:8px; right:8px; height:3px; border-radius:2px; background:rgba(255,255,255,.9)}
-  .glyph::before{top:13px} .glyph::after{top:24px; right:16px}
+  .logo{height:30px; width:auto; flex:none; color:var(--ink); display:block}   /* HPE logo: black parts follow the theme, the green stays #03A883 */
   h1{font-size:21px; font-weight:700; margin:0; letter-spacing:-.01em}
   .sub{color:var(--muted); font-size:12.5px; margin-top:1px}
   .theme-btn{border:1px solid var(--line-2); background:var(--panel); color:var(--ink-2); border-radius:9px; padding:8px 13px; font:inherit; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:7px}
@@ -562,9 +560,9 @@
 <div class="wrap">
   <header class="top">
     <div class="brand">
-      <div class="glyph" aria-hidden="true"></div>
+      <svg class="logo" viewBox="27 539 3787 1082" role="img" aria-label="HPE"><path fill="currentColor" d="M27 539h216v427h710V539h216v1082H953v-439H243v439H27z"/><path fill="currentColor" fill-rule="evenodd" d="M1422 539h717.5a408.5 408.5 0 0 1 0 817H1638v265h-216zM1638 755v385h501.5a192.5 192.5 0 0 0 0-385z"/><path fill="currentColor" d="M2756 539h1058v216H2972v90h-216z"/><path fill="#03A883" fill-rule="evenodd" d="M2756 948h1058v673H2756zM2972 1164v241h842v-241z"/></svg>
       <div>
-        <h1>LLM Inference Estimator</h1>
+        <h1>HPE Server Inference Estimator</h1>
         <div class="sub">How many GPUs your models and users need. One node per model at most.</div>
       </div>
     </div>
@@ -4523,7 +4521,7 @@ ${SUMMARY_CSS}
 </style>
 <main>
   <button class="print" onclick="print()">Print or save as PDF</button>
-  <div class="eyebrow">LLM Inference Estimator · ${esc(role)}</div>
+  <div class="eyebrow">HPE Server Inference Estimator · ${esc(role)}</div>
   <h1>${esc(head)}</h1>
   <p class="sub">${esc(name)} · ${commas(all)} concurrent user${all===1 ? "" : "s"} · ${esc(what)} · ${esc(prec)}</p>
   <div class="date">Prepared ${esc(date)} · estimator ${esc(VERSION)} · model and board data as of ${esc(DATA_AS_OF)}${link}</div>
@@ -4599,7 +4597,7 @@ ${SUMMARY_CSS}
 </style>
 <main>
   <button class="print" onclick="print()">Print or save as PDF</button>
-  <div class="eyebrow">LLM Inference Estimator · ${esc(role)}</div>
+  <div class="eyebrow">HPE Server Inference Estimator · ${esc(role)}</div>
   <h1>${esc(head)}</h1>
   <p class="sub">${n} models · ${commas(all)} concurrent users</p>
   <div class="date">Prepared ${esc(date)} · estimator ${esc(VERSION)} · model and board data as of ${esc(DATA_AS_OF)}${link}</div>

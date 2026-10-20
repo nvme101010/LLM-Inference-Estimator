@@ -1,4 +1,4 @@
-# LLM Inference Estimator
+# HPE Server Inference Estimator
 
 Sizing estimate: how many GPUs your models and users need, with each model on one node at most. Does not cover models spread over several nodes, or NVL rack-scale systems.
 
