@@ -909,123 +909,555 @@
      revises its QuickSpecs; nothing else in the page needs to change. See "servers" in README.md. -->
 <script type="application/json" id="catalog-hpe">
 {
-  "vendor": "HPE",
-  "checked": "2026-10-20",
-  "about": "Every current HPE ProLiant server that takes one of the estimator's boards. Which GPU and NVLink bridge each server takes: the matrix. How many cards: each server's QuickSpecs or HPE Japan configuration guide (count_source). max is per server; a node here is at most 8, so larger counts are capped at 8. Gen11 servers with a Gen12 successor that takes the same GPUs are left out.",
-  "matrix": {"title": "NVIDIA Accelerators for HPE QuickSpecs", "version": "83", "date": "2026-09-08", "url": "https://www.hpe.com/us/en/collaterals/collateral.c04123180.html"},
-  "servers": [
-    {"id": "dl380a-g12", "name": "HPE ProLiant Compute DL380a Gen12", "short": "DL380a Gen12", "group": "GPU-dense", "u": 4, "form": "4U rack", "sockets": 2, "cpu": "Intel Xeon 6",
-     "url": "https://www.hpe.com/us/en/products/compute/proliant/dl380a-gen12.html",
-     "count_source": "https://www.hpe.com/us/en/collaterals/collateral.a00047453enw.html",
-     "notes": ["Up to 10 double-wide or 16 single-wide cards; sized here at 8.", "GPUs install in pairs, split evenly between the sockets."],
-     "gpus": [
-       {"board": "L4", "max": 8, "link": "pcie"},
-       {"board": "L40S", "max": 8, "link": "pcie"},
-       {"board": "RTX PRO 6000 Blackwell", "max": 8, "link": "pcie"},
-       {"board": "H200 NVL", "max": 8, "link": {"bridge": 4, "kit": "S4A91C"}, "constraints": ["NVLink bridges are not supported in the 10-card layout."]}
-     ]},
-    {"id": "dl380-g12", "name": "HPE ProLiant Compute DL380 Gen12", "short": "DL380 Gen12", "group": "Mainstream 2U", "u": 2, "form": "2U rack", "sockets": 2, "cpu": "Intel Xeon 6",
-     "url": "https://www.hpe.com/us/en/products/compute/proliant/dl380-gen12.html",
-     "count_source": "https://h50146.www5.hpe.com/directplus_ent/library/pdfs_servers/dl380gen12.pdf",
-     "notes": ["Double-wide cards: one per riser.", "GPUs and a rear drive cage can't be combined."],
-     "gpus": [
-       {"board": "L4", "max": 8, "link": "pcie"},
-       {"board": "L40S", "max": 3, "link": "pcie"},
-       {"board": "RTX PRO 4500 Blackwell", "max": 5, "link": "pcie"},
-       {"board": "RTX PRO 6000 Blackwell", "max": 3, "link": "pcie", "unconfirmed": "HPE added it in September 2026 without a count; 3 is the server's double-wide limit, one per riser"},
-       {"board": "H200 NVL", "max": 3, "pop": [1, 2, 3], "link": "pcie", "unconfirmed": "HPE added it in September 2026 without a count; 3 is the server's double-wide limit, one per riser", "constraints": ["No NVLink bridge is listed for this server, so the cards reach each other over PCIe."]}
-     ]},
-    {"id": "dl385-g11", "name": "HPE ProLiant DL385 Gen11", "short": "DL385 Gen11", "group": "Mainstream 2U", "u": 2, "form": "2U rack", "sockets": 2, "cpu": "AMD EPYC 9004/9005",
-     "url": "https://www.hpe.com/us/en/collaterals/collateral.a50004300enw.html",
-     "count_source": "https://h50146.www5.hpe.com/directplus_ent/library/pdfs_servers/dl385gen11.pdf",
-     "notes": ["GPU base unit: front GPU bays, two processors, high-performance fans."],
-     "gpus": [
-       {"board": "L4", "max": 8, "link": "pcie"},
-       {"board": "L40S", "max": 4, "link": "pcie"},
-       {"board": "RTX PRO 4500 Blackwell", "max": 4, "link": "pcie"},
-       {"board": "RTX PRO 6000 Blackwell", "max": 4, "link": "pcie"},
-       {"board": "H200 NVL", "max": 4, "link": {"bridge": 2, "kit": "S4A90C"}},
-       {"board": "AMD MI350P", "max": 2, "link": "pcie"}
-     ]},
-    {"id": "dl345-g12", "name": "HPE ProLiant Compute DL345 Gen12", "short": "DL345 Gen12", "group": "Mainstream 2U", "u": 2, "form": "2U rack", "sockets": 1, "cpu": "AMD EPYC 9005",
-     "url": "https://www.hpe.com/us/en/collaterals/collateral.a50009233enw.html",
-     "count_source": "https://h50146.www5.hpe.com/directplus_ent/library/pdfs_servers/dl345gen12.pdf",
-     "notes": ["GPU base unit, front GPU slots; 4 cards need the Front 4xGPU Enablement Kit (P84160-B21)."],
-     "gpus": [
-       {"board": "L4", "max": 4, "link": "pcie"},
-       {"board": "L40S", "max": 4, "link": "pcie"},
-       {"board": "RTX PRO 4500 Blackwell", "max": 4, "link": "pcie"},
-       {"board": "RTX PRO 6000 Blackwell", "max": 2, "link": "pcie"}
-     ]},
-    {"id": "dl340-g12", "name": "HPE ProLiant Compute DL340 Gen12", "short": "DL340 Gen12", "group": "Mainstream 2U", "u": 2, "form": "2U rack", "sockets": 1, "cpu": "Intel Xeon 6",
-     "url": "https://www.hpe.com/us/en/collaterals/collateral.a50004261enw.html",
-     "count_source": "https://h50146.www5.hpe.com/directplus_ent/library/pdfs_servers/dl340gen12.pdf",
-     "notes": ["6 in the rear risers, or 4 in the front GPU chassis (which needs a Xeon 6xx1P)."],
-     "gpus": [{"board": "L4", "max": 6, "link": "pcie"}]},
-    {"id": "ml350-g12", "name": "HPE ProLiant Compute ML350 Gen12", "short": "ML350 Gen12", "group": "Tower", "u": 5, "form": "4U tower, 5U racked", "sockets": 2, "cpu": "Intel Xeon 6",
-     "url": "https://www.hpe.com/us/en/collaterals/collateral.a50006995enw.html",
-     "count_source": "https://h50146.www5.hpe.com/directplus_ent/library/pdfs_servers/ml350gen12.pdf",
-     "notes": ["GPU configurations need the redundant and second-CPU fan kits."],
-     "gpus": [
-       {"board": "L4", "max": 4, "link": "pcie"},
-       {"board": "L40S", "max": 2, "link": "pcie"},
-       {"board": "RTX PRO 4500 Blackwell", "max": 5, "link": "pcie", "constraints": ["Limited to 2 at 30 °C ambient."]}
-     ]},
-    {"id": "ml110-g11", "name": "HPE ProLiant ML110 Gen11", "short": "ML110 Gen11", "group": "Tower", "u": null, "form": "tower", "sockets": 1, "cpu": "Intel Xeon",
-     "url": "https://h50146.www5.hpe.com/directplus_ent/library/pdfs_servers/ml110gen11.pdf",
-     "count_source": "https://h50146.www5.hpe.com/directplus_ent/library/pdfs_servers/ml110gen11.pdf",
-     "notes": ["CPUs above 150 W can't be combined with a GPU."],
-     "gpus": [{"board": "L4", "max": 2, "link": "pcie"}]},
-    {"id": "dl320-g12", "name": "HPE ProLiant Compute DL320 Gen12", "short": "DL320 Gen12", "group": "1U", "u": 1, "form": "1U rack", "sockets": 1, "cpu": "Intel Xeon 6",
-     "url": "https://www.hpe.com/us/en/collaterals/collateral.a50004283enw.html",
-     "count_source": "https://h50146.www5.hpe.com/directplus_ent/library/pdfs_servers/dl320gen12.pdf",
-     "notes": ["GPU base unit; needs a Rich I/O Xeon 6xx1P of 270 W or less."],
-     "gpus": [
-       {"board": "L4", "max": 4, "link": "pcie"},
-       {"board": "L40S", "max": 2, "link": "pcie"}
-     ]},
-    {"id": "dl325-g12", "name": "HPE ProLiant Compute DL325 Gen12", "short": "DL325 Gen12", "group": "1U", "u": 1, "form": "1U rack", "sockets": 1, "cpu": "AMD EPYC 9005",
-     "url": "https://h50146.www5.hpe.com/directplus_ent/library/pdfs_servers/dl325gen12.pdf",
-     "count_source": "https://h50146.www5.hpe.com/directplus_ent/library/pdfs_servers/dl325gen12.pdf",
-     "notes": ["GPU base unit; 5 cards only at 25 °C ambient or below."],
-     "gpus": [{"board": "L4", "max": 4, "link": "pcie"}]},
-    {"id": "dl360-g12", "name": "HPE ProLiant Compute DL360 Gen12", "short": "DL360 Gen12", "group": "1U", "u": 1, "form": "1U rack", "sockets": 2, "cpu": "Intel Xeon 6",
-     "url": "https://www.hpe.com/us/en/collaterals/collateral.a50006984enw.html",
-     "count_source": "https://cdn.blueally.com/servercomputeworks/datasheets/gen12-servers/hpe_proliant_dl360_gen12-datasheet.pdf",
-     "notes": ["Single-wide cards in the rear slots."],
-     "gpus": [{"board": "L4", "max": 3, "link": "pcie"}]},
-    {"id": "dl365-g11", "name": "HPE ProLiant DL365 Gen11", "short": "DL365 Gen11", "group": "1U", "u": 1, "form": "1U rack", "sockets": 2, "cpu": "AMD EPYC 9004/9005",
-     "url": "https://h50146.www5.hpe.com/directplus_ent/library/pdfs_servers/dl365gen11.pdf",
-     "count_source": "https://h50146.www5.hpe.com/directplus_ent/library/pdfs_servers/dl365gen11.pdf",
-     "notes": ["GPU base unit, two front GPU slots; needs two processors."],
-     "gpus": [
-       {"board": "L4", "max": 2, "link": "pcie"},
-       {"board": "RTX PRO 4500 Blackwell", "max": 2, "link": "pcie"}
-     ]},
-    {"id": "dl145-g11", "name": "HPE ProLiant DL145 Gen11", "short": "DL145 Gen11", "group": "Edge", "u": 2, "form": "2U short-depth edge", "sockets": 1, "cpu": "AMD EPYC 8004",
-     "url": "https://h50146.www5.hpe.com/directplus_ent/library/pdfs_servers/dl145gen11.pdf",
-     "count_source": "https://h50146.www5.hpe.com/directplus_ent/library/pdfs_servers/dl145gen11.pdf",
-     "notes": [],
-     "gpus": [
-       {"board": "L4", "max": 2, "link": "pcie"},
-       {"board": "L40S", "max": 1, "link": "pcie"}
-     ]},
-    {"id": "xd685", "name": "HPE ProLiant Compute XD685", "short": "XD685", "group": "8-GPU systems", "u": 6, "form": "5U liquid or 6U air", "sockets": 2, "cpu": "AMD EPYC 9005",
-     "url": "https://buy.hpe.com/emea_africa/en/compute/rack-servers/proliant-compute-xd600-servers/c/1014859861",
-     "count_source": "https://buy.hpe.com/emea_africa/en/compute/rack-servers/proliant-compute-xd600-servers/c/1014859861",
-     "notes": ["Whole 8-GPU systems; CPUs, memory and storage come with the system."],
-     "gpus": [
-       {"board": "HGX H200", "max": 8, "link": "nvswitch"},
-       {"board": "HGX B200", "max": 8, "link": "nvswitch"},
-       {"board": "HGX B300", "max": 8, "link": "nvswitch", "constraints": ["Needs the high-power liquid-cooled chassis."]},
-       {"board": "AMD MI355X", "max": 8, "link": "fabric"}
-     ]}
-  ],
-  "unsized": [
-    {"name": "HPE ProLiant DL145 Gen11", "boards": ["RTX PRO 4500 Blackwell"]},
-    {"name": "HPE ProLiant EL2000 EL240 Gen12", "boards": ["RTX PRO 4500 Blackwell", "RTX PRO 6000 Blackwell"]},
-    {"name": "HPE Edge Server e930t", "boards": ["RTX PRO 4500 Blackwell", "RTX PRO 6000 Blackwell"]}
-  ]
+ "vendor": "HPE",
+ "checked": "2026-10-20",
+ "about": "Every current HPE ProLiant server that takes one of the estimator's boards, for the US. Which GPU and NVLink bridge each server takes: the matrix. How many cards, and each constraint: the server's US QuickSpecs (quickspecs: URL, version, date). max is per server; a node here is at most 8, so larger counts are capped at 8. Gen11 servers with a Gen12 successor that takes the same GPUs are left out.",
+ "matrix": {
+  "title": "NVIDIA Accelerators for HPE QuickSpecs",
+  "version": "83",
+  "date": "2026-09-08",
+  "url": "https://www.hpe.com/us/en/collaterals/collateral.c04123180.html"
+ },
+ "servers": [
+  {
+   "id": "dl380a-g12",
+   "name": "HPE ProLiant Compute DL380a Gen12",
+   "short": "DL380a Gen12",
+   "group": "GPU-dense",
+   "u": 4,
+   "form": "4U rack",
+   "sockets": 2,
+   "cpu": "Intel Xeon 6",
+   "url": "https://www.hpe.com/us/en/products/compute/proliant/dl380a-gen12.html",
+   "notes": [
+    "Up to 10 double-wide or 16 single-wide cards; sized here at 8.",
+    "GPUs install in pairs, split evenly between the sockets."
+   ],
+   "gpus": [
+    {
+     "board": "L4",
+     "max": 8,
+     "link": "pcie"
+    },
+    {
+     "board": "L40S",
+     "max": 8,
+     "link": "pcie"
+    },
+    {
+     "board": "RTX PRO 6000 Blackwell",
+     "max": 8,
+     "link": "pcie"
+    },
+    {
+     "board": "H200 NVL",
+     "max": 8,
+     "link": {
+      "bridge": 4,
+      "kit": "S4A91C"
+     },
+     "constraints": [
+      "NVLink bridges are not supported in the 10-card layout."
+     ]
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a00047453enw.html",
+    "version": "20",
+    "date": "2026-09-08"
+   }
+  },
+  {
+   "id": "dl380-g12",
+   "name": "HPE ProLiant Compute DL380 Gen12",
+   "short": "DL380 Gen12",
+   "group": "Mainstream 2U",
+   "u": 2,
+   "form": "2U rack",
+   "sockets": 2,
+   "cpu": "Intel Xeon 6",
+   "url": "https://www.hpe.com/us/en/products/compute/proliant/dl380-gen12.html",
+   "notes": [
+    "Double-wide cards: one per riser, two slots each.",
+    "GPUs and a rear drive cage can't be combined."
+   ],
+   "gpus": [
+    {
+     "board": "L4",
+     "max": 8,
+     "link": "pcie"
+    },
+    {
+     "board": "L40S",
+     "max": 3,
+     "link": "pcie"
+    },
+    {
+     "board": "RTX PRO 4500 Blackwell",
+     "max": 5,
+     "link": "pcie",
+     "constraints": [
+      "Not in the half-length slots 3 and 6."
+     ]
+    },
+    {
+     "board": "RTX PRO 6000 Blackwell",
+     "max": 3,
+     "link": "pcie",
+     "constraints": [
+      "Power-capped at 450 W.",
+      "27 °C maximum ambient."
+     ]
+    },
+    {
+     "board": "H200 NVL",
+     "max": 2,
+     "link": "pcie",
+     "constraints": [
+      "Power-capped at 450 W (iLO Advanced with Advanced Power Management).",
+      "NVLink bridges are not supported on the DL380 Gen12: the cards reach each other over PCIe.",
+      "27 °C maximum ambient."
+     ]
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a00073551enw.html",
+    "version": "20",
+    "date": "2026-10-05"
+   }
+  },
+  {
+   "id": "dl385-g11",
+   "name": "HPE ProLiant DL385 Gen11",
+   "short": "DL385 Gen11",
+   "group": "Mainstream 2U",
+   "u": 2,
+   "form": "2U rack",
+   "sockets": 2,
+   "cpu": "AMD EPYC 9004/9005",
+   "url": "https://www.hpe.com/us/en/collaterals/collateral.a50004300enw.html",
+   "notes": [
+    "GPU base unit: front GPU bays, two processors, high-performance fans."
+   ],
+   "gpus": [
+    {
+     "board": "L4",
+     "max": 8,
+     "link": "pcie",
+     "constraints": [
+      "8 cards need the 8 single-wide GPU kit; the 4 double-wide kit takes 4."
+     ]
+    },
+    {
+     "board": "L40S",
+     "max": 4,
+     "link": "pcie"
+    },
+    {
+     "board": "RTX PRO 4500 Blackwell",
+     "max": 4,
+     "link": "pcie"
+    },
+    {
+     "board": "RTX PRO 6000 Blackwell",
+     "max": 4,
+     "link": "pcie"
+    },
+    {
+     "board": "H200 NVL",
+     "max": 4,
+     "link": {
+      "bridge": 2,
+      "kit": "S4A90C"
+     },
+     "constraints": [
+      "iLO GPU power capping is required for 3 or 4 cards."
+     ]
+    },
+    {
+     "board": "AMD MI350P",
+     "max": 4,
+     "link": "pcie",
+     "constraints": [
+      "450 W iLO GPU power capping is required.",
+      "HPE targets shipping from December 2026."
+     ]
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a50004300enw.html",
+    "version": "49",
+    "date": "2026-10-05"
+   }
+  },
+  {
+   "id": "dl345-g12",
+   "name": "HPE ProLiant Compute DL345 Gen12",
+   "short": "DL345 Gen12",
+   "group": "Mainstream 2U",
+   "u": 2,
+   "form": "2U rack",
+   "sockets": 1,
+   "cpu": "AMD EPYC 9005",
+   "url": "https://www.hpe.com/us/en/collaterals/collateral.a50009233enw.html",
+   "notes": [
+    "The GPU chassis takes cards in its front slots; 4 need the Front 4xGPU Enablement Kit (P84160-B21)."
+   ],
+   "gpus": [
+    {
+     "board": "L4",
+     "max": 6,
+     "link": "pcie",
+     "constraints": [
+      "6 in the rear of the SFF, EDSFF or LFF chassis; 4 in the front of the GPU chassis."
+     ]
+    },
+    {
+     "board": "L40S",
+     "max": 4,
+     "link": "pcie"
+    },
+    {
+     "board": "RTX PRO 4500 Blackwell",
+     "max": 4,
+     "link": "pcie"
+    },
+    {
+     "board": "RTX PRO 6000 Blackwell",
+     "max": 2,
+     "link": "pcie"
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a50009233enw.html",
+    "version": "13",
+    "date": "2026-10-05"
+   }
+  },
+  {
+   "id": "dl340-g12",
+   "name": "HPE ProLiant Compute DL340 Gen12",
+   "short": "DL340 Gen12",
+   "group": "Mainstream 2U",
+   "u": 2,
+   "form": "2U rack",
+   "sockets": 1,
+   "cpu": "Intel Xeon 6",
+   "url": "https://www.hpe.com/us/en/collaterals/collateral.a50004261enw.html",
+   "notes": [
+    "Front GPU chassis: the 4x GPU kit needs a Rich I/O Xeon 6xx1P; the 2x kit doesn't take one."
+   ],
+   "gpus": [
+    {
+     "board": "L4",
+     "max": 4,
+     "link": "pcie"
+    },
+    {
+     "board": "L40S",
+     "max": 4,
+     "link": "pcie",
+     "constraints": [
+      "GPU chassis only; needs the Front GPU L40S power cable kit."
+     ]
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a50004261enw.html",
+    "version": "16",
+    "date": "2026-10-05"
+   }
+  },
+  {
+   "id": "ml350-g12",
+   "name": "HPE ProLiant Compute ML350 Gen12",
+   "short": "ML350 Gen12",
+   "group": "Tower",
+   "u": 5,
+   "form": "4U tower, 5U racked",
+   "sockets": 2,
+   "cpu": "Intel Xeon 6",
+   "url": "https://www.hpe.com/us/en/collaterals/collateral.a50006995enw.html",
+   "notes": [
+    "GPU configurations need the redundant and second-CPU fan kits."
+   ],
+   "gpus": [
+    {
+     "board": "L4",
+     "max": 4,
+     "link": "pcie"
+    },
+    {
+     "board": "L40S",
+     "max": 2,
+     "link": "pcie",
+     "constraints": [
+      "Slots 2 and 6 only."
+     ]
+    },
+    {
+     "board": "RTX PRO 4500 Blackwell",
+     "max": 4,
+     "link": "pcie",
+     "constraints": [
+      "Needs the external GPU fan kit for 30 °C; without it, 2 cards at 23 °C."
+     ]
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a50006995enw.html",
+    "version": "18",
+    "date": "2026-10-05"
+   }
+  },
+  {
+   "id": "ml110-g11",
+   "name": "HPE ProLiant ML110 Gen11",
+   "short": "ML110 Gen11",
+   "group": "Tower",
+   "u": null,
+   "form": "tower",
+   "sockets": 1,
+   "cpu": "Intel Xeon",
+   "url": "https://www.hpe.com/us/en/collaterals/collateral.a00054055enw.html",
+   "notes": [
+    "The L4 needs the GPU riser and L4 support kits; the CPU is limited to 150 W; 25 °C maximum ambient."
+   ],
+   "gpus": [
+    {
+     "board": "L4",
+     "max": 2,
+     "link": "pcie"
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a00054055enw.html",
+    "version": "36",
+    "date": "2026-07-13"
+   }
+  },
+  {
+   "id": "dl320-g12",
+   "name": "HPE ProLiant Compute DL320 Gen12",
+   "short": "DL320 Gen12",
+   "group": "1U",
+   "u": 1,
+   "form": "1U rack",
+   "sockets": 1,
+   "cpu": "Intel Xeon 6",
+   "url": "https://www.hpe.com/us/en/collaterals/collateral.a50004283enw.html",
+   "notes": [
+    "The GPU server needs a Rich I/O Xeon 6xx1P (16 to 80 cores); CPUs above 270 W need the closed-loop liquid cooling fan kit."
+   ],
+   "gpus": [
+    {
+     "board": "L4",
+     "max": 4,
+     "link": "pcie"
+    },
+    {
+     "board": "L40S",
+     "max": 2,
+     "link": "pcie"
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a50004283enw.html",
+    "version": "21",
+    "date": "2026-10-05"
+   }
+  },
+  {
+   "id": "dl325-g12",
+   "name": "HPE ProLiant Compute DL325 Gen12",
+   "short": "DL325 Gen12",
+   "group": "1U",
+   "u": 1,
+   "form": "1U rack",
+   "sockets": 1,
+   "cpu": "AMD EPYC 9005",
+   "url": "https://www.hpe.com/us/en/collaterals/collateral.a50009232enw.html",
+   "notes": [
+    "GPU base unit; L4 cards go in its front slots."
+   ],
+   "gpus": [
+    {
+     "board": "L4",
+     "max": 4,
+     "link": "pcie"
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a50009232enw.html",
+    "version": "13",
+    "date": "2026-10-05"
+   }
+  },
+  {
+   "id": "dl360-g12",
+   "name": "HPE ProLiant Compute DL360 Gen12",
+   "short": "DL360 Gen12",
+   "group": "1U",
+   "u": 1,
+   "form": "1U rack",
+   "sockets": 2,
+   "cpu": "Intel Xeon 6",
+   "url": "https://www.hpe.com/us/en/collaterals/collateral.a50006984enw.html",
+   "notes": [
+    "Up to three low-profile single-wide GPUs of 75 W or less, in the rear slots."
+   ],
+   "gpus": [
+    {
+     "board": "L4",
+     "max": 3,
+     "link": "pcie"
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a50006984enw.html",
+    "version": "20",
+    "date": "2026-10-05"
+   }
+  },
+  {
+   "id": "dl365-g11",
+   "name": "HPE ProLiant DL365 Gen11",
+   "short": "DL365 Gen11",
+   "group": "1U",
+   "u": 1,
+   "form": "1U rack",
+   "sockets": 2,
+   "cpu": "AMD EPYC 9004/9005",
+   "url": "https://www.hpe.com/us/en/collaterals/collateral.a50004299enw.html",
+   "notes": [
+    "GPU base unit, two front GPU slots; needs two processors."
+   ],
+   "gpus": [
+    {
+     "board": "L4",
+     "max": 2,
+     "link": "pcie"
+    },
+    {
+     "board": "RTX PRO 4500 Blackwell",
+     "max": 2,
+     "link": "pcie"
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a50004299enw.html",
+    "version": "46",
+    "date": "2026-10-05"
+   }
+  },
+  {
+   "id": "dl145-g11",
+   "name": "HPE ProLiant DL145 Gen11",
+   "short": "DL145 Gen11",
+   "group": "Edge",
+   "u": 2,
+   "form": "2U short-depth edge",
+   "sockets": 1,
+   "cpu": "AMD EPYC 8004",
+   "url": "https://www.hpe.com/us/en/collaterals/collateral.a50009217enw.html",
+   "notes": [],
+   "gpus": [
+    {
+     "board": "L4",
+     "max": 3,
+     "link": "pcie"
+    },
+    {
+     "board": "L40S",
+     "max": 1,
+     "link": "pcie"
+    },
+    {
+     "board": "RTX PRO 4500 Blackwell",
+     "max": 1,
+     "link": "pcie",
+     "constraints": [
+      "Needs the 1U heat sink and GPU cable kits; double-wide and single-wide cards can't be mixed."
+     ]
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a50009217enw.html",
+    "version": "23",
+    "date": "2026-10-05"
+   }
+  },
+  {
+   "id": "xd685",
+   "name": "HPE ProLiant Compute XD685",
+   "short": "XD685",
+   "group": "8-GPU systems",
+   "u": 6,
+   "form": "5U liquid or 6U air",
+   "sockets": 2,
+   "cpu": "AMD EPYC 9005",
+   "url": "https://www.hpe.com/us/en/collaterals/collateral.a00073553enw.html",
+   "notes": [
+    "Whole 8-GPU systems; CPUs, memory and storage come with the system."
+   ],
+   "gpus": [
+    {
+     "board": "HGX H200",
+     "max": 8,
+     "link": "nvswitch",
+     "constraints": [
+      "Air-cooled (6U) or direct liquid cooling (5U)."
+     ]
+    },
+    {
+     "board": "HGX B200",
+     "max": 8,
+     "link": "nvswitch",
+     "constraints": [
+      "Direct liquid cooling only (5U)."
+     ]
+    },
+    {
+     "board": "HGX B300",
+     "max": 8,
+     "link": "nvswitch",
+     "constraints": [
+      "Direct liquid cooling only (5U)."
+     ]
+    },
+    {
+     "board": "AMD MI355X",
+     "max": 8,
+     "link": "fabric",
+     "constraints": [
+      "Direct liquid cooling only (5U)."
+     ]
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a00073553enw.html",
+    "version": "16",
+    "date": "2026-08-03"
+   }
+  }
+ ],
+ "unsized": [
+  {
+   "name": "HPE ProLiant EL2000 EL240 Gen12",
+   "boards": [
+    "RTX PRO 4500 Blackwell",
+    "RTX PRO 6000 Blackwell"
+   ]
+  },
+  {
+   "name": "HPE Edge Server e930t",
+   "boards": [
+    "RTX PRO 4500 Blackwell",
+    "RTX PRO 6000 Blackwell"
+   ]
+  }
+ ],
+ "market": "US"
 }
 </script>
 <script>
@@ -1255,7 +1687,7 @@ const popText  = g => { const p = popOf(g); return p.length>1 ? `${p.slice(0, -1
    CATALOG is that block, read once. HPE_HOSTS is the shape the GPU view uses: per board, only what the
    server changes from the board's own figures (max, pop, split, bridge, nolink, est), so with each board
    in its default server (the first that sells it) the GPU view's figures are the board's own, except the
-   MI350P, whose only HPE server holds 2. The Servers view reads CATALOG directly. */
+   MI350P, whose only HPE server holds 4. The Servers view reads CATALOG directly. */
 const CATALOG = JSON.parse(document.getElementById('catalog-hpe').textContent);
 const boardMax = g => g.pop ? Math.max(...g.pop) : g.max || 8;   // the most cards a node of this board holds, before any server
 const HPE_HOSTS = CATALOG.servers.map(sv=> ({
@@ -1364,7 +1796,7 @@ const DATA_AS_OF = "October 2026";   // when the model and board figures were la
    Bump it with each release tag; add to CHANGES whenever a release changes what the figures come to. */
 const VERSION = "1.7.0";
 const CHANGES = [
-  {v:"1.7.0", what:"The answer now opens by server: the Servers view sizes the model on every current GPU-capable HPE ProLiant server, recommends one configuration, tags the smaller and bigger servers that also work, and shows every layout its wiring allows, including pipelining across NVLink groups and over PCIe. The GPU view is one click away, and links made before 1.7.0 open in it. Pipeline across bridge groups, off by default, in Advanced settings: on H200 NVL servers one copy of a model may span both bridged groups of 4 as two pipeline stages, tensor-parallel within each, so a model or a KV cache too big for one group fits on 8 cards. With it off nothing changes. With it on, a board that could only run two copies of 4 can also be suggested as one copy of 8 when that is the only layout that holds everyone; speed per user is sized as one group's, since each stage still reads all of its weights per token, and the figures for pipelined copies are modeled, not yet fitted to a benchmark. Each board is now named with the HPE server it is sized in, and any of 13 current GPU-capable HPE ProLiant servers can be picked in Advanced settings to compare only the boards it takes, at its limits (on the DL385 Gen11, 4 double-wide cards and 2-way H200 NVL bridges; on the DL380 Gen12, H200 NVL with no bridge). Server sizing gives the L4 and RTX PRO 4500 16 CPU cores per GPU at any count (other boards keep 32 per GPU, 16 at 8 GPUs). On Auto the figures are unchanged, except the AMD MI350P: its only HPE server, the DL385 Gen11, holds 2, so it is now sized at 2 cards."},
+  {v:"1.7.0", what:"The answer now opens by server: the Servers view sizes the model on every current GPU-capable HPE ProLiant server, recommends one configuration, tags the smaller and bigger servers that also work, and shows every layout its wiring allows, including pipelining across NVLink groups and over PCIe. The GPU view is one click away, and links made before 1.7.0 open in it. Pipeline across bridge groups, off by default, in Advanced settings: on H200 NVL servers one copy of a model may span both bridged groups of 4 as two pipeline stages, tensor-parallel within each, so a model or a KV cache too big for one group fits on 8 cards. With it off nothing changes. With it on, a board that could only run two copies of 4 can also be suggested as one copy of 8 when that is the only layout that holds everyone; speed per user is sized as one group's, since each stage still reads all of its weights per token, and the figures for pipelined copies are modeled, not yet fitted to a benchmark. Each board is now named with the HPE server it is sized in, and any of 13 current GPU-capable HPE ProLiant servers can be picked in Advanced settings to compare only the boards it takes, at its limits (on the DL385 Gen11, 4 double-wide cards and 2-way H200 NVL bridges; on the DL380 Gen12, H200 NVL with no bridge). Server sizing gives the L4 and RTX PRO 4500 16 CPU cores per GPU at any count (other boards keep 32 per GPU, 16 at 8 GPUs). On Auto the figures are unchanged, except the AMD MI350P: its only HPE server, the DL385 Gen11, holds 4, so it is now sized at 4 cards."},
   {v:"1.5.0", what:"The AMD MI355X joins the boards: 288 GB per GPU, sold only as 8-GPU systems, with published benchmarks of its own. Its GPUs are wired to each other with no switch, one Infinity Fabric link per pair, so a copy split across 2 or 4 of them uses only the links among them. Counting AMD's MI355X benchmark runs the same way, AMD's software reaches 0.75 of the hardware shares rather than 0.68, so the MI350P's figures come out up to 10% faster."},
   {v:"1.4.0", what:"When two layouts use the same GPUs, the suggestion runs more copies of the model rather than splitting one copy wider, on NVLink boards too, since both reach the goal and copies leave room for more users. A small model on an 8-GPU HGX system now runs as 8 copies, not one copy across all 8: speed per user comes out lower but still within the goal. The number of GPUs is unchanged."},
   {v:"1.2.0", what:"Speed and first-token estimates are calibrated against 295 published benchmark points: board compute is now each datasheet's dense figure, and the shares of it serving reaches are fitted, as are vLLM's fixed costs per step and per request, with a further factor for AMD's software stack fitted to MI355X runs. Speed per user, which ran about 20% slow, now lands near the measured figures, prompts read about twice as fast, and a likely range sits beside both. The speed goal is judged at the cautious end of that range. The RTX PRO 6000's memory bandwidth is corrected to the Server Edition's 1,597 GB/s."},
@@ -2326,7 +2758,7 @@ function renderCfg(A, cfgs){
     + `<div class="svsub"><h3>Layouts on this server</h3><span class="cap">Every layout the wiring allows, at each number of copies the server holds. You pick by what the customer is buying for.</span></div>${table}`
     + (d && !systemOf(d.g) ? `<div class="svsub"><h3>Build for ${d.gpus} card${d.gpus===1 ? "" : "s"}</h3></div><ul class="checks">${buildChecks(c, d)}</ul>` : d ? `<ul class="checks">${buildChecks(c, d)}</ul>` : "")
     + (notes.length ? `<ul class="svnotes">${notes.map(n=> `<li>${n}</li>`).join("")}</ul>` : "")
-    + `<p class="cap">Sources: <a href="${CATALOG.matrix.url}" target="_blank" rel="noopener">${esc(CATALOG.matrix.title)}, version ${esc(CATALOG.matrix.version)}</a> for which GPUs and bridges the server takes; <a href="${esc(sv.count_source)}" target="_blank" rel="noopener">this server's configuration guide</a> for the card count. Confirm a build against the current QuickSpecs.</p>`;
+    + `<p class="cap">Sources: <a href="${CATALOG.matrix.url}" target="_blank" rel="noopener">${esc(CATALOG.matrix.title)}, version ${esc(CATALOG.matrix.version)}</a> for which GPUs and bridges the server takes; <a href="${esc(sv.quickspecs.url)}" target="_blank" rel="noopener">this server's US QuickSpecs, version ${esc(sv.quickspecs.version)} (${esc(sv.quickspecs.date)})</a> for the card count and constraints. Confirm a build against the current QuickSpecs.</p>`;
   return d || null;
 }
 /* the whole Servers view, and Show the math for the configuration it details */
@@ -4223,7 +4655,7 @@ const TIPS = {
   chunk:"When a new question arrives, the server reads the prompt in pieces while it keeps writing replies for everyone else. Small pieces keep other people's replies flowing smoothly and ride along with their steps almost free, but each prompt takes more steps to read, so under load prompts queue up and first replies wait longer. Big pieces read prompts sooner, but everyone else's text briefly freezes while each piece is read. The numbers on each choice show both effects on your setup.",
   pause:"While a new prompt is being read, everyone already mid-reply waits, whichever workload they belong to. This is the longest gap they would see between words. Under 0.1 s is unnoticeable; choose Smooth streaming to shorten it.",
   tp:"How many GPUs one copy of the model is split across (tensor parallelism). Every layer's weights are divided and the GPUs all-reduce after each layer, so splitting needs NVLink to be fast. A copy is split 1, 2, 4 or 8 ways because serving engines need the split to divide the model's attention heads evenly; that is a software rule and applies to every board. Auto picks the smallest layout; a fixed number applies to every board. On a bridged board with Pipeline across bridge groups on, a copy wider than one bridge is tensor-parallel within each group and pipelined across them.",
-  svScope:"The HPE servers the answer may use: every current HPE ProLiant server that takes one of these GPUs, from HPE's NVIDIA Accelerators for HPE QuickSpecs and each server's own configuration guide. Pick the customer's standard builds, or the servers you can sell, to size only those. Gen11 servers with a Gen12 successor that takes the same GPUs are left out.",
+  svScope:"The HPE servers the answer may use: every current HPE ProLiant server that takes one of these GPUs, from HPE's NVIDIA Accelerators for HPE QuickSpecs and each server's US QuickSpecs. Pick the customer's standard builds, or the servers you can sell, to size only those. Gen11 servers with a Gen12 successor that takes the same GPUs are left out.",
   svSmaller:"The smallest server, by rack units, that also meets your goal (or comes closest), for a customer who wants a smaller footprint than the recommendation. Check its headroom: it may serve your users with little room to spare.",
   svMoreRoom:"A bigger server with more room than the recommendation: its leanest configuration within your goal and its roomiest, for a customer who expects to grow.",
   svModeled:"This layout pipelines one copy across stages that hand each token's activations to the next over PCIe. The memory it needs is exact; its speed is modeled from the same fitted shares as the rest, with a PCIe hand-off per stage, but no pipelined run is in the benchmark set yet. Load-test it before quoting a speed.",
