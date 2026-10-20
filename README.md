@@ -17,6 +17,19 @@ Every result is one server of up to 8 GPUs. If one node of a board can't serve e
 
 GPU counts round up to what can be bought. H200 NVL servers take 1, 2, 4 or 8 cards, but an NVLink bridge joins at most 4 of them, so one copy of a model spans at most 4 and 8 cards run two copies. **Pipeline across bridge groups** in Advanced settings (off by default) lets one copy span both groups as two pipeline stages, tensor-parallel within each and handing activations between them over PCIe (vLLM's `--tensor-parallel-size 4 --pipeline-parallel-size 2`): that fits a model or a KV cache that one group can't hold, at about one group's speed per user, since each stage still reads all of its weights for every token; two copies of 4 are still preferred when they fit. Pipelined figures are modeled, not yet fitted to a benchmark. The HGX H200, HGX B200 and HGX B300 are sold only as 8-GPU systems, with all 8 GPUs joined through NVSwitch. So is the AMD MI355X, but with no switch: each GPU has one Infinity Fabric link to each of the other 7, so a copy split across 2 or 4 of them uses only the links among them and pays more per layer than on an HGX. RTX PRO 4500 servers hold up to 5 cards (the limit on HPE servers).
 
+### Servers view
+
+The answer opens by server. **Servers in scope** picks the HPE servers to consider (all by default; the customer's standard builds, say). The page sizes the model on every configuration of those servers — each server with each GPU it takes, at the count and wiring HPE supports — and shows:
+
+- **the recommendation**: the configuration that meets the speed goal with the least GPU memory (then not split over PCIe, not pipelined, the most room, the fewest rack units), with its GPU bays, figures, `vllm serve` line and build checks;
+- **step down / step up**: a smaller server that also works (or comes closest), the same server with its open bays filled, and a bigger server;
+- **every server in scope**: the configurations that hold the model, and for the rest the most GPU memory they carry against what the model needs;
+- **one configuration in detail**: how its cards are wired, every layout the wiring allows (TP within an NVLink group or NVSwitch; TP within groups × PP across them; on PCIe cards, TP over PCIe or PP over PCIe) at each number of copies, and its build.
+
+Pipelined layouts are modeled, not yet fitted to a benchmark, and say so. The server catalog is the JSON block `id="catalog-hpe"` in `index.html`; edit it when HPE revises its QuickSpecs. URL keys: `vw=gpu` opens the GPU view, `hs` lists the servers in scope (dot-separated ids), `cf` the configuration in detail.
+
+### HPE servers
+
 Each board is named with the HPE server it is sized in, and **HPE server** in Advanced settings narrows the comparison to one server at its own limits (URL key `hs`). The list is every current HPE ProLiant server that takes one of these GPUs:
 
 | HPE server | Boards (most cards per server) | Notes |

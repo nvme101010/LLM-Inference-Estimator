@@ -459,6 +459,103 @@
   .math-body .cfgnote{margin:0 18px; padding-top:0; border-top:none}
   .h3sub{font-weight:400; color:var(--muted); font-size:12px; margin-left:4px}
   @media (prefers-reduced-motion:reduce){ details.more > summary::before{transition:none} }
+
+  /* ---- Servers view ---- */
+  .viewbar{display:flex; gap:6px; align-items:center; flex-wrap:wrap}
+  .viewbar button{min-height:40px; padding:0 18px; border:1px solid var(--line-2); background:var(--panel); color:var(--ink-2); border-radius:8px; font:inherit; font-size:14px; font-weight:600; cursor:pointer}
+  .viewbar button[aria-pressed=true]{background:var(--ink); border-color:var(--ink); color:var(--bg)}
+  .viewbar button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  .viewhint{font-size:12.5px; color:var(--muted); margin-left:6px}
+  .sview{display:flex; flex-direction:column; gap:18px}
+  .sview[hidden]{display:none}
+  .sv{padding:20px 22px; display:flex; flex-direction:column; gap:14px}
+  .sv h2, .svtitle{margin:0; font-size:15px; font-weight:600}
+  .sv h3{margin:0; font-size:13px; font-weight:600; color:var(--ink-2)}
+  .sv .cap, .svalt .cap{color:var(--muted); font-size:12.5px; margin:0}
+  .svhead{display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 14px}
+  .svhead .svacts{margin-left:auto; display:flex; gap:14px}
+  .svhead .linkbtn{margin:0; font-size:13px; min-height:32px}
+  .svsub{display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 14px; margin-top:6px}
+  .chipgroups{display:flex; flex-wrap:wrap; gap:10px 22px}
+  .chipgroup{display:flex; flex-wrap:wrap; gap:6px; align-items:center}
+  .chipgroup .gl{width:100%; font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted)}
+  .chip{min-height:36px; padding:0 13px; border-radius:18px; border:1px solid var(--line-2); background:var(--panel-2); color:var(--ink-2); font:inherit; font-size:13px; font-weight:500; cursor:pointer}
+  .chip[aria-pressed=true]{border-color:var(--accent); background:color-mix(in srgb, var(--accent) 13%, var(--panel)); color:var(--ink)}
+  .chip:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  .eyebrow-s{font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase; font-weight:600; color:var(--accent-ink)}
+  .eyebrow-s.warn{color:var(--warn)} .eyebrow-s.up{color:var(--tp)}
+  .rec-top{display:flex; flex-wrap:wrap; gap:18px 36px; justify-content:space-between; align-items:flex-start}
+  .rec-main{flex:1 1 480px; min-width:0; display:flex; flex-direction:column; gap:5px}
+  .rec-name{margin:0; font-size:25px; font-weight:700; line-height:1.18}
+  .rec-name a{color:inherit; text-decoration:none} .rec-name a:hover{text-decoration:underline}
+  .rec-spec{font-size:13px; color:var(--muted)}
+  .rec-cfg{margin:6px 0 0; font-size:16.5px; font-weight:500}
+  .rec-why{margin:0; font-size:14px; color:var(--ink-2); max-width:700px}
+  .rec-bays{display:flex; flex-direction:column; gap:7px}
+  .sublbl{font-size:12px; font-weight:600; color:var(--ink-2)}
+  .bays{display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap}
+  .bgroup{display:flex; flex-direction:column; gap:4px}
+  .bgroup .kit{font-family:"IBM Plex Mono",monospace; font-size:10.5px; color:var(--muted); text-align:center}
+  .bgroup .bridge{display:block; height:4px; border-radius:2px; background:var(--accent)}
+  .bgroup .bridge.off{background:none; border-top:2px dashed var(--line-2); height:0; margin-top:2px}
+  .bgroup .slots{display:flex; gap:4px}
+  .bay{display:block; width:18px; height:30px; border-radius:3px; border:1px dashed var(--muted)}
+  .bay.on{background:var(--accent); border:1px solid var(--accent)}
+  .rec .statstrip{margin-top:0}
+  .launch{display:block; font-family:"IBM Plex Mono",monospace; font-size:12.5px; background:#14181d; color:#e6eaee; padding:11px 13px; border-radius:7px; overflow-x:auto; white-space:pre}
+  .rec-foot{display:flex; flex-wrap:wrap; gap:16px 32px}
+  .rec-foot > div{flex:1 1 420px; min-width:0; display:flex; flex-direction:column; gap:7px}
+  .rec-acts{display:flex; flex-wrap:wrap; gap:12px 18px; align-items:center}
+  .rec-acts .linkbtn{margin:0; font-size:13.5px; font-weight:600}
+  .checks{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px; font-size:13px}
+  .checks li{display:flex; gap:8px}
+  .checks .ok{color:var(--good); font-weight:700} .checks .no{color:var(--warn); font-weight:700}
+  .note-warn{margin:0; font-size:13px; color:var(--ink-2); background:var(--warn-bg); border:1px solid color-mix(in srgb, var(--warn) 40%, transparent); padding:9px 11px; border-radius:7px}
+  .svalt{display:flex; flex-direction:column; gap:12px}
+  .svalt[hidden]{display:none}
+  .alts{display:grid; grid-template-columns:repeat(auto-fit, minmax(290px, 1fr)); gap:14px}
+  .alt{padding:18px; display:flex; flex-direction:column; gap:8px}
+  .alt h3{margin:0; font-size:18px; font-weight:700}
+  .alt .opt-line{margin:0; font-size:14px; font-weight:500}
+  .alt .opt{border:1px solid var(--line); border-radius:8px; padding:9px 11px; display:flex; flex-direction:column; gap:2px; font-size:13px; color:var(--ink-2)}
+  .alt .opt b{font-weight:600; color:var(--ink)}
+  .alt dl{margin:0; display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px 14px; font-size:13px}
+  .alt dt{color:var(--muted)} .alt dd{margin:0; font-weight:600}
+  .alt .linkbtn{align-self:flex-start; margin-top:auto; font-size:13px}
+  .tbl{overflow-x:auto; border:1px solid var(--line); border-radius:9px}
+  .tbl table{width:100%; border-collapse:collapse; font-size:13.5px; min-width:860px}
+  .tbl th, .tbl td{padding:10px 12px; text-align:left; border-top:1px solid var(--line); vertical-align:middle}
+  .tbl thead th{border-top:0; font-size:11.5px; font-weight:500; color:var(--muted); background:var(--panel-2)}
+  .tbl tbody th{font-weight:600}
+  .tbl .num{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
+  .tbl tr.sel{background:color-mix(in srgb, var(--accent) 9%, var(--panel))}
+  .tbl tr.dim td{color:var(--muted)}
+  .tbl .rowbtn{font:inherit; font-weight:600; background:none; border:0; padding:6px 0; color:var(--ink); cursor:pointer; text-align:left}
+  .tbl .rowbtn:hover{color:var(--accent-ink); text-decoration:underline}
+  .tbl .rowbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:3px}
+  .tbl .pill{margin-left:6px; vertical-align:1px}
+  .tbl code.flags{font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--ink-2); white-space:nowrap}
+  .sv .warnx{color:var(--warn); font-weight:500}
+  .holds{display:grid; grid-template-columns:minmax(120px, 160px) minmax(0, 1fr) minmax(180px, 260px); gap:8px 16px; align-items:center; font-size:13px}
+  .holds .hname{font-weight:600}
+  .hbar{position:relative; display:block; height:9px; background:var(--panel-2); border:1px solid var(--line); border-radius:5px}
+  .hbar i{display:block; height:100%; background:var(--ov); border-radius:5px}
+  .hbar b{position:absolute; right:-1px; top:-4px; width:2px; height:15px; background:var(--ink)}
+  .wiring{display:flex; flex-wrap:wrap; gap:12px; align-items:stretch}
+  .wgroup{flex:1 1 260px; min-width:0; border:1px solid var(--line); border-radius:9px; padding:13px; display:flex; flex-direction:column; gap:9px}
+  .wgroup.on{border-color:var(--accent); background:color-mix(in srgb, var(--accent) 7%, var(--panel))}
+  .wgroup .wtop{display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 10px; font-size:13px}
+  .wgroup .cards{display:grid; grid-template-columns:repeat(var(--n), minmax(0, 1fr)); gap:6px}
+  .wgroup .card{border-radius:5px; padding:10px 3px; text-align:center; font-size:11px; font-weight:600; border:1px dashed var(--line-2); color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .wgroup .card.on{background:var(--accent); border:1px solid var(--accent); color:#06110f}
+  .wlink{flex:0 1 190px; display:flex; flex-direction:column; justify-content:center; gap:5px; text-align:center; font-size:12px; color:var(--muted); border-top:2px dashed var(--line-2); border-bottom:2px dashed var(--line-2); padding:8px}
+  .wlink b{color:var(--ink); font-size:13px}
+  .svnotes{margin:0; padding-left:18px; font-size:12.5px; color:var(--ink-2); display:flex; flex-direction:column; gap:3px}
+  @media (max-width:640px){
+    .holds{grid-template-columns:1fr; gap:4px}
+    .holds .hname{margin-top:8px}
+    .rec-name{font-size:21px}
+  }
 </style>
 
 <div class="wrap">
@@ -600,8 +697,24 @@
       </div>
     </section>
 
-    <!-- ============ THE ANSWER ============ -->
-    <section class="panel verdict" aria-label="Answer">
+    <!-- ============ WHICH ANSWER: by server, or by GPU ============ -->
+    <div class="viewbar" id="viewbar" role="group" aria-label="Answer by">
+      <button type="button" data-view="srv" aria-pressed="true">Servers</button>
+      <button type="button" data-view="gpu" aria-pressed="false">GPUs</button>
+      <span class="viewhint" id="viewhint"></span>
+    </div>
+
+    <!-- ============ THE SERVERS VIEW ============ -->
+    <div class="sview" id="serverView">
+      <section class="panel sv" id="svScope" aria-label="Servers in scope"></section>
+      <section class="panel sv rec" id="svRec" aria-label="Recommended server"></section>
+      <section class="svalt" id="svAlt" aria-label="Alternatives"></section>
+      <section class="panel sv" id="svAll" aria-label="Every server in scope"></section>
+      <section class="panel sv" id="svCfg" aria-label="Configuration"></section>
+    </div>
+
+    <!-- ============ THE ANSWER (GPU view) ============ -->
+    <section class="panel verdict" id="gpuAnswer" aria-label="Answer">
       <div class="v-note" id="vnote" role="status" hidden></div>
       <div class="v-top">
         <div>
@@ -648,7 +761,7 @@
       <div id="srvbody"></div>
     </section>
 
-    <section class="panel fit">
+    <section class="panel fit" id="gpuBoards">
       <h2>Every board</h2>
       <div class="cap" id="fitcap"></div>
       <div class="boards" id="gpucards"></div>
@@ -1251,7 +1364,7 @@ const DATA_AS_OF = "October 2026";   // when the model and board figures were la
    Bump it with each release tag; add to CHANGES whenever a release changes what the figures come to. */
 const VERSION = "1.7.0";
 const CHANGES = [
-  {v:"1.7.0", what:"Pipeline across bridge groups, off by default, in Advanced settings: on H200 NVL servers one copy of a model may span both bridged groups of 4 as two pipeline stages, tensor-parallel within each, so a model or a KV cache too big for one group fits on 8 cards. With it off nothing changes. With it on, a board that could only run two copies of 4 can also be suggested as one copy of 8 when that is the only layout that holds everyone; speed per user is sized as one group's, since each stage still reads all of its weights per token, and the figures for pipelined copies are modeled, not yet fitted to a benchmark. Each board is now named with the HPE server it is sized in, and any of 13 current GPU-capable HPE ProLiant servers can be picked in Advanced settings to compare only the boards it takes, at its limits (on the DL385 Gen11, 4 double-wide cards and 2-way H200 NVL bridges; on the DL380 Gen12, H200 NVL with no bridge). On Auto the figures are unchanged, except the AMD MI350P: its only HPE server, the DL385 Gen11, holds 2, so it is now sized at 2 cards."},
+  {v:"1.7.0", what:"The answer now opens by server: the Servers view sizes the model on every current GPU-capable HPE ProLiant server, recommends one configuration with a step down and step ups, and shows every layout its wiring allows, including pipelining across NVLink groups and over PCIe. The GPU view is one click away, and links made before 1.7.0 open in it. Pipeline across bridge groups, off by default, in Advanced settings: on H200 NVL servers one copy of a model may span both bridged groups of 4 as two pipeline stages, tensor-parallel within each, so a model or a KV cache too big for one group fits on 8 cards. With it off nothing changes. With it on, a board that could only run two copies of 4 can also be suggested as one copy of 8 when that is the only layout that holds everyone; speed per user is sized as one group's, since each stage still reads all of its weights per token, and the figures for pipelined copies are modeled, not yet fitted to a benchmark. Each board is now named with the HPE server it is sized in, and any of 13 current GPU-capable HPE ProLiant servers can be picked in Advanced settings to compare only the boards it takes, at its limits (on the DL385 Gen11, 4 double-wide cards and 2-way H200 NVL bridges; on the DL380 Gen12, H200 NVL with no bridge). On Auto the figures are unchanged, except the AMD MI350P: its only HPE server, the DL385 Gen11, holds 2, so it is now sized at 2 cards."},
   {v:"1.5.0", what:"The AMD MI355X joins the boards: 288 GB per GPU, sold only as 8-GPU systems, with published benchmarks of its own. Its GPUs are wired to each other with no switch, one Infinity Fabric link per pair, so a copy split across 2 or 4 of them uses only the links among them. Counting AMD's MI355X benchmark runs the same way, AMD's software reaches 0.75 of the hardware shares rather than 0.68, so the MI350P's figures come out up to 10% faster."},
   {v:"1.4.0", what:"When two layouts use the same GPUs, the suggestion runs more copies of the model rather than splitting one copy wider, on NVLink boards too, since both reach the goal and copies leave room for more users. A small model on an 8-GPU HGX system now runs as 8 copies, not one copy across all 8: speed per user comes out lower but still within the goal. The number of GPUs is unchanged."},
   {v:"1.2.0", what:"Speed and first-token estimates are calibrated against 295 published benchmark points: board compute is now each datasheet's dense figure, and the shares of it serving reaches are fitted, as are vLLM's fixed costs per step and per request, with a further factor for AMD's software stack fitted to MI355X runs. Speed per user, which ran about 20% slow, now lands near the measured figures, prompts read about twice as fast, and a likely range sits beside both. The speed goal is judged at the cautious end of that range. The RTX PRO 6000's memory bandwidth is corrected to the Server Edition's 1,597 GB/s."},
@@ -1979,6 +2092,260 @@ function serverAnswer(cfgs){
 /* GPU memory one user needs at the least: the whole model on one GPU's worth of overhead */
 const needGB = () => compute(1, 1, 1).total/GB;
 
+/* ---------------- the Servers view: on the page ----------------
+   Five parts, top to bottom: the servers in scope (chips), the recommendation, the alternatives (step down,
+   step up), every configuration in scope (those that hold the model, then bars for the servers that can't),
+   and the detail of one configuration (its wiring, every layout on its cards, its build). */
+const cfgById = (cfgs, id) => cfgs.find(c=> c.id===id) || null;
+const groupsUsed = (c, d) => linkKind(c.x)==="bridge" ? Math.ceil(d.gpus / c.x.link.bridge) : 0;
+/* how the cards in use are wired, in words: "one 4-way NVLink group (S4A91C)" */
+function wiringText(c, d){
+  const k = linkKind(c.x);
+  if(k==="bridge"){ const n = groupsUsed(c, d), w = c.x.link.bridge;
+    return `${["one", "two", "three", "four"][n-1] || n} ${w}-way NVLink group${n===1 ? "" : "s"} (${n>1 ? `${n} × ` : ""}${c.x.link.kit})`; }
+  return k==="nvswitch" ? "NVSwitch" : k==="fabric" ? "Infinity Fabric, one link per pair" : "PCIe only, no GPU-to-GPU link";
+}
+const wiringShort = c => { const k = linkKind(c.x);
+  return k==="bridge" ? `${c.x.link.bridge}-way NVLink` : k==="nvswitch" ? "NVSwitch" : k==="fabric" ? "Infinity Fabric" : "PCIe only"; };
+const layoutLine = d => d.reps>1 ? `${d.reps} copies × ${layoutName(d.L)}` : `1 copy · ${layoutName(d.L)}`;
+/* the launch line for a layout: one vllm serve per copy, each on its own cards */
+function launchText(d){
+  const flags = `--tensor-parallel-size ${d.tpw}` + (d.pp>1 ? ` --pipeline-parallel-size ${d.pp}` : "");
+  if(d.reps===1) return `vllm serve <model> ${flags}`;
+  return Array.from({length: d.reps}, (_, i)=> `CUDA_VISIBLE_DEVICES=${Array.from({length: d.L.n}, (_, j)=> i*d.L.n + j).join(",")} `
+    + `vllm serve <model> ${flags} --port ${8000 + i}`).join("\n");
+}
+/* what the speed figure rests on: a board with no benchmark of its own, a pipeline, a split over PCIe */
+const speedBasis = d => [d.g.bench ? "" : "extrapolated", d.modeled ? "pipeline modeled" : "", d.nr ? "split over PCIe" : ""].filter(Boolean);
+const flagPills = d => (d.nr ? ` <span class="pill bad">split over PCIe</span>` : "")
+  + (d.modeled ? ` <span class="pill neutral" data-tip="svModeled" tabindex="0">pipeline modeled</span>` : "");
+const star = d => d.g.bench ? "" : `<span class="tipl" data-tip="extrap" tabindex="0">*</span>`;
+
+/* the server's GPU bays: bridged groups with their kit, the cards in use filled */
+function baysHtml(c, d){
+  const k = linkKind(c.x), size = k==="bridge" ? c.x.link.bridge : c.max, groups = Math.ceil(c.max / size);
+  const kit = k==="bridge" ? c.x.link.kit : k==="nvswitch" ? "NVSwitch" : k==="fabric" ? "Infinity Fabric" : "PCIe";
+  const label = `${c.max} GPU bays, ${d ? d.gpus : 0} in use` + (k==="bridge" ? `, in ${groups} groups of ${size} joined by ${kit} NVLink bridges` : `, ${kit}`);
+  return `<div class="bays" role="img" aria-label="${label}">` + Array.from({length: groups}, (_, gi)=>{
+    const from = gi*size, n = Math.min(size, c.max - from), used = d ? Math.max(0, Math.min(n, d.gpus - from)) : 0;
+    const linked = k!=="pcie" && used > 1;
+    return `<div class="bgroup"><span class="kit">${used ? kit : "open"}</span><span class="bridge${linked ? "" : " off"}"></span>`
+      + `<span class="slots">${Array.from({length: n}, (_, i)=> `<span class="bay${i < used ? " on" : ""}"></span>`).join("")}</span></div>`;
+  }).join("") + `</div>`;
+}
+/* the four figures for a layout */
+function statsHtml(d){
+  const t = d.t, all = allUsers(), g = GOALS[S.goal], basis = speedBasis(d);
+  return `<div class="statstrip">`
+    + statCell("tpsUser", "Speed per user", fmtTps(t.perUser), "tok/s", `${likelyTps(t.perUser)}${S.goal!=="any" ? ` · goal ${g.tps}+` : ""}${basis.length ? ` · ${basis.join(" · ")}` : ""}`, basis.length ? "warn" : "")
+    + statCell("ttft", "First token", fmtTime(t.ttft)[0], fmtTime(t.ttft)[1], `${likelyTime(t.ttft)}${S.goal!=="any" ? ` · goal under ${g.ttft} s` : ""}`)
+    + statCell("capacity", "Room for", commas(d.room), d.room===1 ? "user" : "users", d.room < all ? `of your ${commas(all)}: below the goal past that` : `you have ${commas(all)}${d.memRoom > d.room ? ` · cache holds ${commas(d.memRoom)}` : ""}`, d.room < all ? "warn" : "")
+    + statCell("srvGpu", "GPU memory", boxTotal(d.memGB).split(" ")[0], S.unit, `${fmtMem(d.perGB)} used of ${boxMem(d.g)} per card`)
+    + `</div>`;
+}
+/* the build around a layout, as checks: by NVIDIA's guidance, CPU cores as HPE Private Cloud AI builds them */
+function buildChecks(c, d){
+  const ok = t => `<li><span class="ok" aria-hidden="true">✓</span><span>${t}</span></li>`, no = t => `<li><span class="no" aria-hidden="true">!</span><span>${t}</span></li>`;
+  const x = c.x, sv = c.sv, out = [];
+  if(x.unconfirmed) out.push(no(`Card count to confirm: ${esc(x.unconfirmed)}.`));
+  if(systemOf(d.g)){ out.push(ok(`CPUs, memory and storage come with the ${d.g.n} system (${esc(sv.cpu)})`)); return out.join(""); }
+  const s = serverOf(d.g, d.gpus, [[d, d.gpus]]);
+  if(linkKind(x)==="bridge"){ const n = groupsUsed(c, d); out.push(ok(`${n} × ${x.link.kit} ${x.link.bridge}-way NVLink bridge${n===1 ? "" : "s"}`)); }
+  out.push(sv.sockets >= 2 ? ok(`2 sockets, ${commas(s.cores)} physical cores (${s.cores/d.gpus} per GPU, as HPE Private Cloud AI builds it)`)
+                           : no(`One socket (${esc(sv.cpu)}): NVIDIA's guidance asks for two, with at least 6 cores per GPU`));
+  out.push(ok(`${commas(Math.ceil(s.ram))} GB system memory: 2 × GPU memory, over every channel`));
+  out.push(ok(`${capParts(s.diskGB).join(" ")} usable NVMe for weights, plus a 1 TB boot drive`));
+  out.push(no(`Power and PSU redundancy: check in HPE Power Advisor`));
+  return out.join("");
+}
+/* the sentence under a configuration: how its copy is laid out, and what's left in the server */
+function layoutWhy(c, d){
+  const bridged = linkKind(c.x)==="bridge", open = c.max - d.gpus;
+  const how = d.pp>1 ? `One copy across ${d.pp} ${bridged ? "NVLink groups" : "cards"} as pipeline stages${d.tpw>1 ? `, tensor-parallel across the ${d.tpw} cards of each` : ""}.`
+            : d.reps>1 ? `${d.reps} copies of the model${d.tpw>1 ? `, each tensor-parallel across ${d.tpw} ${bridged ? "bridged " : ""}cards` : ", one per card"}, sharing the users.`
+            : d.tpw>1 ? `One copy, tensor-parallel across ${d.tpw} ${bridged ? "bridged " : ""}cards.` : `One copy on one card.`;
+  const room = !systemOf(d.g) && open > 0 ? ` ${open} bay${open===1 ? " stays" : "s stay"} open, so the same server grows without a new chassis.` : "";
+  const pcie = d.nr ? ` The cards have no direct link, so an all-reduce crosses PCIe after every layer; the speed shown reflects that.` : "";
+  return how + room + pcie;
+}
+const openBtn = (id, txt) => `<button type="button" class="linkbtn" data-cfg="${esc(id)}">${txt}</button>`;
+
+function renderScope(A){
+  const n = S.scope.size, all = CATALOG.servers.length;
+  $('svScope').innerHTML = `<div class="svhead"><h2>Servers in scope <span class="i" data-tip="svScope" tabindex="0">i</span></h2>`
+    + `<span class="cap">${n===all ? `All ${all} current GPU-capable HPE servers` : `${n} of ${all}`}. Pick the customer's standard builds to size only those.</span>`
+    + `<span class="svacts"><button type="button" class="linkbtn" data-scope-all>All</button><button type="button" class="linkbtn" data-scope-none>None</button></span></div>`
+    + `<div class="chipgroups">` + [...new Set(CATALOG.servers.map(sv=> sv.group))].map(grp=>
+        `<div class="chipgroup" role="group" aria-label="${esc(grp)}"><span class="gl">${esc(grp)}</span>`
+        + CATALOG.servers.filter(sv=> sv.group===grp).map(sv=>
+            `<button type="button" class="chip" data-scope="${sv.id}" aria-pressed="${S.scope.has(sv.id)}">${esc(sv.short)}</button>`).join("")
+        + `</div>`).join("") + `</div>`;
+}
+function renderRec(A){
+  const el = $('svRec'), all = allUsers();
+  if(!A.rec){
+    el.innerHTML = `<span class="eyebrow-s warn">${S.scope.size ? "No server in scope holds it" : "No servers in scope"}</span>`
+      + `<h2 class="rec-name">${S.scope.size ? "Too big for every server in scope" : "Pick at least one server"}</h2>`
+      + (S.scope.size ? `<p class="rec-why">One copy of the model needs about ${fmtMem(needGB())} of GPU memory. Add a larger server to the scope, or lower the precision or the prompt and reply lengths.</p>` : "");
+    return;
+  }
+  const c = A.rec, d = c.best, sv = c.sv;
+  const eyebrow = c.ok ? `<span class="eyebrow-s">Recommended · least GPU memory that meets your goal</span>`
+                       : `<span class="eyebrow-s warn">Closest · serves ${commas(d.served)} of ${commas(all)} within your goal</span>`;
+  el.innerHTML = `<div class="rec-top"><div class="rec-main">${eyebrow}`
+    + `<h2 class="rec-name">${hostLink(HPE_HOSTS.find(h=> h.id===sv.id))}</h2>`
+    + `<span class="rec-spec">${esc(sv.form)} · ${sv.sockets} × ${esc(sv.cpu)}</span>`
+    + `<p class="rec-cfg">${d.gpus} × ${esc(d.g.n)}${d.gpus>1 ? `, ${wiringText(c, d)}` : ""}${flagPills(d)}</p>`
+    + `<p class="rec-why">${layoutWhy(c, d)}</p></div>`
+    + `<div class="rec-bays"><span class="sublbl">GPU bays</span>${baysHtml(c, d)}</div></div>`
+    + statsHtml(d)
+    + (speedBasis(d).includes("extrapolated") ? `<p class="note-warn">Speed is extrapolated: the ${esc(d.g.n)} has no published benchmark here, so its figures apply the shares fitted on other boards' runs to its datasheet. Memory fit is not affected. Load-test before quoting speeds.</p>` : "")
+    + `<div class="rec-foot"><div><span class="sublbl">Launch</span><code class="launch">${esc(launchText(d))}</code></div>`
+    + `<div><span class="sublbl">Build checks</span><ul class="checks">${buildChecks(c, d)}</ul>`
+    + ((c.x.constraints || []).length ? `<ul class="svnotes">${c.x.constraints.map(t=> `<li>${esc(t)}</li>`).join("")}</ul>` : "") + `</div></div>`
+    + `<div class="rec-acts">${openBtn(c.id, "Layouts and build for this configuration")}<button type="button" class="tool-btn" data-copylink>Copy link</button></div>`;
+}
+function altCard(cls, eyebrow, c, body){
+  return `<article class="panel alt"><span class="eyebrow-s ${cls}">${eyebrow}</span><h3>${esc(c.sv.short)}</h3>`
+    + `<span class="rec-spec">${esc(c.sv.form)} · ${c.sv.sockets} × ${esc(c.sv.cpu)}</span>${body}</article>`;
+}
+const optBox = (title, d) => `<div class="opt"><b>${title}</b><span>${fmtTps(d.t.perUser)} tok/s per user${star(d)} · room for ${commas(d.room)}${d.memRoom > d.room*1.5 ? ` · cache room for ${commas(d.memRoom)}` : ""} · ${boxTotal(d.memGB)}</span></div>`;
+function renderAlts(A){
+  const el = $('svAlt'), all = allUsers(), cards = [];
+  if(A.rec && A.down){
+    const c = A.down, d = c.best, head = d.room - all;
+    cards.push(altCard("warn", "Step down · smaller server", c,
+      `<p class="opt-line">${d.gpus} × ${esc(d.g.n)}, ${wiringText(c, d)}${flagPills(d)}</p><p class="cap">${layoutLine(d)}</p>`
+      + `<dl><div><dt>Speed per user</dt><dd>${fmtTps(d.t.perUser)} tok/s${star(d)}</dd></div><div><dt>${c.ok ? "Room for" : "Serves"}</dt><dd>${c.ok ? commas(d.room) : `${commas(d.served)} of ${commas(all)}`} users</dd></div></dl>`
+      + `<p class="note-warn">${c.ok ? `${c.sv.u}U instead of ${A.rec.sv.u}U${head < all ? `, with ${commas(head)} user${head===1 ? "" : "s"} of headroom over your ${commas(all)}` : ""}.` : `Doesn't serve everyone within your goal.`}</p>`
+      + openBtn(c.id, "Layouts and build")));
+  }
+  if(A.rec && A.upSame){
+    const c = A.rec, u = A.upSame;
+    cards.push(altCard("up", "Step up · fill the open bays", c,
+      `<p class="cap">same server</p>` + optBox(`${u.roomy.gpus} cards · ${layoutLine(u.roomy)} — more users`, u.roomy)
+      + (u.context ? optBox(`${u.context.gpus} cards · ${layoutLine(u.context)} — longer context`, u.context) : "")
+      + openBtn(c.id, "Every layout on this server")));
+  }
+  if(A.rec && A.upBig){
+    const b = A.upBig, c0 = b.configs[0];
+    cards.push(altCard("up", "Step up · bigger server", c0,
+      b.configs.map(c=> optBox(`${c.best.gpus} × ${esc(c.best.g.n)} · ${layoutLine(c.best)}`, c.best)).join("")
+      + openBtn(c0.id, "Layouts and build")));
+  }
+  el.hidden = !cards.length;
+  el.innerHTML = `<h2 class="svtitle">If the customer pushes back</h2><div class="alts">${cards.join("")}</div>`;
+}
+function renderAll(A, cfgs){
+  const all = allUsers(), need = needGB(), sel = (cfgById(cfgs, S.cfg) || A.rec || {}).id;
+  const rows = A.fits.slice().sort((a, c)=> (+c.ok - +a.ok) || a.best.memGB - c.best.memGB || (+a.best.nr - +c.best.nr) || c.best.room - a.best.room);
+  const okN = A.fits.filter(c=> c.ok).length, okServers = new Set(A.fits.filter(c=> c.ok).map(c=> c.sv.id)).size;
+  const byServer = new Map();
+  for(const c of A.inScope) if(!A.fits.some(f=> f.sv.id===c.sv.id)) (byServer.get(c.sv.id) || byServer.set(c.sv.id, []).get(c.sv.id)).push(c);
+  const cant = [...byServer.values()].map(cs=>{
+    const top = Math.max(...cs.map(c=> c.usable));
+    return {sv: cs[0].sv, usable: top, how: cs.filter(c=> c.usable >= top*0.999).map(c=> `${c.max} × ${esc(c.x.board)}`).join(" or "), est: cs.some(c=> c.usable >= top*0.999 && c.x.unconfirmed)};
+  }).sort((a, b)=> b.usable - a.usable);
+  const out = CATALOG.servers.length - S.scope.size;
+  $('svAll').innerHTML = `<div class="svhead"><h2>Every server in scope</h2><span class="cap">${okServers} server${okServers===1 ? " meets" : "s meet"} your goal in ${okN} configuration${okN===1 ? "" : "s"}`
+      + `${A.fits.length > okN ? ` · ${A.fits.length - okN} more hold it below the goal` : ""} · ${cant.length} can't hold it${out ? ` · ${out} out of scope` : ""}</span></div>`
+    + (rows.length ? `<div class="tbl"><table><thead><tr><th scope="col">Server</th><th scope="col">GPUs</th><th scope="col">GPU link</th><th scope="col">Layout</th>`
+      + `<th scope="col" class="num">Per user</th><th scope="col" class="num">Room for</th><th scope="col" class="num">GPU memory</th></tr></thead><tbody>`
+      + rows.map(c=>{ const d = c.best, isRec = A.rec && c.id===A.rec.id;
+          return `<tr class="${c.id===sel ? "sel" : ""}${c.ok ? "" : " dim"}"><th scope="row"><button type="button" class="rowbtn" data-cfg="${esc(c.id)}">${esc(c.sv.short)}</button>${isRec ? ` <span class="pill sugg">Recommended</span>` : ""}</th>`
+            + `<td>${d.gpus} × ${esc(d.g.n)}</td><td>${wiringShort(c)}</td><td class="mono-s">${layoutLine(d)}${flagPills(d)}</td>`
+            + `<td class="num">${fmtTps(d.t.perUser)} tok/s${star(d)}</td>`
+            + `<td class="num">${c.ok ? commas(d.room) : `<span class="warnx">${commas(d.served)} of ${commas(all)}</span>`}</td><td class="num">${boxTotal(d.memGB)}</td></tr>`; }).join("")
+      + `</tbody></table></div><p class="cap">* Speed extrapolated: no published benchmark for this board; it applies the shares fitted on other boards' runs. Click a server for its layouts and build.</p>` : "")
+    + (cant.length ? `<div class="svsub"><h3>Won't hold it</h3><span class="cap">One copy needs about ${fmtMem(need)} of GPU memory for one user. Bars show the most usable GPU memory each server carries.</span></div>`
+      + `<div class="holds">` + cant.map(h=> `<span class="hname">${esc(h.sv.short)}</span>`
+          + `<span class="hbar" role="img" aria-label="${Math.round(h.usable)} of ${Math.round(need)} GB"><i style="width:${Math.min(100, h.usable/need*100).toFixed(1)}%"></i><b></b></span>`
+          + `<span class="cap">${h.how} · ${fmtMem(h.usable)}${h.est ? ` · <span class="warnx">count to confirm</span>` : ""}</span>`).join("") + `</div>` : "")
+    + `<p class="cap">Also sold with these GPUs, but HPE publishes no card count, so not sized: ${HPE_UNSIZED.map(u=> `${esc(u.name)} (${u.boards.map(esc).join(", ")})`).join("; ")}.</p>`;
+}
+function renderCfg(A, cfgs){
+  const el = $('svCfg'), c = cfgById(cfgs, S.cfg) || A.rec;
+  el.hidden = !c;
+  if(!c) return null;
+  const sv = c.sv, d = c.best, all = allUsers(), k = linkKind(c.x);
+  const size = k==="bridge" ? c.x.link.bridge : c.max, groups = Math.ceil(c.max/size), used = d ? d.gpus : 0;
+  const wire = `<div class="wiring">` + Array.from({length: groups}, (_, gi)=>{
+      const from = gi*size, n = Math.min(size, c.max - from), on = Math.max(0, Math.min(n, used - from));
+      const title = groups>1 ? `Group ${String.fromCharCode(65 + gi)} · bays ${from + 1}–${from + n}` : `Bays 1–${c.max}`;
+      const link = k==="bridge" ? `${c.x.link.kit} ${c.x.link.bridge}-way bridge` : k==="nvswitch" ? "NVSwitch, every GPU to every GPU" : k==="fabric" ? "Infinity Fabric, one link per pair" : "PCIe Gen5 x16 per card";
+      return `<div class="wgroup${on ? " on" : ""}"><div class="wtop"><b>${title}</b><span class="cap">${link}</span></div>`
+        + `<div class="cards" style="--n:${Math.min(n, 8)}">${Array.from({length: n}, (_, i)=> `<span class="card${i < on ? " on" : ""}">${i < on ? esc(d.g.n.replace(" Blackwell", "")) : "open"}</span>`).join("")}</div></div>`
+        + (gi < groups - 1 ? `<div class="wlink"><b>PCIe Gen5</b><span>${PCIE_BW} GB/s each way, through the host. Only pipeline hand-offs cross here, never an all-reduce.</span></div>` : "");
+    }).join("") + `</div>`;
+  const opts = c.opts.slice().sort((a, b)=> a.gpus - b.gpus || b.reps - a.reps || a.L.pp - b.L.pp);
+  const table = opts.length ? `<div class="tbl"><table><thead><tr><th scope="col">Cards</th><th scope="col">Layout</th><th scope="col" class="num">Per user</th><th scope="col" class="num">First token</th>`
+      + `<th scope="col" class="num">Room for</th><th scope="col" class="num">Cache room</th><th scope="col" class="num">Per card</th><th scope="col">Launch</th></tr></thead><tbody>`
+      + opts.map(o=> `<tr class="${o===d ? "sel" : ""}${o.meets && !o.partial ? "" : " dim"}"><td>${o.gpus}</td>`
+          + `<th scope="row">${layoutLine(o)}${o===d ? ` <span class="pill sugg">${c.ok ? "Best for your goal" : "Closest"}</span>` : ""}${flagPills(o)}</th>`
+          + `<td class="num">${fmtTps(o.t.perUser)} tok/s${star(o)}</td><td class="num">${fmtTime(o.t.ttft).join(" ")}</td>`
+          + `<td class="num">${o.partial ? `<span class="warnx">${commas(o.served)} of ${commas(all)}</span>` : commas(o.room)}</td><td class="num">${commas(o.memRoom)}</td>`
+          + `<td class="num">${fmtMem(o.perGB)}</td><td><code class="flags">--tensor-parallel-size ${o.tpw}${o.pp>1 ? ` --pipeline-parallel-size ${o.pp}` : ""}${o.reps>1 ? ` ×${o.reps}` : ""}</code></td></tr>`).join("")
+      + `</tbody></table></div>` : `<p class="note-warn">No layout on this server holds one copy: it needs about ${fmtMem(needGB())} of GPU memory, and the server carries ${fmtMem(c.usable)} at most.</p>`;
+  const notes = [...(sv.notes || []), ...(c.x.constraints || [])].map(esc);
+  if(c.x.unconfirmed) notes.unshift(`<span class="warnx">Card count to confirm: ${esc(c.x.unconfirmed)}.</span>`);
+  el.innerHTML = `<div class="svhead"><span class="eyebrow-s">Configuration</span></div>`
+    + `<h2 class="rec-name">${esc(sv.name)} · ${esc(c.x.board)}</h2>`
+    + `<span class="rec-spec">${esc(sv.form)} · ${sv.sockets} × ${esc(sv.cpu)} · up to ${c.max} × ${esc(c.x.board)}, ${wiringShort(c)}</span>`
+    + `<div class="svsub"><h3>How the cards are wired</h3></div>${wire}`
+    + `<div class="svsub"><h3>Layouts on this server</h3><span class="cap">Every layout the wiring allows, at each number of copies the server holds. You pick by what the customer is buying for.</span></div>${table}`
+    + (d && !systemOf(d.g) ? `<div class="svsub"><h3>Build for ${d.gpus} card${d.gpus===1 ? "" : "s"}</h3></div><ul class="checks">${buildChecks(c, d)}</ul>` : d ? `<ul class="checks">${buildChecks(c, d)}</ul>` : "")
+    + (notes.length ? `<ul class="svnotes">${notes.map(n=> `<li>${n}</li>`).join("")}</ul>` : "")
+    + `<p class="cap">Sources: <a href="${CATALOG.matrix.url}" target="_blank" rel="noopener">${esc(CATALOG.matrix.title)}, version ${esc(CATALOG.matrix.version)}</a> for which GPUs and bridges the server takes; <a href="${esc(sv.count_source)}" target="_blank" rel="noopener">this server's configuration guide</a> for the card count. Confirm a build against the current QuickSpecs.</p>`;
+  return d || null;
+}
+/* the whole Servers view, and Show the math for the configuration it details */
+function renderServerView(){
+  const cfgs = allConfigs(), A = serverAnswer(cfgs);
+  if(S.cfg && !cfgById(cfgs, S.cfg)) S.cfg = null;
+  renderScope(A); renderRec(A); renderAlts(A); renderAll(A, cfgs);
+  const d = renderCfg(A, cfgs);
+  const many = S.models.length > 1;
+  $('viewhint').textContent = many ? `Sizing ${specName(S.models[S.edit])}: the Servers view sizes one model at a time. GPUs sizes them together.` : "";
+  if(d){
+    S.tp = d.tp; S.pp = d.pp;
+    $('mathState').textContent = `${(cfgById(cfgs, S.cfg) || A.rec).sv.short} · ${d.gpus} × ${d.g.n}: speed · model architecture · memory breakdown · how it's calculated`;
+    renderBreakdown(d.r, d.tp, d.reps, d);
+    renderChunkOptions(d);
+    renderThroughput(d);
+  }
+}
+/* render() for the Servers view: the view, then the parts of the page both views share */
+function renderServers(){
+  renderServerView();
+  renderAdvState(); updateGoalHint(); renderTraffic(); syncMix();
+  syncHash(); labelTips();
+}
+/* which answer shows: the Servers view, or the GPU view's panels */
+function showView(){
+  const srv = S.view==="srv";
+  $('serverView').hidden = !srv;
+  $('gpuAnswer').hidden = srv; $('gpuBoards').hidden = srv;
+  if(srv){ $('fleetPanel').hidden = true; $('srvPanel').hidden = true; }
+  document.querySelectorAll('#viewbar [data-view]').forEach(b=> b.setAttribute('aria-pressed', b.dataset.view===S.view));
+}
+/* the Servers view's clicks: the view switch, scope chips, a configuration to detail (wired at init) */
+function wireServerView(){
+$('viewbar').addEventListener('click', e=>{
+  const b = e.target.closest('[data-view]'); if(!b || b.dataset.view===S.view) return;
+  S.view = b.dataset.view; render();
+});
+$('serverView').addEventListener('click', e=>{
+  const t = e.target.closest('[data-scope],[data-scope-all],[data-scope-none],[data-cfg],[data-copylink]');
+  if(!t) return;
+  if(t.hasAttribute('data-copylink')){ $('copyLinkBtn').click(); return; }
+  if(t.hasAttribute('data-scope-all')) S.scope = new Set(CATALOG.servers.map(sv=> sv.id));
+  else if(t.hasAttribute('data-scope-none')) S.scope = new Set();
+  else if(t.dataset.scope){ const id = t.dataset.scope; S.scope.has(id) ? S.scope.delete(id) : S.scope.add(id); }
+  else if(t.dataset.cfg){ S.cfg = t.dataset.cfg; render(); $('svCfg').scrollIntoView({behavior: 'smooth', block: 'start'}); return; }
+  render();
+});
+}
+
 /* ---------------- the server around the GPUs ----------------
    With Server set to NVIDIA guidance, the rest of the server follows the inference server in NVIDIA's
    Certified Systems Configuration Guide (Table 1). All minimums:
@@ -2189,7 +2556,9 @@ const statCell = (tip, label, n, unit, sub, state) =>
   + `<div class="n">${n}${unit ? ` <small>${unit}</small>` : ""}</div><div class="sub">${sub}</div></div>`;
 
 function render(){
-  saveSpec(); renderTabs();
+  saveSpec(); renderTabs(); showView();
+  if(S.view==="srv") return renderServers();
+  $('viewhint').textContent = "";
   if(S.models.length > 1) return renderFleet();
   $('fleetPanel').hidden = true; showGauge(true); $('mathState').textContent = MATH_STATE;
   const deps = new Map(boardsInPlay().map(g=>[g.n, deploymentFor(g)]));
@@ -3339,7 +3708,7 @@ let DL = null;   // claude.ai's downloads capability, when this page runs there
 /* The address holds only what differs from the defaults: the version first, then the page's settings and
    each model's. Model 1's keys are as they have always been; model k's are the same keys with k appended
    (m2, u2…). KEY_ORDER keeps a one-model link exactly as earlier versions wrote it. */
-const KEY_ORDER = ["v","m","c","u","w","p","r","cb","x","th","tv","wq","g","kv","tp","pp","ck","ov","pc","sv","hs","sh","fr","b","tf","e"];   // e: the model the controls show, when not the first
+const KEY_ORDER = ["v","m","c","u","w","p","r","cb","x","th","tv","wq","g","kv","tp","pp","ck","ov","pc","sv","vw","hs","cf","sh","fr","b","tf","e"];   // e: the model the controls show, when not the first
 function stateToHash(){
   saveSpec();
   const out = [["v", VERSION]];               // the estimator the link was made with, first so it reads at a glance
@@ -3347,6 +3716,9 @@ function stateToHash(){
   if(S.ovpct!==7) out.push(["ov", S.ovpct]);
   if(!S.cache) out.push(["pc", "off"]);
   if(S.srv) out.push(["sv", "nv"]);
+  if(S.view!=="srv") out.push(["vw", S.view]);
+  if(S.scope.size < CATALOG.servers.length) out.push(["hs", [...S.scope].join(".") || "none"]);
+  if(S.cfg) out.push(["cf", S.cfg]);
   if(S.board!=="auto") out.push(["b", S.board]);
   if(S.edit) out.push(["e", S.edit + 1]);
   const rank = ([k])=> { const [, key, n] = k.match(/^([a-z]+)(\d*)$/); return (+n || 1)*100 + KEY_ORDER.indexOf(key); };
@@ -3480,6 +3852,11 @@ function applyHash(){
     S.ovpct = q.has("ov") && ov>=0 && ov<=25 ? ov : 7;
     S.cache = q.get("pc")==="off" ? 0 : 1;
     S.srv = q.get("sv")==="nv" ? 1 : 0;
+    /* the Servers view is the answer unless the link says otherwise; links made before it existed open as they were, in the GPU view */
+    S.view = q.get("vw")==="gpu" || (!q.has("vw") && olderThan(v || LINK_BEFORE, "1.7.0")) ? "gpu" : "srv";
+    const ids = CATALOG.servers.map(sv=> sv.id), hs = q.get("hs");
+    S.scope = new Set(hs===null ? ids : hs==="none" ? [] : hs.split(".").filter(id=> ids.includes(id)));
+    S.cfg = q.get("cf") || null;
     const bq = {"H200":"H200 NVL", "B200":"HGX B200", "B300":"HGX B300", "AMD MI350X":"AMD MI355X"}[q.get("b")] || q.get("b");   // rows renamed: when the HGX H200 was added, and the MI350X became the MI355X
     S.board = GPUS.some(g=> g.n===bq) ? bq : "auto";
     showSpec();
@@ -3806,6 +4183,8 @@ const TIPS = {
   chunk:"When a new question arrives, the server reads the prompt in pieces while it keeps writing replies for everyone else. Small pieces keep other people's replies flowing smoothly and ride along with their steps almost free, but each prompt takes more steps to read, so under load prompts queue up and first replies wait longer. Big pieces read prompts sooner, but everyone else's text briefly freezes while each piece is read. The numbers on each choice show both effects on your setup.",
   pause:"While a new prompt is being read, everyone already mid-reply waits, whichever workload they belong to. This is the longest gap they would see between words. Under 0.1 s is unnoticeable; choose Smooth streaming to shorten it.",
   tp:"How many GPUs one copy of the model is split across (tensor parallelism). Every layer's weights are divided and the GPUs all-reduce after each layer, so splitting needs NVLink to be fast. A copy is split 1, 2, 4 or 8 ways because serving engines need the split to divide the model's attention heads evenly; that is a software rule and applies to every board. Auto picks the smallest layout; a fixed number applies to every board. On a bridged board with Pipeline across bridge groups on, a copy wider than one bridge is tensor-parallel within each group and pipelined across them.",
+  svScope:"The HPE servers the answer may use: every current HPE ProLiant server that takes one of these GPUs, from HPE's NVIDIA Accelerators for HPE QuickSpecs and each server's own configuration guide. Pick the customer's standard builds, or the servers you can sell, to size only those. Gen11 servers with a Gen12 successor that takes the same GPUs are left out.",
+  svModeled:"This layout pipelines one copy across stages that hand each token's activations to the next over PCIe. The memory it needs is exact; its speed is modeled from the same fitted shares as the rest, with a PCIe hand-off per stage, but no pipelined run is in the benchmark set yet. Load-test it before quoting a speed.",
   pipe:"Pipeline parallelism between a server's NVLink bridge groups. An H200 NVL bridge joins at most 4 cards (HPE's S4A91C, in the DL380a Gen12), so a copy of a model normally spans at most 4 and 8 cards run two copies. In a DL385 Gen11 the bridge is 2-way, so there it is two groups of 2 in 4 cards. On, one copy may span both groups as two pipeline stages: each stage holds half the layers on its own bridged group, tensor-parallel within it, and hands each token's activations to the next stage over PCIe. It fits a model, or a KV cache, that one group can't hold. It does not raise speed per user: each stage still reads all of its weights for every token, and the engine runs the stages on alternating halves of the batch (vLLM --pipeline-parallel-size 2). Two copies of 4 serve more users when they fit, and the page still prefers them.",
   copies:"A copy (replica) is a full, independent instance of the model on its own GPUs within the node, serving its share of the users. More copies serve more users without slowing each other down, and unlike splitting one copy across GPUs, they need no direct GPU-to-GPU link between them.",
   fleet:"Each model runs as copies of its own on GPUs of its own, sized as it would be alone; the copies of every model are then packed into the board's servers, widest first, and spare GPUs run extra copies of the models closest to their goals. Models don't share GPUs, so each one's speed is its own. The strip shows every server's GPUs, numbered by model.",
@@ -3886,6 +4265,7 @@ function labelTips(){
   });
 }
 /* init */
+wireServerView();
 usersSlider.max = USER_STOPS.length-1;
 usersSlider.value = stopIndex(USER_STOPS, S.users);
 $('asof').textContent = `Estimator ${VERSION} · model and board data as of ${DATA_AS_OF}. Estimates for planning, not a guarantee.`;
