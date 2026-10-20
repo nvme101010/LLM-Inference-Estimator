@@ -1164,8 +1164,8 @@ const findHost = id => HPE_HOSTS.find(h=> h.id===id);
 /* the HPE server a board is sized in, in the GPU view: its default, the first that sells it; null if none */
 const hostOf = g => HPE_HOSTS.find(h=> h.boards[g.n]) || null;
 /* a board as its HPE server holds it: fewer cards, a narrower bridge, and the server's name with it */
-function inHost(g){
-  const h = hostOf(g);
+const inHost = g => boardWith(g, hostOf(g));
+function boardWith(g, h){
   if(!h) return g;
   const o = h.boards[g.n], max = o.max;
   return Object.assign({}, g, {host: h, bridge: o.bridge || null, est: o.est || null},
@@ -1288,6 +1288,9 @@ function loadUnit(){ try { return localStorage.getItem(UNIT_KEY)==="GiB" ? "GiB"
 const S = { wq:2, wqLbl:"NATIVE", kq:2, tp:1, pp:1, tpo:"auto", pipe:0, chunk:512, ovpct:7, users:16, board:"auto",
             goal:"smooth",
             srv:0,             // Server: 0 = GPUs only, 1 = NVIDIA's guidance for the whole server (see serverFor)
+            view:"srv",        // which answer shows: "srv" = the Servers view (configurations of HPE servers), "gpu" = boards
+            scope:null,        // the Servers view's servers in scope: a Set of catalog ids (every server, set at start)
+            cfg:null,          // the configuration its detail shows: "<server id>|<board>", or null for the recommendation
             workload:"chat", prompt:2048, reply:512, wantPrompt:2048, wantReply:512,
             think:false, thinkTok:4096, thinking:0,
             seeThink:true,     // Users see the thinking: the speed goal's wait is to the first token; off, to the answer
@@ -1301,6 +1304,8 @@ const S = { wq:2, wqLbl:"NATIVE", kq:2, tp:1, pp:1, tpo:"auto", pipe:0, chunk:51
             unit:loadUnit() };
 let M = findModel("l31-8b");
 let LAST = null;   // what the last render showed, for the downloadable summary
+
+S.scope = new Set(CATALOG.servers.map(sv=> sv.id));   // every server in scope to start
 
 /* ---------------- one model's settings ----------------
    The settings that belong to a model (PER_MODEL) sit on S while it is the model the controls show, so
@@ -1851,6 +1856,128 @@ function capacityFor(d){
   const both  = S.goal==="any" ? byMem : copyCapacity(d.g, d.tp, 1e6, false);
   return {perCopy: both, users: both*d.reps, memory: byMem*d.reps, limit: both < byMem ? "speed" : "memory"};
 }
+
+/* ---------------- the Servers view: configurations ----------------
+   A configuration is one HPE server from CATALOG with one board in it, at the count and wiring the
+   catalog gives. The Servers view sizes the model the controls show (S.edit) on every configuration of
+   every server in scope (S.scope), and recommends one of them.
+   On each configuration the search tries every card count and every layout the wiring allows (layoutsOn),
+   with as many copies as the server holds, and keeps them all: the best becomes the configuration's
+   answer, the rest are its alternatives (the detail panel shows them). Pipelining is part of the search
+   here, whatever Pipeline across bridge groups says, since the server's wiring decides what's possible. */
+const linkKind = x => !x.link || x.link==="pcie" ? "pcie" : x.link.bridge ? "bridge" : x.link;   // pcie | bridge | nvswitch | fabric
+/* the board as this server holds it (count, pop, bridge), as the GPU view's inHost does for a board's default server */
+function boardIn(sv, x){
+  const g = GPUS.find(b=> b.n===x.board), h = HPE_HOSTS.find(y=> y.id===sv.id);
+  return g && h ? boardWith(g, h) : null;
+}
+/* Every way to run one copy on n of these cards, as the wiring allows: tensor-parallel within one NVLink
+   group, or across an NVSwitch or fabric; tensor-parallel within each group and pipelined across groups;
+   and on PCIe cards, tensor-parallel over PCIe (an all-reduce crosses PCIe after every layer, so it is
+   flagged) or pipelined over PCIe (one hand-off per stage; modeled, not benchmarked). */
+function layoutsOn(b){
+  const out = [], max = nodeMax(b);
+  for(const n of TP_OPTIONS){
+    if(n > max) break;
+    if(b.split && n > b.split){ if(n % b.split===0) out.push({n, tp: b.split, pp: n/b.split}); continue; }
+    out.push({n, tp: n, pp: 1});
+    if(!b.link && n > 1) out.push({n, tp: 1, pp: n});
+  }
+  return out;
+}
+const layoutName = L => L.pp>1 ? (L.tp>1 ? `TP ${L.tp} × PP ${L.pp}` : `PP ${L.pp}`) : `TP ${L.tp}`;
+/* one layout with reps copies, upr users on each: memory, speed, goal (as evaluate does for the GPU view) */
+function evalLayout(b, L, reps, upr = Math.ceil(allUsers()/reps)){
+  const r = compute(L.tp, upr, L.pp), perGB = r.perGPU/GB, fits = fitsOn(b, perGB);
+  const t = fits ? throughput(b, L.tp, S.chunk, upr, L.pp) : null, gpus = L.n*reps;
+  return {g: b, L, tp: L.n, tpw: L.tp, pp: L.pp, reps, upr, gpus, r, perGB, fits, t, meets: !!t && meetsGoal(t),
+          memGB: gpus*b.cap, nr: L.tp>1 && !b.link, modeled: L.pp>1};
+}
+/* the most users one copy of layout L holds (memOnly) or serves within the goal, up to upTo */
+function layoutCapacity(b, L, upTo, memOnly){
+  const ok = u => fitsOn(b, compute(L.tp, u, L.pp).perGPU/GB)
+               && (memOnly || S.goal==="any" || meetsGoal(throughput(b, L.tp, S.chunk, u, L.pp)));
+  if(!ok(1)) return 0;
+  if(ok(upTo)) return upTo;
+  let lo = 1, hi = upTo;
+  while(hi-lo > 1){ const mid = (lo+hi) >> 1; if(ok(mid)) lo = mid; else hi = mid; }
+  return lo;
+}
+const ROOM_MAX = 100000;   // capacity is counted up to this many users
+/* Every option on one configuration: each layout, at each number of copies the server holds (rounded to
+   counts it is bought in), with its users spread evenly over the copies. room = users it serves within
+   the goal, memRoom = users whose caches it holds at all. */
+function configFor(sv, x){
+  const b = boardIn(sv, x);
+  if(!b) return null;
+  const all = allUsers(), max = nodeMax(b), opts = [];
+  for(const L of layoutsOn(b)){
+    const capMem = layoutCapacity(b, L, ROOM_MAX, true);
+    if(!capMem) continue;
+    const capGoal = S.goal==="any" ? capMem : layoutCapacity(b, L, ROOM_MAX, false);
+    for(let k = 1; L.n*k <= max; k++){
+      if(popOf(b) && !popOf(b).includes(L.n*k)) continue;
+      const d = evalLayout(b, L, k);
+      if(!d.fits) continue;
+      Object.assign(d, {room: capGoal*k, memRoom: capMem*k, served: Math.min(all, capGoal*k)});
+      d.partial = d.room < all;
+      opts.push(d);
+    }
+  }
+  /* best: meets the goal for everyone, not split over PCIe, fewest cards, copies over width, then faster;
+     else the option that serves the most within the goal */
+  const okOf = d => d.meets && !d.partial;
+  const best = opts.slice().sort((a, c)=> (+okOf(c) - +okOf(a)) || (okOf(a)
+      ? (+a.nr - +c.nr) || a.gpus - c.gpus || a.L.n - c.L.n || c.t.perUser - a.t.perUser
+      : (c.served - a.served) || (+a.nr - +c.nr) || a.gpus - c.gpus))[0] || null;
+  return {sv, x, b, opts, best, fits: !!best, usable: max*b.cap*USABLE, max,
+          ok: !!best && best.meets && !best.partial, id: `${sv.id}|${x.board}`};
+}
+const SERVER_MEMO = new Map();
+/* every configuration of every server in the catalog, for the model and settings on screen */
+function allConfigs(){
+  const key = JSON.stringify([specOf(), S.srv, S.ovpct, S.cache, CAL]);
+  if(!SERVER_MEMO.has(key)){
+    if(SERVER_MEMO.size >= 50) SERVER_MEMO.clear();
+    SERVER_MEMO.set(key, CATALOG.servers.flatMap(sv=> sv.gpus.map(x=> configFor(sv, x))).filter(Boolean));
+  }
+  return SERVER_MEMO.get(key);
+}
+/* The answer for the servers in scope:
+   rec      the configuration that serves everyone within the goal with the least GPU memory, then not split
+            over PCIe, then not pipelined (its speed is modeled, not fitted), then the most room, then the
+            fewest rack units; failing that, the one serving the most
+   down     a smaller server (fewer rack units) that also meets the goal, or else serves the most
+   upSame   the recommended server with more cards: the option with the most room, and the one that holds
+            the most context when that is a different layout
+   upBig    another server whose answer has more room than the recommendation: its leanest configuration
+            within the goal and its roomiest */
+const rackU = c => c.sv.u ?? 99;
+function serverAnswer(cfgs){
+  const inScope = cfgs.filter(c=> S.scope.has(c.sv.id)), fits = inScope.filter(c=> c.fits);
+  const ok = fits.filter(c=> c.ok);
+  const lean = (a, c)=> a.best.memGB - c.best.memGB || (+a.best.nr - +c.best.nr) || (+a.best.modeled - +c.best.modeled)
+                     || c.best.room - a.best.room || rackU(a) - rackU(c);
+  const rec = ok.slice().sort(lean)[0] || fits.slice().sort((a, c)=> c.best.served - a.best.served || lean(a, c))[0] || null;
+  if(!rec) return {inScope, fits, rec: null};
+  const others = fits.filter(c=> c.sv.id!==rec.sv.id);
+  const down = rec.sv.u ? (others.filter(c=> c.ok && rackU(c) < rec.sv.u).sort((a, c)=> rackU(a) - rackU(c) || lean(a, c))[0]
+                       || others.filter(c=> rackU(c) < rec.sv.u && c.best.served > 0).sort((a, c)=> (+a.best.nr - +c.best.nr) || c.best.served - a.best.served)[0] || null) : null;
+  const more = rec.opts.filter(d=> d.gpus > rec.best.gpus && d.meets && !d.partial && !d.nr);
+  const roomy = more.slice().sort((a, c)=> c.room - a.room || a.gpus - c.gpus)[0] || null;
+  const context = more.slice().sort((a, c)=> c.memRoom - a.memRoom || c.room - a.room)[0] || null;
+  const upSame = roomy ? {roomy, context: context && context!==roomy && context.memRoom > roomy.memRoom*1.5 ? context : null} : null;
+  const bigger = others.filter(c=> c.ok && c.best.room > rec.best.room && c.sv.id!==(down && down.sv.id));
+  const bigSv = bigger.sort((a, c)=> c.best.room - a.best.room)[0];
+  const upBig = bigSv ? (()=>{
+    const on = bigger.filter(c=> c.sv.id===bigSv.sv.id);
+    const leanest = on.slice().sort(lean)[0], roomiest = on.slice().sort((a, c)=> c.best.room - a.best.room)[0];
+    return {sv: bigSv.sv, configs: leanest===roomiest ? [leanest] : [leanest, roomiest]};
+  })() : null;
+  return {inScope, fits, ok, rec, down, upSame, upBig};
+}
+/* GPU memory one user needs at the least: the whole model on one GPU's worth of overhead */
+const needGB = () => compute(1, 1, 1).total/GB;
 
 /* ---------------- the server around the GPUs ----------------
    With Server set to NVIDIA guidance, the rest of the server follows the inference server in NVIDIA's
