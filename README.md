@@ -17,16 +17,27 @@ Every result is one server of up to 8 GPUs. If one node of a board can't serve e
 
 GPU counts round up to what can be bought. H200 NVL servers take 1, 2, 4 or 8 cards, but an NVLink bridge joins at most 4 of them, so one copy of a model spans at most 4 and 8 cards run two copies. **Pipeline across bridge groups** in Advanced settings (off by default) lets one copy span both groups as two pipeline stages, tensor-parallel within each and handing activations between them over PCIe (vLLM's `--tensor-parallel-size 4 --pipeline-parallel-size 2`): that fits a model or a KV cache that one group can't hold, at about one group's speed per user, since each stage still reads all of its weights for every token; two copies of 4 are still preferred when they fit. Pipelined figures are modeled, not yet fitted to a benchmark. The HGX H200, HGX B200 and HGX B300 are sold only as 8-GPU systems, with all 8 GPUs joined through NVSwitch. So is the AMD MI355X, but with no switch: each GPU has one Infinity Fabric link to each of the other 7, so a copy split across 2 or 4 of them uses only the links among them and pays more per layer than on an HGX. RTX PRO 4500 servers hold up to 5 cards (the limit on HPE servers).
 
-Each board is named with the HPE server it is sized in, and **HPE server** in Advanced settings narrows the comparison to one server at its own limits (URL key `hs`):
+Each board is named with the HPE server it is sized in, and **HPE server** in Advanced settings narrows the comparison to one server at its own limits (URL key `hs`). The list is every current HPE ProLiant server that takes one of these GPUs:
 
-| HPE server | Boards | Limits applied |
+| HPE server | Boards (most cards per server) | Notes |
 |---|---|---|
-| ProLiant Compute DL380a Gen12 (4U, 2 × Xeon 6) | L4, L40S, RTX PRO 6000, H200 NVL | H200 NVL in two 4-way NVLink groups (S4A91C bridge, supported only on this server); a node is sized at 8 of the up to 10 double-wide cards |
-| ProLiant DL385 Gen11 (2U, 2 × EPYC 9004/9005) | RTX PRO 6000, H200 NVL | 4 double-wide cards; H200 NVL with the 2-way S4A90C bridge only, so a copy spans 2, or 4 as TP 2 × 2 stages |
-| ProLiant Compute DL380 Gen12 (2U, 2 × Xeon 6) | RTX PRO 4500 | up to 5 cards |
-| ProLiant Compute XD685 (5U liquid / 6U air, 2 × EPYC 9005) | HGX H200, HGX B200, HGX B300, MI355X | whole 8-GPU systems |
+| ProLiant Compute DL380a Gen12 · 4U · 2 × Xeon 6 | L4, L40S, RTX PRO 6000 (8), H200 NVL | H200 NVL in two 4-way NVLink groups (S4A91C, supported only here, and not in the 10-card layout). Holds up to 10 double-wide / 16 single-wide; a node is sized at 8 |
+| ProLiant Compute DL380 Gen12 · 2U · 2 × Xeon 6 | L4 (8), L40S (3), RTX PRO 4500 (5), RTX PRO 6000 (3\*), H200 NVL (3\*) | no NVLink bridge listed for H200 NVL here, so a split copy runs over PCIe |
+| ProLiant DL385 Gen11 · 2U · 2 × EPYC 9004/9005 | L4 (8), L40S (4), RTX PRO 4500 (4), RTX PRO 6000 (4), H200 NVL (4), MI350P (2) | H200 NVL with the 2-way S4A90C bridge only: a copy spans 2, or 4 as TP 2 × 2 stages |
+| ProLiant Compute DL345 Gen12 · 2U · 1 × EPYC 9005 | L4 (4), L40S (4), RTX PRO 4500 (4), RTX PRO 6000 (2) | GPU base unit with the Front 4xGPU kit |
+| ProLiant Compute DL340 Gen12 · 2U · 1 × Xeon 6 | L4 (6) | |
+| ProLiant Compute ML350 Gen12 · 4U tower · 2 × Xeon 6 | L4 (4), L40S (2), RTX PRO 4500 (5) | RTX PRO 4500 limited to 2 at 30 °C ambient |
+| ProLiant ML110 Gen11 · tower · 1 × Xeon | L4 (2) | |
+| ProLiant Compute DL320 Gen12 · 1U · 1 × Xeon 6 | L4 (4), L40S (2) | GPU base unit |
+| ProLiant Compute DL325 Gen12 · 1U · 1 × EPYC 9005 | L4 (4) | GPU base unit; 5 at 25 °C ambient or below |
+| ProLiant Compute DL360 Gen12 · 1U · 2 × Xeon 6 | L4 (3) | rear slots |
+| ProLiant DL365 Gen11 · 1U · 2 × EPYC 9004/9005 | L4 (2), RTX PRO 4500 (2) | GPU base unit |
+| ProLiant DL145 Gen11 · 2U edge · 1 × EPYC 8004 | L4 (2), L40S (1) | |
+| ProLiant Compute XD685 · 5U DLC / 6U air · 2 × EPYC 9005 | HGX H200, HGX B200, HGX B300, MI355X | whole 8-GPU systems |
 
-On **Auto** each board sits in the first server above that lists it, which matches the board's own figures, so nothing changes; the MI350P has no HPE server listed. Sources: HPE QuickSpecs and product pages and the *NVIDIA Accelerators for HPE* document, checked October 2026; confirm a build against the current QuickSpecs.
+\* HPE added these to the DL380 Gen12 in September 2026 without a count; 3 is its double-wide limit (one per riser). The page marks them "count to confirm".
+
+On **Auto** each board sits in the first server above that lists it. That matches the board's own figures, except the MI350P, which is now sized at the DL385 Gen11's 2 cards. Gen11 servers with a Gen12 successor that takes the same GPUs are left out. HPE also lists the RTX PRO 4500 for the DL145 Gen11, and the RTX PRO 4500 and 6000 for the EL2000 EL240 Gen12 and Edge Server e930t, without a card count, so those are named beside the picker but not sized. Storage, Superdome, Compute Scale-up and EL8000 systems are out of scope. Sources: HPE's *NVIDIA Accelerators for HPE* QuickSpecs (version 83, 8 September 2026) for which servers take which GPU and bridge, and each server's QuickSpecs or HPE Japan configuration guide for card counts; confirm a build against the current QuickSpecs.
 
 Separately, one copy of a model is split across 1, 2, 4 or 8 GPUs. Serving engines need the split to divide the model's attention heads evenly, so this is a software rule that applies to every board. On a 5-card RTX PRO 4500 server, one copy uses at most 4 cards and the fifth can run another copy. When the GPUs bought are more than one copy needs, as with a small model on an 8-GPU HGX system, they run more copies rather than one copy split wider, unless only the wider split reaches the speed goal: copies leave room for far more users, and it is how small models are served in production.
 

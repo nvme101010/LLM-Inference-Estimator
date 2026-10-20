@@ -727,10 +727,6 @@
           <p class="eyebrow">HPE server <span class="i" data-tip="host" tabindex="0">i</span></p>
           <select id="host" aria-label="HPE server">
             <option value="auto" selected>Auto — each board in its HPE server</option>
-            <option value="dl380a-g12">ProLiant Compute DL380a Gen12</option>
-            <option value="dl385-g11">ProLiant DL385 Gen11</option>
-            <option value="dl380-g12">ProLiant Compute DL380 Gen12</option>
-            <option value="xd685">ProLiant Compute XD685</option>
           </select>
           <div class="hint" id="hostnote"></div>
         </div>
@@ -1022,30 +1018,72 @@ const GUIDE_POP = [2,4,8];
 const popOf    = g => S.srv && !systemOf(g) ? GUIDE_POP.filter(n=> n <= (g.max || NODE)) : g.pop;
 const popText  = g => { const p = popOf(g); return p.length>1 ? `${p.slice(0, -1).join(", ")} or ${p[p.length-1]}` : String(p[0]); };
 /* ---------------- HPE servers ----------------
-   The HPE servers each board is sold in, from HPE's QuickSpecs, product pages and the "NVIDIA
-   Accelerators for HPE" document (checked October 2026). Per board, what that server changes:
-   max = the most cards of it the server holds, where fewer than the board's own figure ·
-   split = the most cards one NVLink bridge joins there · bridge = HPE's bridge kit for it.
-   The first server listing a board is its default, and matches the board's own figures, so with
-   HPE server on Auto every figure is as it was. Picking a server keeps only the boards it takes,
-   at its limits; boards with no HPE server here (the MI350P) then drop out.
-   The H200 NVL's 4-way bridge (S4A91C) is supported only on the DL380a Gen12, so that is the one HPE
-   server with two 4-way NVLink groups in a node; the DL385 Gen11 takes the 2-way bridge (S4A90C) and
-   4 double-wide cards, two groups of 2. The DL380a Gen12 holds up to 10 double-wide H200 NVL, L40S or
-   H100 NVL; a node here is at most 8, so 8 is two full 4-way groups. */
+   Every current HPE ProLiant server that takes one of these boards, from HPE's "NVIDIA Accelerators for
+   HPE" QuickSpecs (c04123180, version 83, 8 September 2026: which servers each GPU is supported in, and
+   the NVLink bridge kits) and each server's own QuickSpecs or HPE Japan configuration guide (how many
+   cards). Gen11 servers are left out where a Gen12 successor takes the same GPUs (DL320, DL325, DL345,
+   DL360, DL380, DL380a, ML350 Gen11); those without one (DL385, DL365, DL145, ML110 Gen11) are current.
+   Per board, what the server changes:
+     max = the most cards of it the server holds (a node here is at most 8, so the DL380a Gen12's 10
+           double-wide and 16 single-wide come out as 8) · pop = the counts it can be bought with, where
+           not every count up to max · split = the most cards one NVLink bridge joins there ·
+     bridge = HPE's bridge kit · nolink = the server lists no NVLink bridge for the board, so its cards
+           talk over PCIe · est = the count is not in HPE's published figures yet; the reason given
+   The first server listing a board is its default. Each default matches the board's own figures, except
+   the MI350P, whose only HPE server (DL385 Gen11) holds 2. Picking a server keeps only the boards it takes,
+   at its limits.
+   HPE supports the H200 NVL's 4-way bridge (S4A91C) only in the DL380a Gen12, and not in its 10-card
+   layout, so 8 cards there are the one HPE configuration with two 4-way NVLink groups in a node. */
 const HPE_HOSTS = [
-  {id:"dl380a-g12", n:"HPE ProLiant Compute DL380a Gen12", short:"DL380a Gen12", spec:"4U · 2 × Intel Xeon 6",
+  {id:"dl380a-g12", n:"HPE ProLiant Compute DL380a Gen12", short:"DL380a Gen12", spec:"4U · 2 × Intel Xeon 6", group:"GPU-dense",
    url:"https://www.hpe.com/us/en/products/compute/proliant/dl380a-gen12.html",
    boards:{"L4":{}, "L40S":{}, "RTX PRO 6000 Blackwell":{}, "H200 NVL":{split:4, bridge:"S4A91C 4-way NVLink bridge"}}},
-  {id:"dl385-g11", n:"HPE ProLiant DL385 Gen11", short:"DL385 Gen11", spec:"2U · 2 × AMD EPYC 9004/9005",
+  {id:"dl380-g12", n:"HPE ProLiant Compute DL380 Gen12", short:"DL380 Gen12", spec:"2U · 2 × Intel Xeon 6", group:"Mainstream 2U",
+   url:"https://www.hpe.com/us/en/products/compute/proliant/dl380-gen12.html",
+   boards:{"L4":{max:8}, "L40S":{max:3}, "RTX PRO 4500 Blackwell":{max:5},
+           "RTX PRO 6000 Blackwell":{max:3, est:"HPE added it in September 2026 without a count; 3 is the server's double-wide limit, one per riser"},
+           "H200 NVL":{max:3, pop:[1,2,3], nolink:true, est:"HPE added it in September 2026 without a count; 3 is the server's double-wide limit, one per riser"}}},
+  {id:"dl385-g11", n:"HPE ProLiant DL385 Gen11", short:"DL385 Gen11", spec:"2U · 2 × AMD EPYC 9004/9005", group:"Mainstream 2U",
    url:"https://www.hpe.com/us/en/collaterals/collateral.a50004300enw.html",
-   boards:{"RTX PRO 6000 Blackwell":{max:4}, "H200 NVL":{max:4, split:2, bridge:"S4A90C 2-way NVLink bridge"}}},
-  {id:"dl380-g12", n:"HPE ProLiant Compute DL380 Gen12", short:"DL380 Gen12", spec:"2U · 2 × Intel Xeon 6",
-   url:"https://www.hpe.com/psnow/doc/a00156898enw",
-   boards:{"RTX PRO 4500 Blackwell":{}}},
-  {id:"xd685", n:"HPE ProLiant Compute XD685", short:"XD685", spec:"5U liquid or 6U air · 2 × AMD EPYC 9005",
+   boards:{"L4":{max:8}, "L40S":{max:4}, "RTX PRO 4500 Blackwell":{max:4}, "RTX PRO 6000 Blackwell":{max:4},
+           "H200 NVL":{max:4, split:2, bridge:"S4A90C 2-way NVLink bridge"}, "AMD MI350P":{max:2}}},
+  {id:"dl345-g12", n:"HPE ProLiant Compute DL345 Gen12", short:"DL345 Gen12", spec:"2U · 1 × AMD EPYC 9005, GPU base unit", group:"Mainstream 2U",
+   url:"https://www.hpe.com/us/en/collaterals/collateral.a50009233enw.html",
+   boards:{"L4":{max:4}, "L40S":{max:4}, "RTX PRO 4500 Blackwell":{max:4}, "RTX PRO 6000 Blackwell":{max:2}}},
+  {id:"dl340-g12", n:"HPE ProLiant Compute DL340 Gen12", short:"DL340 Gen12", spec:"2U · 1 × Intel Xeon 6", group:"Mainstream 2U",
+   url:"https://www.hpe.com/us/en/collaterals/collateral.a50004261enw.html",
+   boards:{"L4":{max:6}}},
+  {id:"ml350-g12", n:"HPE ProLiant Compute ML350 Gen12", short:"ML350 Gen12", spec:"4U tower (5U racked) · 2 × Intel Xeon 6", group:"Tower",
+   url:"https://www.hpe.com/us/en/collaterals/collateral.a50006995enw.html",
+   boards:{"L4":{max:4}, "L40S":{max:2}, "RTX PRO 4500 Blackwell":{max:5}}},
+  {id:"ml110-g11", n:"HPE ProLiant ML110 Gen11", short:"ML110 Gen11", spec:"tower · 1 × Intel Xeon", group:"Tower",
+   url:"https://h50146.www5.hpe.com/directplus_ent/library/pdfs_servers/ml110gen11.pdf",
+   boards:{"L4":{max:2}}},
+  {id:"dl320-g12", n:"HPE ProLiant Compute DL320 Gen12", short:"DL320 Gen12", spec:"1U · 1 × Intel Xeon 6, GPU base unit", group:"1U",
+   url:"https://www.hpe.com/us/en/collaterals/collateral.a50004283enw.html",
+   boards:{"L4":{max:4}, "L40S":{max:2}}},
+  {id:"dl325-g12", n:"HPE ProLiant Compute DL325 Gen12", short:"DL325 Gen12", spec:"1U · 1 × AMD EPYC 9005, GPU base unit", group:"1U",
+   url:"https://h50146.www5.hpe.com/directplus_ent/library/pdfs_servers/dl325gen12.pdf",
+   boards:{"L4":{max:4}}},
+  {id:"dl360-g12", n:"HPE ProLiant Compute DL360 Gen12", short:"DL360 Gen12", spec:"1U · 2 × Intel Xeon 6", group:"1U",
+   url:"https://www.hpe.com/us/en/collaterals/collateral.a50006984enw.html",
+   boards:{"L4":{max:3}}},
+  {id:"dl365-g11", n:"HPE ProLiant DL365 Gen11", short:"DL365 Gen11", spec:"1U · 2 × AMD EPYC 9004/9005, GPU base unit", group:"1U",
+   url:"https://h50146.www5.hpe.com/directplus_ent/library/pdfs_servers/dl365gen11.pdf",
+   boards:{"L4":{max:2}, "RTX PRO 4500 Blackwell":{max:2}}},
+  {id:"dl145-g11", n:"HPE ProLiant DL145 Gen11", short:"DL145 Gen11", spec:"2U short-depth edge · 1 × AMD EPYC 8004", group:"Edge",
+   url:"https://h50146.www5.hpe.com/directplus_ent/library/pdfs_servers/dl145gen11.pdf",
+   boards:{"L4":{max:2}, "L40S":{max:1}}},
+  {id:"xd685", n:"HPE ProLiant Compute XD685", short:"XD685", spec:"5U liquid or 6U air · 2 × AMD EPYC 9005", group:"8-GPU systems",
    url:"https://buy.hpe.com/emea_africa/en/compute/rack-servers/proliant-compute-xd600-servers/c/1014859861",
    boards:{"HGX H200":{}, "HGX B200":{}, "HGX B300":{}, "AMD MI355X":{}}},
+];
+/* Current HPE servers HPE lists for these boards but without a published card count, so they are named,
+   not sized: the page says so beside the picker. */
+const HPE_UNSIZED = [
+  {n:"HPE ProLiant DL145 Gen11", boards:["RTX PRO 4500 Blackwell"]},
+  {n:"HPE ProLiant EL2000 EL240 Gen12", boards:["RTX PRO 4500 Blackwell", "RTX PRO 6000 Blackwell"]},
+  {n:"HPE Edge Server e930t", boards:["RTX PRO 4500 Blackwell", "RTX PRO 6000 Blackwell"]},
 ];
 const findHost = id => HPE_HOSTS.find(h=> h.id===id);
 /* the HPE server a board is sized in: the one picked, or its default (the first that sells it); null if none */
@@ -1056,9 +1094,11 @@ function inHost(g){
   const h = hostOf(g);
   if(!h) return g;
   const o = h.boards[g.n], max = o.max;
-  return Object.assign({}, g, {host: h, bridge: o.bridge || null},
+  return Object.assign({}, g, {host: h, bridge: o.bridge || null, est: o.est || null},
     o.split ? {split: o.split, linkLbl: `NVLink bridge · up to ${o.split}`} : {},
-    max ? {max, pop: g.pop ? g.pop.filter(n=> n <= max) : undefined} : {});
+    // no bridge for it in this server: the cards reach each other over PCIe Gen5 only
+    o.nolink ? {link: false, lbw: 64, lname: "PCIe Gen5 (no NVLink bridge in this server)", linkLbl: undefined, split: undefined} : {},
+    max ? {max, pop: o.pop || (g.pop ? g.pop.filter(n=> n <= max) : undefined)} : {});
 }
 /* the boards compared: all of them, or by NVIDIA's guidance only those it covers; with an HPE server
    picked, only those it takes, at its limits */
@@ -1139,7 +1179,7 @@ const DATA_AS_OF = "October 2026";   // when the model and board figures were la
    Bump it with each release tag; add to CHANGES whenever a release changes what the figures come to. */
 const VERSION = "1.7.0";
 const CHANGES = [
-  {v:"1.7.0", what:"Pipeline across bridge groups, off by default, in Advanced settings: on H200 NVL servers one copy of a model may span both bridged groups of 4 as two pipeline stages, tensor-parallel within each, so a model or a KV cache too big for one group fits on 8 cards. With it off nothing changes. With it on, a board that could only run two copies of 4 can also be suggested as one copy of 8 when that is the only layout that holds everyone; speed per user is sized as one group's, since each stage still reads all of its weights per token, and the figures for pipelined copies are modeled, not yet fitted to a benchmark. Each board is now named with the HPE server it is sized in (DL380a Gen12, DL380 Gen12, XD685), and an HPE server can be picked in Advanced settings to compare only the boards it takes, at its limits: on the DL385 Gen11, 4 double-wide cards and 2-way H200 NVL bridges. On Auto the figures are unchanged."},
+  {v:"1.7.0", what:"Pipeline across bridge groups, off by default, in Advanced settings: on H200 NVL servers one copy of a model may span both bridged groups of 4 as two pipeline stages, tensor-parallel within each, so a model or a KV cache too big for one group fits on 8 cards. With it off nothing changes. With it on, a board that could only run two copies of 4 can also be suggested as one copy of 8 when that is the only layout that holds everyone; speed per user is sized as one group's, since each stage still reads all of its weights per token, and the figures for pipelined copies are modeled, not yet fitted to a benchmark. Each board is now named with the HPE server it is sized in, and any of 13 current GPU-capable HPE ProLiant servers can be picked in Advanced settings to compare only the boards it takes, at its limits (on the DL385 Gen11, 4 double-wide cards and 2-way H200 NVL bridges; on the DL380 Gen12, H200 NVL with no bridge). On Auto the figures are unchanged, except the AMD MI350P: its only HPE server, the DL385 Gen11, holds 2, so it is now sized at 2 cards."},
   {v:"1.5.0", what:"The AMD MI355X joins the boards: 288 GB per GPU, sold only as 8-GPU systems, with published benchmarks of its own. Its GPUs are wired to each other with no switch, one Infinity Fabric link per pair, so a copy split across 2 or 4 of them uses only the links among them. Counting AMD's MI355X benchmark runs the same way, AMD's software reaches 0.75 of the hardware shares rather than 0.68, so the MI350P's figures come out up to 10% faster."},
   {v:"1.4.0", what:"When two layouts use the same GPUs, the suggestion runs more copies of the model rather than splitting one copy wider, on NVLink boards too, since both reach the goal and copies leave room for more users. A small model on an 8-GPU HGX system now runs as 8 copies, not one copy across all 8: speed per user comes out lower but still within the goal. The number of GPUs is unchanged."},
   {v:"1.2.0", what:"Speed and first-token estimates are calibrated against 295 published benchmark points: board compute is now each datasheet's dense figure, and the shares of it serving reaches are fitted, as are vLLM's fixed costs per step and per request, with a further factor for AMD's software stack fitted to MI355X runs. Speed per user, which ran about 20% slow, now lands near the measured figures, prompts read about twice as fast, and a likely range sits beside both. The speed goal is judged at the cautious end of that range. The RTX PRO 6000's memory bandwidth is corrected to the Server Edition's 1,597 GB/s."},
@@ -1728,9 +1768,12 @@ const notRecommended = d => d.fits && d.tp>1 && !d.g.link;
 const pickable = d => d.fits;                             // a board that can't hold the model is greyed out
 const suggestable = deps => [...deps.values()].filter(d=> pickable(d) && !notRecommended(d));
 function suggestDeployment(deps){
-  const ok = suggestable(deps), whole = ok.filter(d=> !d.partial), part = ok.filter(d=> d.partial);
   const most = ds => ds.sort((a,b)=> b.served-a.served || a.memGB-b.memGB)[0];
-  return smallest(whole.filter(d=>d.meets)) || most(part.filter(d=>d.meets)) || closest(whole) || most(part) || null;
+  const best = ok => { const whole = ok.filter(d=> !d.partial), part = ok.filter(d=> d.partial);
+    return smallest(whole.filter(d=>d.meets)) || most(part.filter(d=>d.meets)) || closest(whole) || most(part) || null; };
+  /* With an HPE server picked, its boards may all be PCIe cards that can only split a copy over PCIe:
+     then the best of those is still the answer for that server, marked as split over PCIe. */
+  return best(suggestable(deps)) || (S.host!=="auto" ? best([...deps.values()].filter(pickable)) : null);
 }
 /* How many users the deployment could serve at these lengths: what one copy holds, times copies.
    memory = what fits, whatever the speed; users = what also reaches the goal, by the speed estimate. */
@@ -1887,7 +1930,8 @@ function suggestFleet(fleets){
     return fleets.find(f=> f.models[0].d===s) || null;
   }
   const sum = (f, x)=> f.models.reduce((s, m)=> s + x(m), 0), slowest = f => Math.min(...f.models.map(m=> m.d.t.perUser));
-  const ok = fleets.filter(f=> f.fits && !f.models.some(m=> notRecommended(m.d)));
+  let ok = fleets.filter(f=> f.fits && !f.models.some(m=> notRecommended(m.d)));
+  if(!ok.length && S.host!=="auto") ok = fleets.filter(f=> f.fits);   // a picked HPE server with only PCIe-split layouts: still its best
   const whole = ok.filter(f=> f.meets).sort((a, b)=> a.memGB - b.memGB || a.servers.length - b.servers.length
     || sum(a, m=> m.d.tp) - sum(b, m=> m.d.tp) || slowest(b) - slowest(a));
   if(whole.length) return whole[0];
@@ -2058,6 +2102,7 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
   if(fits){
     // what the suggestion is chosen for, beside it
     lbl = picked ? (notRecommended(active) ? "Your pick · split over PCIe" : "Your pick")
+        : notRecommended(active) ? `Best the ${g.host ? g.host.short : g.n} allows · split over PCIe`
         : active.partial ? "Closest single node · serves the most users"
         : `Suggested deployment · least GPU memory that ${hasGoal ? "meets your goal" : "fits"}`;
     main = deployName(active);
@@ -2109,8 +2154,10 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
     if(hasGoal && active.meets) why = why.trimEnd() + ` Speed is estimated (${likelyTps(active.t.perUser)} per user), not measured: confirm with a load test before buying.`;
   } else {
     lbl = "No single node fits";
-    main = S.tpo==="auto" ? "Too big for one 8-GPU node" : `No board holds a copy at TP ${tp}`;
-    sub += `<br>One copy of the model needs more than ${S.tpo==="auto" ? "8 GPUs" : `${tp} GPU${tp>1?"s":""}`}. Lower the precision or the prompt and reply lengths.`;
+    const hs = S.host!=="auto" ? findHost(S.host) : null;
+    main = S.tpo!=="auto" ? `No board holds a copy at TP ${tp}` : hs ? `Too big for one ${hs.short}` : "Too big for one 8-GPU node";
+    sub += hs && S.tpo==="auto" ? `<br>One copy of the model needs more than the GPUs the ${hostLink(hs)} holds. Lower the precision or the prompt and reply lengths, or pick a larger server.`
+         : `<br>One copy of the model needs more than ${S.tpo==="auto" ? "8 GPUs" : `${tp} GPU${tp>1?"s":""}`}. Lower the precision or the prompt and reply lengths.`;
     acts = autoTp;
   }
   $('vlbl').textContent = lbl;
@@ -2261,7 +2308,7 @@ function renderCards(deps, active, suggested, picked){
       <td class="board"><div class="gname">${b.n}${isSugg ? `<span class="pill sugg">${d.partial ? "Closest" : "Suggested"}</span>` : ""}</div>
         <div class="gcap">${boxMem(b)} ${b.mem}${systemOf(b) ? ` · ${systemOf(b)}-GPU systems only`
           : S.srv ? ` · ${popText(b)} per server${b.split ? `, NVLink across ${b.split}` : ""}`
-          : b.split ? ` · up to ${nodeMax(b)} per server, NVLink across ${b.split}` : b.max ? ` · up to ${b.max} per server` : ""}${b.host ? ` · HPE ${b.host.short}` : ""}${b.bench ? "" : ` · <span class="tipl" data-tip="extrap">speed extrapolated</span>`}</div></td>
+          : b.split ? ` · up to ${nodeMax(b)} per server, NVLink across ${b.split}` : b.max ? ` · up to ${b.max} per server` : ""}${b.host ? ` · HPE ${b.host.short}${b.est ? ` <span class="tipl" title="${esc(b.est)}">(count to confirm)</span>` : ""}` : ""}${b.bench ? "" : ` · <span class="tipl" data-tip="extrap">speed extrapolated</span>`}</div></td>
       <td class="link col-opt tipl" data-tip="${linkTip}">${linkTxt}</td>
       <td class="num"><b>${!d.fits ? "—" : systems || d.gpus}</b> <small>× ${systems ? `${Math.max(...b.pop)}-GPU system${systems===1 ? "" : "s"}` : "GPU"}</small></td>
       <td class="layout">${status || layout}</td>
@@ -2395,18 +2442,25 @@ function renderPipeNote(active){
 /* under the HPE server control: which boards the chosen server takes, and at what limits */
 function renderHostNote(){
   const h = S.host!=="auto" ? findHost(S.host) : null;
-  const none = GPUS.filter(g=> !HPE_HOSTS.some(x=> x.boards[g.n])).map(g=> g.n);
+  const defOf = g => HPE_HOSTS.find(y=> y.boards[g.n]);
+  const none = GPUS.filter(g=> !defOf(g)).map(g=> g.n);
+  const unsized = HPE_UNSIZED.map(u=> `${u.n} (${u.boards.join(", ")})`).join("; ");
+  const limits = ([n, o])=> `${n}${o.max ? ` × ${o.max}${o.est ? "*" : ""}` : ""}${o.split ? `, NVLink across ${o.split}${o.bridge ? ` (${o.bridge})` : ""}` : ""}${o.nolink ? ", no NVLink bridge" : ""}`;
   $('hostnote').innerHTML = !h
-    ? `Each board is sized in its default HPE server: ${HPE_HOSTS.map(x=> [x, GPUS.filter(g=> HPE_HOSTS.find(y=> y.boards[g.n])===x).map(g=> g.n)]).filter(([, b])=> b.length).map(([x, b])=> `<b>${x.short}</b> for the ${b.join(", ")}`).join("; ")}.`
-      + ` Pick ${HPE_HOSTS.filter(x=> !GPUS.some(g=> HPE_HOSTS.find(y=> y.boards[g.n])===x)).map(x=> `the ${x.short}`).join(" or ") || "a server"} to size the boards it takes at its own limits.`
+    ? `Each board is sized in its default HPE server: ${HPE_HOSTS.map(x=> [x, GPUS.filter(g=> defOf(g)===x).map(g=> g.n)]).filter(([, b])=> b.length).map(([x, b])=> `<b>${x.short}</b> for the ${b.join(", ")}`).join("; ")}.`
+      + ` Pick one of the ${HPE_HOSTS.length} current GPU-capable HPE servers to size only the boards it takes, at its limits.`
       + (none.length ? ` No HPE server is listed for the ${none.join(", ")}.` : "")
-    : `Only the boards the ${hostLink(h)} takes (${h.spec}): ${Object.entries(h.boards).map(([n, o])=> `${n}${o.max ? `, up to ${o.max}` : ""}${o.split ? `, NVLink across ${o.split}${o.bridge ? ` (${o.bridge})` : ""}` : ""}`).join("; ")}.`;
+      + ` Also listed by HPE but without a published card count, so not sized: ${unsized}.`
+    : `Only the boards the ${hostLink(h)} takes (${h.spec}): ${Object.entries(h.boards).map(limits).join("; ")}.`
+      + (Object.values(h.boards).some(o=> o.est) ? ` * ${Object.values(h.boards).find(o=> o.est).est}; confirm in HPE's configurator.` : "")
+      + (Object.values(h.boards).some(o=> o.nolink) ? ` HPE lists no NVLink bridge for the ${Object.entries(h.boards).filter(([, o])=> o.nolink).map(([n])=> n).join(", ")} in this server, so a copy split across those cards runs over PCIe.` : "");
 }
 /* the headline's sentence on the HPE server and, for a copy that spans bridge groups, how to launch it */
 function hostSentence(d){
   const g = d.g;
   if(!g.host) return "";
-  const s = `In an <b>${hostLink(g.host)}</b> (${g.host.spec}). `;
+  const s = `In an <b>${hostLink(g.host)}</b> (${g.host.spec}). `
+    + (g.est ? `<span class="warnx">Card count to confirm: ${g.est}.</span> ` : "");
   if(d.pp>1) return s + `One copy spans its ${d.pp} NVLink bridge groups${g.bridge ? ` (${d.pp} × ${g.bridge})` : ""}: tensor-parallel across the ${d.tpw} cards of each group and ${d.pp} pipeline stages between them, as <code>vllm serve --tensor-parallel-size ${d.tpw} --pipeline-parallel-size ${d.pp}</code>. `;
   if(g.split && d.tp>1) return s + `Each copy sits inside one NVLink bridge group${g.bridge ? ` (${g.bridge})` : ""}: <code>vllm serve --tensor-parallel-size ${d.tp}</code>${d.reps>1 ? `, one instance per group` : ""}. `;
   return s;
@@ -2572,8 +2626,9 @@ function renderFleetVerdict(fleets, f, picked){
     const fits = [...fleets.values()].filter(x=> x.fits);
     const lost = S.models.map((s, i)=> i).filter(i=> ![...fleets.values()].some(x=> x.models[i].alone.fits));
     lbl = "No board holds every model";
-    main = lost.length ? "Too big for one 8-GPU node" : "No board suits every model";
-    why = lost.length ? `${lost.map(i=> esc(specName(S.models[i]))).join(" and ")} need${lost.length===1 ? "s" : ""} more than one 8-GPU node on every board. Lower the precision or the prompt and reply lengths.`
+    const hs = S.host!=="auto" ? findHost(S.host) : null;
+    main = lost.length ? (hs ? `Too big for one ${hs.short}` : "Too big for one 8-GPU node") : "No board suits every model";
+    why = lost.length ? `${lost.map(i=> esc(specName(S.models[i]))).join(" and ")} need${lost.length===1 ? "s" : ""} more than ${hs ? `one ${hostLink(hs)} holds, on every board it takes` : "one 8-GPU node on every board"}. Lower the precision or the prompt and reply lengths${hs ? ", or pick a larger server" : ""}.`
         : fits.length ? `Every board that holds them all splits a copy across cards with no direct GPU link. Pick one below to see it anyway.`
         : `Each model fits on some board, but no one kind of board holds them all. The board table below says which model doesn't fit where.`;
   }
@@ -2700,7 +2755,7 @@ function renderFleetCards(fleets, active, suggested, picked){
       <td class="board"><div class="gname">${b.n}${isSugg ? `<span class="pill sugg">${suggested.meets ? "Suggested" : "Closest"}</span>` : ""}</div>
         <div class="gcap">${boxMem(b)} ${b.mem}${big ? ` · ${big}-GPU systems only`
           : S.srv ? ` · ${popText(b)} per server${b.split ? `, NVLink across ${b.split}` : ""}`
-          : b.split ? ` · up to ${nodeMax(b)} per server, NVLink across ${b.split}` : b.max ? ` · up to ${b.max} per server` : ""}${b.host ? ` · HPE ${b.host.short}` : ""}${b.bench ? "" : ` · <span class="tipl" data-tip="extrap">speed extrapolated</span>`}</div></td>
+          : b.split ? ` · up to ${nodeMax(b)} per server, NVLink across ${b.split}` : b.max ? ` · up to ${b.max} per server` : ""}${b.host ? ` · HPE ${b.host.short}${b.est ? ` <span class="tipl" title="${esc(b.est)}">(count to confirm)</span>` : ""}` : ""}${b.bench ? "" : ` · <span class="tipl" data-tip="extrap">speed extrapolated</span>`}</div></td>
       <td class="link col-opt tipl" data-tip="${linkTip}">${linkTxt}</td>
       <td class="num"><b>${!f.fits ? "—" : big ? k : f.gpus}</b> <small>× ${big ? `${big}-GPU system${k===1 ? "" : "s"}` : "GPU"}</small></td>
       <td class="layout">${status || (f.fits ? (big ? plural(k, "system") : k===1 ? "1 server" : `${k} servers: ${f.servers.map(s=> s.n).join(" + ")}`) : "—")}</td>
@@ -2883,6 +2938,12 @@ wireSeg('tp','tpo');
 wireSeg('pipe','pipe');
 wireSeg('srv','srv');
 const hostSel = $('host');
+/* the picker's servers, grouped as HPE_HOSTS groups them */
+[...new Set(HPE_HOSTS.map(h=> h.group))].forEach(grp=>{
+  const og = document.createElement('optgroup'); og.label = grp;
+  HPE_HOSTS.filter(h=> h.group===grp).forEach(h=> og.appendChild(new Option(`${h.short} — ${h.spec}`, h.id)));
+  hostSel.appendChild(og);
+});
 hostSel.addEventListener('change', ()=>{ S.host = hostSel.value; render(); });
 function kqLabel(){ return $('kq').querySelector(`[data-v="${S.kq}"]`).dataset.lbl; }
 
@@ -3342,7 +3403,7 @@ function buildSummary(){
   const prec = S.wqLbl==="NATIVE" ? `${m.nat.f}, as released` : S.wqLbl;
   const all = allUsers(), wl = groupNames(), gs = groups();
   const date = new Date().toLocaleDateString('en-US', {year:'numeric', month:'long', day:'numeric'});
-  const head = fits ? deployName(a) + (a.g.host ? ` in an ${a.g.host.n}` : "") : "Too big for one 8-GPU node";
+  const head = fits ? deployName(a) + (a.g.host ? ` in an ${a.g.host.n}` : "") : S.host!=="auto" ? `Too big for one ${findHost(S.host).n}` : "Too big for one 8-GPU node";
   const role = fits ? (L.picked ? (notRecommended(a) ? "Selected node · split over PCIe" : "Selected node") : a.partial ? "Closest single node" : "Recommended node") : "No single node fits";
   const short = fits && a.partial
     ? `One node ${a.meets ? "serves" : "holds"} up to ${commas(a.served)} of the ${commas(all)} users${hasGoal ? (a.meets ? " within the speed goal" : ", below the speed goal") : ""}.` : "";
@@ -3581,7 +3642,7 @@ const TIPS = {
   chunk:"When a new question arrives, the server reads the prompt in pieces while it keeps writing replies for everyone else. Small pieces keep other people's replies flowing smoothly and ride along with their steps almost free, but each prompt takes more steps to read, so under load prompts queue up and first replies wait longer. Big pieces read prompts sooner, but everyone else's text briefly freezes while each piece is read. The numbers on each choice show both effects on your setup.",
   pause:"While a new prompt is being read, everyone already mid-reply waits, whichever workload they belong to. This is the longest gap they would see between words. Under 0.1 s is unnoticeable; choose Smooth streaming to shorten it.",
   tp:"How many GPUs one copy of the model is split across (tensor parallelism). Every layer's weights are divided and the GPUs all-reduce after each layer, so splitting needs NVLink to be fast. A copy is split 1, 2, 4 or 8 ways because serving engines need the split to divide the model's attention heads evenly; that is a software rule and applies to every board. Auto picks the smallest layout; a fixed number applies to every board. On a bridged board with Pipeline across bridge groups on, a copy wider than one bridge is tensor-parallel within each group and pipelined across them.",
-  host:"The HPE server each board is sized in. Auto puts each board in the HPE server that sells it with the most cards: the DL380a Gen12 for the L4, L40S, RTX PRO 6000 and H200 NVL (two 4-way NVLink groups of H200 NVL, with HPE's S4A91C bridge, which only the DL380a Gen12 takes), the DL380 Gen12 for the RTX PRO 4500, and the XD685 for the 8-GPU HGX and MI355X systems. Pick a server to compare only the boards it takes, at its limits: the DL385 Gen11 holds 4 double-wide cards, and joins H200 NVL with the 2-way S4A90C bridge only, so one copy spans 2 of them (or 4 as two pipeline stages). Checked against HPE QuickSpecs and the NVIDIA Accelerators for HPE document, October 2026; confirm a build against the current QuickSpecs.",
+  host:"The HPE server each board is sized in, from every current HPE ProLiant server that takes one of these GPUs (HPE's NVIDIA Accelerators for HPE QuickSpecs, version 83, September 2026, and each server's QuickSpecs). Auto puts each board in its default: the DL380a Gen12 for the L4, L40S, RTX PRO 6000 and H200 NVL, the DL380 Gen12 for the RTX PRO 4500, the DL385 Gen11 for the MI350P (2 cards), and the XD685 for the 8-GPU systems. Pick a server to compare only the boards it takes, at its limits. Only the DL380a Gen12 takes HPE's 4-way H200 NVL bridge (S4A91C); the DL385 Gen11 takes the 2-way S4A90C, and the DL380 Gen12 takes H200 NVL with no bridge at all, over PCIe. Gen11 servers with a Gen12 successor are left out. Confirm a build against the current QuickSpecs.",
   pipe:"Pipeline parallelism between a server's NVLink bridge groups. An H200 NVL bridge joins at most 4 cards (HPE's S4A91C, in the DL380a Gen12), so a copy of a model normally spans at most 4 and 8 cards run two copies. In a DL385 Gen11 the bridge is 2-way, so there it is two groups of 2 in 4 cards. On, one copy may span both groups as two pipeline stages: each stage holds half the layers on its own bridged group, tensor-parallel within it, and hands each token's activations to the next stage over PCIe. It fits a model, or a KV cache, that one group can't hold. It does not raise speed per user: each stage still reads all of its weights for every token, and the engine runs the stages on alternating halves of the batch (vLLM --pipeline-parallel-size 2). Two copies of 4 serve more users when they fit, and the page still prefers them.",
   copies:"A copy (replica) is a full, independent instance of the model on its own GPUs within the node, serving its share of the users. More copies serve more users without slowing each other down, and unlike splitting one copy across GPUs, they need no direct GPU-to-GPU link between them.",
   fleet:"Each model runs as copies of its own on GPUs of its own, sized as it would be alone; the copies of every model are then packed into the board's servers, widest first, and spare GPUs run extra copies of the models closest to their goals. Models don't share GPUs, so each one's speed is its own. The strip shows every server's GPUs, numbered by model.",
