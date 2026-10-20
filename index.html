@@ -679,6 +679,14 @@
           <div class="hint" id="tpnote"></div>
         </div>
         <div>
+          <p class="eyebrow">Pipeline across bridge groups <span class="i" data-tip="pipe" tabindex="0">i</span></p>
+          <div class="seg" id="pipe" role="group" aria-label="Pipeline parallelism across NVLink bridge groups">
+            <button data-v="0" aria-pressed="true">Off</button>
+            <button data-v="1" aria-pressed="false">On</button>
+          </div>
+          <div class="hint" id="pipenote"></div>
+        </div>
+        <div>
           <div class="sliderhead">
             <p class="eyebrow" style="margin:0">Optimize for <span class="i" data-tip="chunk" tabindex="0">i</span></p>
             <span class="opt-colhead">first reply · pause</span>
@@ -746,6 +754,7 @@
             <details class="mitem"><summary>Activations</summary><div class="mtext"><p><b>Activations</b> = <code>T × (hidden × 4 + ffn × 2) × 2 B</code> plus <code>users × vocab × 4 B</code> of fp32 logits, where <code>T</code> is tokens per step — the prompt piece size set by <b>Optimize for</b>, or the number of users, whichever is larger. The <b>MLP intermediate</b> (<code>ffn</code>, 3.5–4× hidden for SwiGLU) dominates, which is why activations track the piece size rather than context length. Compute stays bf16 even when weights are quantized, and FlashAttention keeps the T² score matrix off HBM — so there is no quadratic term. Genuinely the smallest of the four on most configs; choose Fast first reply to see it grow.</p></div></details>
             <details class="mitem"><summary>Overhead</summary><div class="mtext"><p><b>Overhead</b> = a fixed <code>~1.0 GB</code> CUDA/driver context plus a slider % of the three above, standing in for allocator fragmentation, framework buffers, and CUDA graphs.</p></div></details>
             <details class="mitem"><summary>Tensor-parallel overhead</summary><div class="mtext"><p>The page picks TP for you as part of the smallest layout, fixed in Advanced settings if you prefer. One copy of a model is split 1, 2, 4 or 8 ways: serving engines need the split to divide the model's attention heads and layer sizes evenly, and these are the splits production deployments run. This is a software rule that applies to every board, and it is separate from how many cards a server can hold. With TP &gt; 1 the model is sharded across GPUs: weights and activations divide by TP, and the KV cache divides by <code>min(TP, kv_heads)</code>. Sharding <i>adds</i> memory: every GPU carries its own <code>~1 GB</code> CUDA context, plus NCCL all-reduce workspace and comm buffers (<code>~0.3 GB + users × hidden × 8 B</code> per GPU).</p><p>When <b>TP exceeds a layer's KV heads</b>, that part of the cache can't split further and copies to every GPU — watch it stop shrinking. Models with latent or compressed attention (DeepSeek, GLM, Kimi, Mistral Small 4) have a single cache head, so a plain split would copy their whole cache to every GPU. SGLang and vLLM serve them with <b>data-parallel attention</b> instead, where each GPU keeps only its own users' cache, and the page sizes them that way. Linear-attention state splits cleanly.</p></div></details>
+            <details class="mitem"><summary>Pipeline across bridge groups</summary><div class="mtext"><p>An NVLink bridge joins at most 4 H200 NVL cards, so a copy of a model spans at most one bridged group and 8 cards run two copies. With <b>Pipeline across bridge groups</b> on in Advanced settings, a copy may span both groups as <b>pipeline stages</b>: each stage holds <code>layers ÷ stages</code> on its own bridged group, tensor-parallel within it, so weights land at <code>÷ stages ÷ TP</code> per GPU and each GPU holds only its own layers' share of the KV cache. The engine runs one microbatch per stage (vLLM's <code>--pipeline-parallel-size</code>), so a stage's pass holds a half of the batch and a stage hands each microbatch's activations (<code>requests × hidden × 2 B</code>, kilobytes to a few megabytes) to the next over PCIe at <code>64 GB/s</code> — one crossing per layer boundary, never an all-reduce, which is why the bridge groups needn't be linked. Speed is modeled as <code>stages</code> passes of a stage back to back, each reading that stage's weights and its microbatch's cache, plus the pipeline fill of <code>(stages − 1)</code> crossings: a GPU still reads all of its weights for every token, so pipelining holds a model or a cache that one group can't, at about one group's speed per user, rather than making anyone faster. The page keeps preferring two copies of 4 when they fit, since copies leave more room for users and lose nothing if a card fails. The PCIe crossing and the pass accounting are modeled, not fitted: no benchmark in the validation set runs pipeline stages, so treat a pipelined figure as ±30% until one does.</p></div></details>
             <details class="mitem"><summary>Units</summary><div class="mtext"><p>Every amount is computed in bytes and shown in the unit picked at the top: <b>GB</b> is 10⁹ bytes (spec sheets, download pages), <b>GiB</b> is 2³⁰ bytes (nvidia-smi, PyTorch and vLLM's logs). Switching changes the labels, never the answer. Board capacities are the size on the box, counted as GB, so an H200 is 141 GB or 131 GiB. Real boards expose that much or slightly more, so a fit here errs on the safe side.</p></div></details>
           </div>
           <div class="mgroup">
@@ -761,7 +770,7 @@
           <div class="mgroup">
             <p class="mhead">Sizing</p>
             <details class="mitem"><summary>Single node</summary><div class="mtext"><p>This estimates one server of up to 8 GPUs for each model. Every model's result is at most a single node; multi-node deployments and NVL rack-scale systems are not covered. With several models, their copies share servers (see Several models). If one node of a board can't serve every user, its row says how many it does serve. For production, plan at least one more node (or replica) than this, so the service keeps running if one fails or is being updated.</p></div></details>
-            <details class="mitem"><summary>Suggestion and capacity</summary><div class="mtext"><p>Every board is tried at 1, 2, 4 and 8 GPUs per copy (splitting a copy only across NVLink boards), with as many copies as the node's 8 GPUs allow. The suggestion is the node that serves every user within the speed goal at the cautious end of the estimate (speed per user at the low end of its likely range, first token at the slow end), with the least GPU memory in total (on any one board, the fewest GPUs). If no node serves everyone within the goal, it is the full node that serves the most users. GPU counts round up to what can be bought: H200 NVL servers take 1, 2, 4 or 8 cards, so 3 rounds up to 4 and 5 to 7 round up to 8; but an NVLink bridge joins at most 4 of them, so one copy of a model spans at most 4, and 8 cards run two copies.</p><p>The HGX H200, HGX B200 and HGX B300 ship only as 8-GPU systems, with all 8 GPUs joined through NVSwitch. RTX PRO 4500 servers hold any number of cards up to 5 (HPE's limit); because of the split rule above, one copy of a model uses at most 4 of them, and the fifth can run another copy. Spare GPUs run extra copies of the model. <b>Room for</b> (<b>Handles up to</b> in the summary) is the most users the node holds at the current prompt and reply lengths while fitting in memory and, with a goal, still reaching it on the estimate; when the goal is the limit, it also says how many memory alone would hold.</p></div></details>
+            <details class="mitem"><summary>Suggestion and capacity</summary><div class="mtext"><p>Every board is tried at 1, 2, 4 and 8 GPUs per copy (splitting a copy only across NVLink boards), with as many copies as the node's 8 GPUs allow. The suggestion is the node that serves every user within the speed goal at the cautious end of the estimate (speed per user at the low end of its likely range, first token at the slow end), with the least GPU memory in total (on any one board, the fewest GPUs). If no node serves everyone within the goal, it is the full node that serves the most users. GPU counts round up to what can be bought: H200 NVL servers take 1, 2, 4 or 8 cards, so 3 rounds up to 4 and 5 to 7 round up to 8; but an NVLink bridge joins at most 4 of them, so one copy of a model spans at most 4, and 8 cards run two copies (unless Pipeline across bridge groups is on: then one copy may span all 8 as two pipeline stages, and 8 is also tried).</p><p>The HGX H200, HGX B200 and HGX B300 ship only as 8-GPU systems, with all 8 GPUs joined through NVSwitch. RTX PRO 4500 servers hold any number of cards up to 5 (HPE's limit); because of the split rule above, one copy of a model uses at most 4 of them, and the fifth can run another copy. Spare GPUs run extra copies of the model. <b>Room for</b> (<b>Handles up to</b> in the summary) is the most users the node holds at the current prompt and reply lengths while fitting in memory and, with a goal, still reaching it on the estimate; when the goal is the limit, it also says how many memory alone would hold.</p></div></details>
             <details class="mitem"><summary>Copies (replicas)</summary><div class="mtext"><p>For more users, the page runs more copies of the model on the node's GPUs instead of splitting one copy wider. Each copy has its own GPUs and an even share of the users, so memory, the bar and the breakdown describe one copy, while GPU count, output and capacity add up across all of them. Copies don't exchange data while generating, so they need no direct GPU-to-GPU link between them; that's why PCIe boards run several copies well even though they split a single copy poorly. When two layouts use the same GPUs, the page takes more copies over splitting one wider, on every board: both reach the goal, and copies leave room for more users. A copy is split wider only when memory or the speed goal needs it. When a board needs more GPUs than memory alone calls for, the extra ones are there to reach the speed goal, and the page says so. This assumes requests are spread evenly across the copies.</p></div></details>
             <details class="mitem"><summary>Several models</summary><div class="mtext"><p>Add up to four models, each with its own users, workloads, precision and speed goal; the controls above set the model whose tab is selected, while overhead, prompt caching and Server apply to all. Every model runs as copies of its own on GPUs of its own, sized as it would be alone but before rounding up to a server size. All the copies are then packed into servers of the board, the widest first, and a server that isn't full shrinks to the smallest size the board comes in; a copy of 4 on H200 NVL cards stays within one bridged group. Spare GPUs run extra copies of the models closest to missing their goals, and each model then uses the fewest GPUs per copy that still meet its goal. A model that one node can't serve keeps a node of its own.</p><p>The suggestion is the board where every model meets its goal with the least GPU memory in all, then the fewest servers; every model runs on the same kind of board. Models don't share GPUs, so each one's speed is its own; they share the servers' CPUs, memory and storage, and each server's storage holds the weights of every model it runs, once each.</p></div></details>
             <details class="mitem"><summary>Server (beta)</summary><div class="mtext"><p>The server sizing is in beta: its rules and figures are still being worked on and may change. Set <b>Server</b> to NVIDIA guidance in Advanced settings and the page follows the inference server recommendations in NVIDIA's Certified Systems Configuration Guide. GPU counts round up to <code>2, 4 or 8</code> per server, split evenly across two CPU sockets (2 or 4 for the RTX PRO 4500, whose servers hold 5), which can change which board is suggested; the HGX systems stay whole 8-GPU systems. Around the GPUs the guide asks for CPUs with PCIe Gen5 and a base clock of 2.0 GHz or more and at least 6 physical cores per GPU, but the page sizes cores as HPE builds the AI worker nodes of HPE Private Cloud AI, its inference platform with NVIDIA: <code>32 physical cores per GPU</code> in a 2- or 4-GPU server and <code>16 per GPU</code> in an 8-GPU one (2 × 32-core CPUs for 2 GPUs, 2 × 64-core for 4 or 8).</p><p>The guide also asks for system memory of at least <code>2 × the GPU memory</code> spread over every memory channel of both sockets, each GPU in an x16 slot of its own PCIe generation, PCIe Gen5 switches with 8 GPUs (with one or two per socket the CPUs' own lanes may be enough), one NVMe drive of at least 1 TB per socket and, in NVIDIA's reference architectures, a 1 TB NVMe boot drive, with drives under the same switch or root complex as the GPUs. The guide also covers network cards, remote management and TPM; the page leaves those to the conversation with the customer. The storage figure is the page's own: the <b>usable capacity</b> the model needs, <code>(2 × weights + 100 GB) ÷ 0.8</code>, rounded up (to 10 GB, or a tenth of a TB above 1 TB).</p><p>That is two copies of the weights (the version serving and the next one downloading) and 100 GB for container images, compile caches and logs, kept under 80% full, beside a separate boot volume for the OS. How it is made from drives and RAID is the vendor's choice, so the page doesn't size drives. KV cache offloaded to disk, as NVIDIA Dynamo's KV block manager does, needs a disk tier at least as large as its CPU tier, which should be 100 GB or more and larger than the GPUs' KV cache; the page gives that figure in the storage tooltip only, since few single servers offload to disk. Server amounts are in GB as sold, whatever unit is picked at the top.</p><p>All of these are minimums for planning, and the guide adds that LLM servers should aim above them. An HGX system's CPUs, memory and storage come with it from its manufacturer, so the page leaves them to its spec sheet. The AMD boards are left out of the comparison while Server is set to NVIDIA guidance, since the guide is written for NVIDIA GPUs. A server is NVIDIA-Certified only if it is on NVIDIA's list of certified systems.</p></div></details>
@@ -960,8 +969,11 @@ const THINK_LABEL = {always:"always thinks before answering", default:"thinks be
    pop = how many GPUs a server of this board can be populated with. H200 NVL servers take 1, 2, 4 or 8;
    the HGX H200, HGX B200, HGX B300 and AMD MI355X ship only as 8-GPU systems (NVL rack-scale
    systems are out of scope). linkLbl = the link column's text, when the default doesn't fit.
-   split = the most cards one copy of a model can span, where that is fewer than the server holds: an
-   NVLink bridge joins at most 4 H200 NVL cards, so 8 cards are two bridged groups running two copies.
+   split = the most cards one NVLink bridge joins, where that is fewer than the server holds: an NVLink
+   bridge joins at most 4 H200 NVL cards, so 8 cards are two bridged groups. One copy of a model spans
+   at most one group, unless Pipeline across bridge groups is on (S.pipe): then a copy can span both,
+   tensor-parallel inside each group and pipeline-parallel between them, the stages handing activations
+   over PCIe (PCIE_BW).
    A deployment's GPU count rounds up to one that can be bought: see buyable().
    max = the most GPUs one server of this board holds, where that is fewer than a node's 8: HPE servers
    take up to 5 RTX PRO 4500 Blackwell cards.
@@ -1003,6 +1015,9 @@ const boardsInPlay = () => S.srv ? GPUS.filter(g=> g.guide!==false) : GPUS;
 const leftOut      = () => S.srv ? GPUS.filter(g=> g.guide===false) : [];
 
 const USABLE = 0.90; // share of board memory the server may use (vLLM's gpu_memory_utilization default)
+/* The path between two bridged groups in one server: PCIe Gen5 x16 at 64 GB/s each way (through the
+   host or a PCIe switch). Only pipeline stages cross it, once per layer boundary, never an all-reduce. */
+const PCIE_BW = 64;
 const BIGGEST = GPUS.reduce((a,b)=> b.cap>a.cap ? b : a);   // what "too big" is measured against
 
 /* ---------------- speed goals ----------------
@@ -1068,8 +1083,9 @@ const DATA_AS_OF = "October 2026";   // when the model and board figures were la
 /* The estimator's version, carried in every shared link and summary. A link made under an older
    version opens with the changes since then listed, so a sizing never shifts without saying so.
    Bump it with each release tag; add to CHANGES whenever a release changes what the figures come to. */
-const VERSION = "1.6.0";
+const VERSION = "1.7.0";
 const CHANGES = [
+  {v:"1.7.0", what:"Pipeline across bridge groups, off by default, in Advanced settings: on H200 NVL servers one copy of a model may span both bridged groups of 4 as two pipeline stages, tensor-parallel within each, so a model or a KV cache too big for one group fits on 8 cards. With it off nothing changes. With it on, a board that could only run two copies of 4 can also be suggested as one copy of 8 when that is the only layout that holds everyone; speed per user is sized as one group's, since each stage still reads all of its weights per token, and the figures for pipelined copies are modeled, not yet fitted to a benchmark."},
   {v:"1.5.0", what:"The AMD MI355X joins the boards: 288 GB per GPU, sold only as 8-GPU systems, with published benchmarks of its own. Its GPUs are wired to each other with no switch, one Infinity Fabric link per pair, so a copy split across 2 or 4 of them uses only the links among them. Counting AMD's MI355X benchmark runs the same way, AMD's software reaches 0.75 of the hardware shares rather than 0.68, so the MI350P's figures come out up to 10% faster."},
   {v:"1.4.0", what:"When two layouts use the same GPUs, the suggestion runs more copies of the model rather than splitting one copy wider, on NVLink boards too, since both reach the goal and copies leave room for more users. A small model on an 8-GPU HGX system now runs as 8 copies, not one copy across all 8: speed per user comes out lower but still within the goal. The number of GPUs is unchanged."},
   {v:"1.2.0", what:"Speed and first-token estimates are calibrated against 295 published benchmark points: board compute is now each datasheet's dense figure, and the shares of it serving reaches are fitted, as are vLLM's fixed costs per step and per request, with a further factor for AMD's software stack fitted to MI355X runs. Speed per user, which ran about 20% slow, now lands near the measured figures, prompts read about twice as fast, and a likely range sits beside both. The speed goal is judged at the cautious end of that range. The RTX PRO 6000's memory bandwidth is corrected to the Server Edition's 1,597 GB/s."},
@@ -1095,12 +1111,15 @@ function loadUnit(){ try { return localStorage.getItem(UNIT_KEY)==="GiB" ? "GiB"
 
 
 /* ---------------- state ---------------- */
-/* tpo = TP override ("auto" or 1/2/4/8) · tp = the TP of the deployment on screen · board = "auto" or a clicked board */
+/* tpo = GPUs-per-copy override ("auto" or 1/2/4/8) · tp = GPUs per copy of the deployment on screen ·
+   pp = its pipeline stages (1 unless a copy spans two bridged groups) · board = "auto" or a clicked board
+   pipe = Pipeline across bridge groups: 0 = a copy stays within one NVLink bridge (as before),
+   1 = a copy may span both of a server's bridged groups, TP inside each and PP across them */
 /* prompt/reply = lengths in use; wantPrompt/wantReply = what the workload asked for, kept so a
    model with a shorter context trims them and switching back restores them.
    think = the Thinking switch · thinkTok = thinking tokens asked for · thinking = tokens in use (0 when off).
    A user's context is prompt + thinking + reply. */
-const S = { wq:2, wqLbl:"NATIVE", kq:2, tp:1, tpo:"auto", chunk:512, ovpct:7, users:16, board:"auto",
+const S = { wq:2, wqLbl:"NATIVE", kq:2, tp:1, pp:1, tpo:"auto", pipe:0, chunk:512, ovpct:7, users:16, board:"auto",
             goal:"smooth",
             srv:0,             // Server: 0 = GPUs only, 1 = NVIDIA's guidance for the whole server (see serverFor)
             workload:"chat", prompt:2048, reply:512, wantPrompt:2048, wantReply:512,
@@ -1124,7 +1143,7 @@ let LAST = null;   // what the last render showed, for the downloadable summary
    puts another spec on S for as long as fn runs, to size that model without touching the page, and
    puts S back as it was. The rest of S (Server, overhead, prompt caching, the board picked, the unit)
    belongs to the page, whatever the model. */
-const PER_MODEL = ["custom", "wq", "wqLbl", "kq", "tp", "tpo", "chunk", "chunkBase", "users", "goal", "workload",
+const PER_MODEL = ["custom", "wq", "wqLbl", "kq", "tp", "pp", "tpo", "pipe", "chunk", "chunkBase", "users", "goal", "workload",
   "prompt", "reply", "wantPrompt", "wantReply", "think", "thinkTok", "thinking", "seeThink", "shared", "fresh",
   "traffic", "trafficApplied", "extra"];
 const specOf   = () => structuredClone({m: M.id, ...Object.fromEntries(PER_MODEL.map(k=> [k, S[k]]))});
@@ -1276,9 +1295,12 @@ function cacheFor(m, tokens, tp){
 }
 const precClass = m => S.wqLbl==="NATIVE" ? m.nat.cls : S.wqLbl;
 
-function compute(tpOverride, usersOverride){
+/* tp = GPUs one copy is split across by tensor parallelism (one bridged group, or the whole copy) ·
+   pp = pipeline stages: with 2, each stage holds half the layers on its own tp GPUs, so a copy is
+   tp × pp GPUs. Every per-GPU figure is for one GPU of one stage; the aggregate is the whole copy. */
+function compute(tpOverride, usersOverride, pp = 1){
   const m = activeModel();
-  const users = usersOverride ?? allUsers(), tp = tpOverride ?? S.tp;
+  const users = usersOverride ?? allUsers(), tp = tpOverride ?? S.tp, n = tp*pp;
   const cuda = 1.0 * GB;                                            // per-GPU CUDA/driver context
 
   // aggregate core (whole deployment, before sharding)
@@ -1295,38 +1317,42 @@ function compute(tpOverride, usersOverride){
      intermediates, which dominate. Compute dtype is bf16 (2 B) even when weights are
      quantized. FlashAttention keeps scores off-HBM, so there is no T² term.
      Logits are materialized in fp32 for the last token of each sequence. */
-  const T        = Math.max(S.chunk, users);                        // tokens per forward pass
+  /* With pipeline stages the engine runs pp microbatches, one per stage at a time, so a stage's pass
+     holds a pp-th of the batch (a prompt piece stays whole). The last stage alone holds the logits;
+     every GPU is sized as if it did, so the tightest one fits. */
+  const T        = Math.max(S.chunk, Math.ceil(users/pp));          // tokens per forward pass, per stage
   const ffn      = m.ffn, vocab = m.v;
   const actBuf   = T * (m.h*4 + ffn*2) * 2;                         // hidden + MLP intermediates
   const actLogit = users * vocab * 4;                               // fp32 logits, one row per seq
   const act      = actBuf + actLogit;
 
-  // tensor-parallel sharding
-  const w_pg       = weights / tp;
-  const onGpu = cache.dp ? Math.ceil(users/tp) : users;            // users whose cache sits on each GPU
+  // sharding: weights and cache split by layers across stages (÷ pp), then within a stage by TP
+  const w_pg       = weights / n;
+  const onGpu = cache.dp ? Math.ceil(users/tp) : users;            // users whose cache sits on each GPU of a stage
   const kv_pg      = sum(x=>{
     const u = x.users*onGpu/users;                                  // this workload's share of them
     return cache.dp ? x.cache.req*u - x.sh.req*Math.max(0, u-1)     // data-parallel: this GPU's own users, whole caches
                     : x.cache.pg*u - x.sh.pg*Math.max(0, u-1);
-  });
+  }) / pp;                                                          // and only this stage's layers of it
   const act_pg     = act / tp;
   const frag_pg    = (w_pg + kv_pg + act_pg) * (S.ovpct/100);
   const tpcomm_pg  = tp>1 ? (0.3*GB + users*m.h*2*4) : 0;           // NCCL workspace + comm buffers
-  const perGPU     = w_pg + kv_pg + act_pg + cuda + frag_pg + tpcomm_pg;
+  const ppcomm_pg  = pp>1 ? (0.1*GB + 2*T*m.h*2) : 0;               // send/recv buffers for the activations handed to the next stage
+  const perGPU     = w_pg + kv_pg + act_pg + cuda + frag_pg + tpcomm_pg + ppcomm_pg;
 
-  // aggregate components for the bar/table (sum across all GPUs)
+  // aggregate components for the bar/table (sum across all n GPUs of the copy)
   const kvReq        = sum(x=> x.cache.req*x.users);                // everyone's cache, counted once
   const kv_agg       = cache.dp ? sum(x=> x.cache.req*x.users - x.sh.req*Math.max(0, x.users - Math.min(x.users, tp)))
-                                : kv_pg * tp;                       // inflates when tp > kv_heads (replication)
-  const kv_saved     = (cache.dp ? kvReq : sum(x=> x.cache.pg*x.users)*tp) - kv_agg;   // what sharing the prompt start saves
-  const act_agg      = act_pg * tp;
-  const overhead_agg = cuda + frag_pg*tp;                           // one base context + fragmentation on every GPU
-  const tp_agg       = tp>1 ? (tp-1)*cuda + tpcomm_pg*tp : 0;       // extra contexts + all comm buffers
+                                : kv_pg * n;                        // inflates when tp > kv_heads (replication)
+  const kv_saved     = (cache.dp ? kvReq : sum(x=> x.cache.pg*x.users)*n/pp) - kv_agg;   // what sharing the prompt start saves
+  const act_agg      = act_pg * n;
+  const overhead_agg = cuda + frag_pg*n;                            // one base context + fragmentation on every GPU
+  const tp_agg       = n>1 ? (n-1)*cuda + (tpcomm_pg + ppcomm_pg)*n : 0;   // extra contexts + all comm buffers
   const total        = weights + kv_agg + act_agg + overhead_agg + tp_agg;
 
-  return {m, ctx, users, tp, cache, mix, kvReq, T, ffn, vocab, actBuf, actLogit,
+  return {m, ctx, users, tp, pp, n, cache, mix, kvReq, T, ffn, vocab, actBuf, actLogit,
           weights, kv:kv_agg, act:act_agg, overhead:overhead_agg, tpov:tp_agg,
-          w_pg, kv_pg, act_pg, tpcomm_pg, perGPU, total, kv_saved};
+          w_pg, kv_pg, act_pg, tpcomm_pg, ppcomm_pg, perGPU, total, kv_saved};
 }
 
 /* ---------------- throughput model ----------------
@@ -1356,8 +1382,18 @@ const PREC = {                  // d = share of the bandwidth saving realized ·
   INT8:{d:0.85, p:0.8},  INT4:{d:0.75, p:0.8}, INT3:{d:0.7, p:0.75}, INT2:{d:0.65, p:0.7},
 };
 
-function throughput(g, tp, chunk = S.chunk, users = allUsers()){
+/* Pipeline stages (pp > 1). The engine (vLLM, SGLang) runs pp microbatches, each a pp-th of the
+   requests, and every stage works on a different one at a time, so a token for everyone takes pp
+   passes of each stage. A stage holds a pp-th of the layers, so one pass reads a pp-th of the
+   weights — but pp passes read them all again: pipelining does not cut the weight bytes a GPU reads per
+   token, which is why it adds memory and users rather than speed per user. A pass reads only its
+   microbatch's cache for its own layers (÷ pp²), compute spreads over every GPU of the copy, and the
+   TP all-reduces run within a stage, over its bridged group. Between passes a microbatch's activations
+   cross to the next stage over PCIe; the pp − 1 crossings of a token for everyone are added to the
+   step as pipeline fill, the rest overlapping the other stages' work. */
+function throughput(g, tp, chunk = S.chunk, users = allUsers(), pp = 1){
   const m = activeModel();
+  const n = tp*pp;
   const mix = mixAt(users);
   const cls = precClass(m);
   let {d, p} = cls==="FP8" ? {d:CAL.fp8d, p:CAL.fp8p} : PREC[cls];
@@ -1388,16 +1424,28 @@ function throughput(g, tp, chunk = S.chunk, users = allUsers()){
     // attention is two matmuls (scores, then values) over the span, 2 FLOPs per multiply-add
     flops += x.users * (2*paramsActive + 4*live.span*m.h);
   }
-  const readBytes = paramsRead*S.wq/tp + cacheRead;
   const eff       = g.stack==="rocm" ? CAL.rocm : 1;     // AMD's stack reaches less of the same hardware shares
-  const tMem      = readBytes / (g.bw*GB * CAL.mbu * eff * d);
-  const tCompute  = flops / (g.flops*1e12 * CAL.mfuDecode * eff * p * tp);
-  const tComm     = 2*m.L * allReduce(users*m.h*2);
-  const tStep     = Math.max(tMem, tCompute) + tComm + CAL.step;   // a step with no prompt to read
+  /* one pass of one stage over one microbatch (with pp = 1, the whole step's memory and compute) */
+  const uPass     = Math.ceil(users/pp);                 // requests in a microbatch
+  const readPass  = paramsRead*S.wq/n + cacheRead/(pp*pp);
+  const tMemPass  = readPass / (g.bw*GB * CAL.mbu * eff * d);
+  const tCompPass = flops/pp / (g.flops*1e12 * CAL.mfuDecode * eff * p * n);
+  const tCommPass = 2*m.L/pp * allReduce(uPass*m.h*2);
+  // a microbatch's activations handed to the next stage: fixed latency + the tensor at PCIe speed
+  const hop       = pp>1 ? CAL.pcieLatency + uPass*m.h*2/(PCIE_BW*GB) : 0;
+  const tPipe     = (pp-1)*hop;
+  /* the step: pp passes of a stage, back to back, plus the pipeline fill. Reported as the whole step's
+     parts (what each GPU spends on memory, compute and links for one token for everyone). */
+  const tMem      = pp*tMemPass, tCompute = pp*tCompPass, tComm = pp*tCommPass;
+  const tStep     = pp*(Math.max(tMemPass, tCompPass) + tCommPass + CAL.step) + tPipe;   // a step with no prompt to read
   /* A step that also reads k prompt tokens (chunked prefill). They add compute to a step that is
      usually waiting on memory, so a small piece rides along almost free and a big one makes the step
-     compute-bound; their activations join the batch's all-reduces. */
-  const stepWith = (k, secTok) => Math.max(tMem, tCompute + k*secTok) + 2*m.L * allReduce((users + k)*m.h*2) + CAL.step;
+     compute-bound; their activations join the batch's all-reduces. With stages, the piece rides in one
+     microbatch and crosses every stage, each adding its pp-th of the piece's compute, so the step grows
+     by the same amount on every stage: one pass carries the piece, the other pp − 1 do not. */
+  const stepWith = (k, secTok) => (pp-1)*(Math.max(tMemPass, tCompPass) + tCommPass + CAL.step)
+                                + Math.max(tMemPass, tCompPass + k*secTok/pp) + 2*m.L/pp * allReduce((uPass + k)*m.h*2) + CAL.step
+                                + tPipe + (pp>1 ? (pp-1)*k*m.h*2/(PCIE_BW*GB) : 0);
 
   /* Reading one prompt, in pieces, each in a step shared with everyone else's next token:
        · more, smaller pieces → the prompt takes more steps to read (slower first reply)
@@ -1461,12 +1509,12 @@ function throughput(g, tp, chunk = S.chunk, users = allUsers()){
   const slow  = per.reduce((a, b)=> b.ttft > a.ttft ? b : a);
   const stall = per.reduce((a, b)=> b.pause > a.pause ? b : a);
 
-  const core = Math.max(tMem, tCompute);
-  const bottleneck = busy >= 0.5 ? "prompts" : tComm > core ? "interconnect" : CAL.step > core ? "scheduler"
+  const core = Math.max(tMem, tCompute), tOver = pp*CAL.step;
+  const bottleneck = busy >= 0.5 ? "prompts" : tComm + tPipe > core ? "interconnect" : tOver > core ? "scheduler"
                    : tCompute > tMem ? "compute" : "memory";
   return { perUser, total: users*perUser, ttft: slow.ttft, pause: stall.pause, prefillTps: slow.prefillTps, prompt: slow.prompt,
            between: 1/tStep, wait, busy, rate: per.reduce((s, x)=> s + x.rate, 0),
-           per, slow, stall, tMem, tCompute, tComm, tOver: CAL.step, tStep, bottleneck };
+           per, slow, stall, tMem, tCompute, tComm, tPipe, tOver, tStep, bottleneck, pp };
 }
 
 const fitsOn = (g, perGB) => perGB <= g.cap*USABLE;
@@ -1484,17 +1532,25 @@ const fitsOn = (g, perGB) => perGB <= g.cap*USABLE;
 const TP_OPTIONS = [1,2,4,8];
 const NODE = 8;   // GPUs in one node
 const nodeMax = g => popOf(g) ? Math.max(...popOf(g)) : g.max || NODE;   // fewer on a board whose servers hold fewer
-const splitMax = g => Math.min(nodeMax(g), g.split || NODE);   // and a copy spans no more than its link joins
-function evaluate(g, tp, reps, upr = Math.ceil(allUsers()/reps)){   // upr = users on each copy
-  const r = compute(tp, upr), perGB = r.perGPU/GB, fits = fitsOn(g, perGB);
-  const t = fits ? throughput(g, tp, S.chunk, upr) : null, gpus = tp*reps;
-  return {g, tp, reps, upr, gpus, r, perGB, fits, t, meets: !!t && meetsGoal(t), memGB: gpus*g.cap};   // memGB = GPU memory bought
+/* and a copy spans no more than its link joins — unless it may pipeline across the server's bridged groups */
+const splitMax = g => Math.min(nodeMax(g), g.split && !S.pipe ? g.split : NODE);
+/* How a copy of n GPUs on board g is parallelized: tensor-parallel within one bridged group, and
+   pipeline-parallel across the groups when the copy is wider than one group (pipe on). A board with no
+   bridge limit (an NVSwitch system, or PCIe cards) is all tensor-parallel, as before. */
+const partsOf = (g, n) => g.split && n > g.split ? {tp: g.split, pp: n/g.split} : {tp: n, pp: 1};
+function evaluate(g, n, reps, upr = Math.ceil(allUsers()/reps)){   // n = GPUs per copy · upr = users on each copy
+  const {tp, pp} = partsOf(g, n);
+  const r = compute(tp, upr, pp), perGB = r.perGPU/GB, fits = fitsOn(g, perGB);
+  const t = fits ? throughput(g, tp, S.chunk, upr, pp) : null, gpus = n*reps;
+  // tp = GPUs per copy, as every layout and packing rule counts it; tpw × pp is how they are used
+  return {g, tp: n, tpw: tp, pp, reps, upr, gpus, r, perGB, fits, t, meets: !!t && meetsGoal(t), memGB: gpus*g.cap};   // memGB = GPU memory bought
 }
-/* The most users one copy (tp GPUs of g) can serve, up to upTo: memory must fit and, unless memOnly,
+/* The most users one copy (n GPUs of g) can serve, up to upTo: memory must fit and, unless memOnly,
    every user must still reach the goal. Both only get worse as users grow, so bisect. */
-function copyCapacity(g, tp, upTo, memOnly){
-  const ok = n => fitsOn(g, compute(tp, n).perGPU/GB)
-               && (memOnly || S.goal==="any" || meetsGoal(throughput(g, tp, S.chunk, n)));
+function copyCapacity(g, n, upTo, memOnly){
+  const {tp, pp} = partsOf(g, n);
+  const ok = u => fitsOn(g, compute(tp, u, pp).perGPU/GB)
+               && (memOnly || S.goal==="any" || meetsGoal(throughput(g, tp, S.chunk, u, pp)));
   if(!ok(1)) return 0;
   if(ok(upTo)) return upTo;
   let lo = 1, hi = upTo;
@@ -1587,16 +1643,18 @@ function memoryReason(d){
     const holds = copyCapacity(d.g, d.tp, 1e6, true);
     return holds < allUsers() ? {holds, on: d.tp===1 ? "one GPU" : "one copy", verb:"has"} : null;
   }
-  const n = d.tp/2, holds = copyCapacity(d.g, n, 1e6, true);
+  const n = d.tp/2, holds = copyCapacity(d.g, n, 1e6, true), half = partsOf(d.g, n);
   const r = {holds, on: n===1 ? "one GPU" : `${n} GPUs`, verb: n===1 ? "has" : "have"};
-  if(!holds) r.over = {need: compute(n, 1).perGPU*n/GB, usable: d.g.cap*USABLE*n};
+  if(!holds) r.over = {need: compute(half.tp, 1, half.pp).perGPU*n/GB, usable: d.g.cap*USABLE*n};
   return r;
 }
 /* how the node's GPUs are used, in words: the model can run once per GPU, as a few copies of several
    GPUs each, or as one copy spread across them */
+/* a copy that spans two bridged groups says how: "TP 4 × 2 stages" */
+const splitText = d => d.pp>1 ? ` (TP ${d.tpw} × ${d.pp} stages)` : "";
 function layoutText(d){
-  if(d.reps===1) return d.tp===1 ? "Fits on one GPU" : `1 copy across ${d.tp} GPUs`;
-  return d.tp===1 ? "1 copy per GPU" : `${d.reps} copies, ${d.tp} GPUs each`;
+  if(d.reps===1) return d.tp===1 ? "Fits on one GPU" : `1 copy across ${d.tp} GPUs${splitText(d)}`;
+  return d.tp===1 ? "1 copy per GPU" : `${d.reps} copies, ${d.tp} GPUs each${splitText(d)}`;
 }
 /* the deployment by name: "2 × H200 NVL", or "1 × 8-GPU HGX H200 system" once it's a whole system */
 function deployName(d){
@@ -1847,6 +1905,7 @@ function render(){
   const suggested = suggestDeployment(deps);
   const active = picked ? deps.get(picked.n) : suggested;     // null only when nothing fits
   const tp = S.tp = active ? active.tp : (S.tpo==="auto" ? 8 : S.tpo);
+  S.pp = active ? active.pp : 1;
   // memory, the bar and the breakdown describe one copy; with nothing that fits, the model alone
   const r = active ? active.r : compute(tp, 1), m = r.m, tot = r.total, totGB = tot/GB, perGB = r.perGPU/GB;
   const reps = active ? active.reps : 1;
@@ -1899,11 +1958,12 @@ function renderBreakdown(r, tp, reps, active){
 }
 /* the parts of one copy's memory, each with its color, the bar segment that shows it, and how it's computed */
 function memoryParts(r, tp){
-  const m = r.m;
+  const m = r.m, pp = r.pp || 1;
+  const split = pp>1 ? `÷ ${pp} stages ÷ TP ${r.tp}` : `÷ TP ${tp}`;   // how one GPU's share is reached
   return [
     {k:"Model weights", v:r.weights, c:"var(--w)", bar:"bw", tip:"weights",
      f:`${fmtB(m.p)} params × ${+S.wq.toFixed(3)} B/param (${S.wqLbl==="NATIVE" ? m.nat.f+", as released" : S.wqLbl})`
-       + (tp>1?`<br>÷ TP ${tp} = <b>${fmtMem(r.w_pg/GB)}/GPU</b>`:``)},
+       + (tp>1?`<br>${split} = <b>${fmtMem(r.w_pg/GB)}/GPU</b>`:``)},
     {k:"KV cache", v:r.kv, c:"var(--kv)", bar:"bkv", tip:"kv", f:kvFormula(r),
      // split across more GPUs than a layer has KV heads, each GPU keeps that layer's cache: say how much that adds
      extra: r.cache.dp ? `data-parallel attention: each GPU holds its own users' cache`
@@ -1911,9 +1971,9 @@ function memoryParts(r, tp){
     {k:"Activations", v:r.act, c:"var(--act)", bar:"bact", tip:"act",
      f:`${commas(r.T)} tokens per step × (${commas(m.h)}h × 4 + ${commas(r.ffn)}ffn × 2) × 2 B = ${fmtMem(r.actBuf/GB)}`
        + `<br>+ ${commas(r.users)} × ${commas(r.vocab)} vocab × 4 B fp32 logits = ${fmtMem(r.actLogit/GB)}`
-       + (tp>1?`<br>÷ TP ${tp} = <b>${fmtMem(r.act_pg/GB)}/GPU</b>`:``)},
-    {k:"Tensor-parallel overhead", v:r.tpov, c:"var(--tp)", bar:"btp", tponly:true, tip:"tpov",
-     f:`${tp-1} extra CUDA context${tp-1>1?"s":""} + NCCL / comm buffers<br>${fmtMem(r.tpcomm_pg/GB)}/GPU comm × ${tp} GPUs`},
+       + (tp>1?`<br>÷ TP ${r.tp} = <b>${fmtMem(r.act_pg/GB)}/GPU</b>${pp>1 ? ` (a stage's pass holds a ${pp === 2 ? "half" : `${pp}th`} of the batch)` : ""}`:``)},
+    {k: pp>1 ? "Parallel overhead" : "Tensor-parallel overhead", v:r.tpov, c:"var(--tp)", bar:"btp", tponly:true, tip:"tpov",
+     f:`${tp-1} extra CUDA context${tp-1>1?"s":""} + NCCL / comm buffers<br>${fmtMem(r.tpcomm_pg/GB)}/GPU comm${pp>1 ? ` + ${fmtMem(r.ppcomm_pg/GB)}/GPU stage hand-off` : ""} × ${tp} GPUs`},
     {k:"Overhead", v:r.overhead, c:"var(--ov)", bar:"bov", tip:"overhead",
      f:`${fmtMem(1)} CUDA ctx + ${S.ovpct}% fragmentation<br>framework & allocator`},
   ];
@@ -2102,7 +2162,7 @@ function renderCards(deps, active, suggested, picked){
     const d = deps.get(b.n), slow = notRecommended(d);
     const systems = systemsIn(d);          // counted in whole systems, the layout then says how they're used
     let status = "";                        // a pill only when something is wrong; a good fit is quiet
-    if(!d.fits) status = `<span class="pill bad">${S.tpo==="auto" ? "Won't fit on a node" : `Not at TP ${d.tp}`}</span>`;
+    if(!d.fits) status = `<span class="pill bad">${S.tpo==="auto" ? "Won't fit on a node" : `Not on ${d.tp} GPUs`}</span>`;
     else if(d.partial) status = `<span class="pill warn">${d.meets ? "Serves" : "Holds"} ${commas(d.served)} of ${commas(all)}</span>`;
     else if(!d.meets) status = `<span class="pill warn">Below goal</span>`;
     const layout = d.fits ? layoutText(d) : "—";
@@ -2124,7 +2184,7 @@ function renderCards(deps, active, suggested, picked){
           ? `A copy split across ${d.tp} GPUs doesn't fit here: an NVLink bridge joins at most ${b.split} ${b.n} cards, so one copy spans at most ${b.split}. ${nodeMax(b)} cards run ${nodeMax(b)/b.split} copies instead.`
           : `A copy split across ${d.tp} GPUs doesn't fit here: this board's servers hold up to ${nodeMax(b)}.`)
         : !d.fits ? `The model needs ${fmtMem(d.perGB*d.tp)}, but ${d.tp} GPU${d.tp===1 ? "" : "s"} can use only ${fmtMem(b.cap*USABLE*d.tp)} (90% of capacity).${
-            S.tpo!=="auto" ? "" : b.split ? ` Its servers hold up to ${nodeMax(b)} cards, but an NVLink bridge joins at most ${b.split}, so one copy of a model spans at most ${b.split} of them.`
+            S.tpo!=="auto" ? "" : b.split && !S.pipe ? ` Its servers hold up to ${nodeMax(b)} cards, but an NVLink bridge joins at most ${b.split}, so one copy of a model spans at most ${b.split} of them. Turn on <b>Pipeline across bridge groups</b> in Advanced settings to let a copy span all ${nodeMax(b)}.`
             : nodeMax(b) < NODE ? ` Its servers hold up to ${nodeMax(b)} cards${S.srv ? " by NVIDIA's guidance" : ""}, and one copy of a model can be split across at most ${Math.max(...TP_OPTIONS.filter(t=> t<=nodeMax(b)))} of them.` : ""}`
         : d.partial ? `This is the most one server can ${d.meets ? "serve" : "hold"}${hasGoal && d.meets ? " at your speed goal" : hasGoal ? ", and it is below your speed goal" : ""}.`
         : forSpeed(d) ? `Fits on ${d.memOnly.gpus} GPU${d.memOnly.gpus===1 ? "" : "s"}, but ${
@@ -2136,7 +2196,8 @@ function renderCards(deps, active, suggested, picked){
                : `${d.reps} copies on ${d.tp} GPUs each meet`} your speed goal.`
         : rounded ? `Needs ${d.need} GPU${d.need===1 ? "" : "s"}. ${S.srv ? "By NVIDIA's server guidance a server holds" : "Servers take"} ${popText(b)}, so it rounds up to ${d.gpus}.`
         : memWhy;
-    const slowWhy = slow ? ` Not recommended: one copy is split across cards with no ${fabric(b)}, so they coordinate over PCIe after every layer; the speed shown reflects that.` : "";
+    const slowWhy = slow ? ` Not recommended: one copy is split across cards with no ${fabric(b)}, so they coordinate over PCIe after every layer; the speed shown reflects that.`
+                  : d.fits && d.pp>1 ? ` Each copy spans both bridged groups: tensor-parallel across the ${d.tpw} cards of a group, and ${d.pp} pipeline stages handing activations between the groups over PCIe. That holds a model, or users, that one group can't, at about one group's speed per user; two copies of ${d.tpw} would serve more users when they fit.` : "";
     const isActive = !!active && active.g.n===b.n, isPicked = !!picked && picked.n===b.n, isSugg = !!suggested && suggested.g.n===b.n;
     const off = !pickable(d), open = isActive || OPEN_WHY.has(b.n), hasWhy = !!(why || slowWhy);
     const cls = `brow${slow ? " nr" : ""}${isActive ? " sel" : ""}${off ? " off" : ""}`;
@@ -2165,7 +2226,7 @@ function renderChunkOptions(d){
   document.querySelectorAll('#chunk button').forEach(b=>{
     const num = b.querySelector('.opt-num');
     if(!d){ num.textContent = "—"; return; }
-    const t = throughput(d.g, d.tp, +b.dataset.v, d.upr);
+    const t = throughput(d.g, d.tpw, +b.dataset.v, d.upr, d.pp);
     num.textContent = `${fmtTime(t.ttft).join(" ")} · ${fmtTime(t.pause).join(" ")}`;
   });
   const fresh = Math.max(...groups().map(w=> promptParts(w).fresh));   // the most new tokens any workload's prompt brings
@@ -2206,6 +2267,7 @@ function renderThroughput(d){
   const segs = [
     {l: t.tCompute>t.tMem ? "Compute" : "Memory read", v: core,    c:"var(--accent)"},
     {l: "Interconnect",                               v: t.tComm, c:"var(--tp)"},
+    {l: "Stage hand-off",                             v: t.tPipe || 0, c:"var(--kv)"},
     {l: "Scheduler",                                  v: t.tOver, c:"var(--ov)"},
   ].filter(s=> s.v>0);
 
@@ -2247,27 +2309,38 @@ function renderThroughput(d){
 }
 
 function renderTpNote(m, tp, active){
-  const per = `${tp} GPU${tp>1?"s":""} per copy`;
+  const per = `${tp} GPU${tp>1?"s":""} per copy`, pp = active ? active.pp : 1, tpw = active ? active.tpw : tp;
   let t = S.tpo!=="auto" ? `<b>Fixed at ${per}</b> on every board, with as many copies as your users need.`
         : active ? `<b>Auto</b> — ${per}${active.reps>1 ? `, ${active.reps} copies` : ""}: the smallest layout on ${active.g.n}.`
         : `<b>Auto</b> — one copy doesn't fit, even split 8 ways.`;
-  if(tp>1){
+  if(pp>1) t += ` On ${active.g.n} that is <b>TP ${tpw} × ${pp} pipeline stages</b>, one per bridged group.`;
+  if(tpw>1){
     const minHeads = Math.min(...m.kv.filter(g=>!g.state).map(g=>g.heads));
     if(usesDpAttention(m)) t += `<br>This model's attention is served <b>data-parallel</b>, as SGLang and vLLM run it: each GPU keeps only its own users' cache, so nothing is copied.`;
     else if(minHeads===1) t += `<br>Part of this model's cache has a single head, so <b>every GPU keeps a full copy</b> of it.`;
-    else if(tp>minHeads) t += `<br><b>TP &gt; ${minHeads} KV heads</b> — part of the cache copies instead of splitting, so it stops shrinking.`;
-    else t += ` The cache splits ÷ ${tp} across KV heads.`;
+    else if(tpw>minHeads) t += `<br><b>TP &gt; ${minHeads} KV heads</b> — part of the cache copies instead of splitting, so it stops shrinking.`;
+    else t += ` The cache splits ÷ ${tpw} across KV heads${pp>1 ? ` and ÷ ${pp} across stages` : ""}.`;
   }
   $('tpnote').innerHTML = t;
+  renderPipeNote(active);
+}
+/* under the Pipeline control: which boards it can apply to, and whether the deployment on screen uses it */
+function renderPipeNote(active){
+  const bridged = GPUS.filter(g=> g.split);
+  const names = bridged.map(g=> g.n).join(", ");
+  let t = !S.pipe ? `<b>Off</b> — one copy stays within one NVLink bridge${bridged.length ? ` (${names}: at most ${bridged[0].split} cards), so 8 cards run two copies` : ""}.`
+        : `<b>On</b> — on ${names || "a bridged board"} one copy may span both bridged groups as pipeline stages, tensor-parallel within each. It holds a model or users that one group can't; speed per user stays about one group's, since every stage still reads all of its weights for each token.`;
+  if(active && active.pp>1) t += ` The deployment shown uses it.`;
+  $('pipenote').innerHTML = t;
 }
 
 
 /* the collapsed Advanced header still says what's set, and how much differs from the defaults */
 function renderAdvState(){
-  const changed = [S.kq!==2, S.tpo!=="auto", S.chunk!==S.chunkBase, S.ovpct!==7, !S.cache, S.srv].filter(Boolean).length;
+  const changed = [S.kq!==2, S.tpo!=="auto", S.pipe, S.chunk!==S.chunkBase, S.ovpct!==7, !S.cache, S.srv].filter(Boolean).length;
   const many = S.models.length > 1;   // with several models, say which settings are the shown model's and which every model's
   $('advState').innerHTML = (changed ? `<b>${changed} changed</b> · ` : "") + (many ? `${esc(specName(S.models[S.edit]))}: ` : "")
-    + `KV ${kqLabel()} · TP ${S.tpo==="auto" ? "auto" : S.tpo} · ${CHUNK_NAME[S.chunk]} · ${many ? "all models: " : ""}${S.ovpct}% overhead · prompt caching ${S.cache ? "on" : "off"}`
+    + `KV ${kqLabel()} · TP ${S.tpo==="auto" ? "auto" : S.tpo}${S.pipe ? " · pipeline across bridges" : ""} · ${CHUNK_NAME[S.chunk]} · ${many ? "all models: " : ""}${S.ovpct}% overhead · prompt caching ${S.cache ? "on" : "off"}`
     + ` · ${S.srv ? "server by NVIDIA guidance (beta)" : "GPUs only"}`;
 }
 
@@ -2361,6 +2434,7 @@ function renderFleet(){
   const d = active ? active.models[S.edit].d
           : suggestDeployment(new Map([...fleets.values()].map(f=> [f.g.n, f.models[S.edit].alone])));
   const fits = !!(d && d.fits), tp = S.tp = d ? d.tp : (S.tpo==="auto" ? 8 : S.tpo);
+  S.pp = d ? d.pp : 1;
   const r = d ? d.r : compute(tp, 1);
   showGauge(false);
   $('mathState').textContent = `${specName(S.models[S.edit])}${fits ? ` on ${d.g.n}` : ""}: speed · model architecture · memory breakdown · how it's calculated`;
@@ -2725,6 +2799,7 @@ function wireSeg(id, key){
 wireSeg('kq','kq');
 wireSeg('chunk','chunk');
 wireSeg('tp','tpo');
+wireSeg('pipe','pipe');
 wireSeg('srv','srv');
 function kqLabel(){ return $('kq').querySelector(`[data-v="${S.kq}"]`).dataset.lbl; }
 
@@ -2954,7 +3029,7 @@ let DL = null;   // claude.ai's downloads capability, when this page runs there
 /* The address holds only what differs from the defaults: the version first, then the page's settings and
    each model's. Model 1's keys are as they have always been; model k's are the same keys with k appended
    (m2, u2…). KEY_ORDER keeps a one-model link exactly as earlier versions wrote it. */
-const KEY_ORDER = ["v","m","c","u","w","p","r","cb","x","th","tv","wq","g","kv","tp","ck","ov","pc","sv","sh","fr","b","tf","e"];   // e: the model the controls show, when not the first
+const KEY_ORDER = ["v","m","c","u","w","p","r","cb","x","th","tv","wq","g","kv","tp","pp","ck","ov","pc","sv","sh","fr","b","tf","e"];   // e: the model the controls show, when not the first
 function stateToHash(){
   saveSpec();
   const out = [["v", VERSION]];               // the estimator the link was made with, first so it reads at a glance
@@ -2983,6 +3058,7 @@ function specToParams(spec){
     if(S.goal!=="smooth") p.push(["g", S.goal]);
     if(S.kq!==2) p.push(["kv", kqLabel()]);
     if(S.tpo!=="auto") p.push(["tp", S.tpo]);
+    if(S.pipe) p.push(["pp", "on"]);
     if(S.chunk!==S.chunkBase) p.push(["ck", S.chunk]);
     if(S.workload==="custom") p.push(["sh", S.shared], ["fr", S.fresh==null ? "rest" : S.fresh]);
     if(trafficInUse()){ const t = S.trafficApplied; p.push(["tf", [t.people, t.req, t.hours, t.peak].join("_")]); }
@@ -3039,6 +3115,7 @@ function parseSpec(get, base){
     S.goal = GOALS[get("g")] ? get("g") : "smooth";
     S.kq = segValue('kq', get("kv") || "FP16") ?? S.kq;
     S.tpo = segValue('tp', get("tp") || "auto") ?? S.tpo;
+    S.pipe = get("pp")==="on" ? 1 : 0;
     if(w==="custom" && get("sh")!==null){ S.shared = Math.max(0, Math.round(+get("sh")) || 0); S.fresh = get("fr")==="rest" || get("fr")===null ? null : Math.max(1, Math.round(+get("fr")) || 1); }
     S.extra = (get("x") || "").split(".").map(s=>{
       const [key, u, p, r, sh, fr] = s.split("_"), n = Math.round(+u);
@@ -3065,7 +3142,7 @@ function showSpec(){
   workloadSel.value = S.workload; showSeg('chunk', S.chunk); showLengths();
   showUsers(); usersNum.value = S.users;
   $('goal').value = S.goal; updateGoalHint();
-  showSeg('kq', S.kq); showSeg('tp', S.tpo); showSeg('pcache', S.cache); showSeg('srv', S.srv);
+  showSeg('kq', S.kq); showSeg('tp', S.tpo); showSeg('pipe', S.pipe); showSeg('pcache', S.cache); showSeg('srv', S.srv);
   ovSlider.value = S.ovpct; syncOv();
   renderMix(); syncTrafficInputs();
 }
@@ -3224,7 +3301,7 @@ function buildSummary(){
                    ["Workload", `${wl[0]}: ${lengths(S)}`]]),
     ["Speed goal", hasGoal ? goalDesc().replace(/\.$/, "") : "None: the smallest setup that fits"],
     ["Layout", layout],
-    ["Advanced", `KV cache ${kqLabel()} · GPUs per copy ${S.tpo==="auto" ? "chosen automatically" : S.tpo} · ${CHUNK_NAME[S.chunk]} · ${S.ovpct}% overhead`
+    ["Advanced", `KV cache ${kqLabel()} · GPUs per copy ${S.tpo==="auto" ? "chosen automatically" : S.tpo}${S.pipe ? " · pipeline across bridge groups on" : ""} · ${CHUNK_NAME[S.chunk]} · ${S.ovpct}% overhead`
       + ` · ${S.srv ? "server sized by NVIDIA's guidance (beta)" : "GPUs only"}`],
   ];
   /* the server, when Server is set to NVIDIA guidance: the page's tiles as a table, or the manufacturer's system */
@@ -3418,7 +3495,8 @@ const TIPS = {
   users:"How many requests are served at once — the batch. Each carries its own KV cache, so this scales cache memory linearly and is the main lever on serving capacity.",
   chunk:"When a new question arrives, the server reads the prompt in pieces while it keeps writing replies for everyone else. Small pieces keep other people's replies flowing smoothly and ride along with their steps almost free, but each prompt takes more steps to read, so under load prompts queue up and first replies wait longer. Big pieces read prompts sooner, but everyone else's text briefly freezes while each piece is read. The numbers on each choice show both effects on your setup.",
   pause:"While a new prompt is being read, everyone already mid-reply waits, whichever workload they belong to. This is the longest gap they would see between words. Under 0.1 s is unnoticeable; choose Smooth streaming to shorten it.",
-  tp:"How many GPUs one copy of the model is split across (tensor parallelism). Every layer's weights are divided and the GPUs all-reduce after each layer, so splitting needs NVLink to be fast. A copy is split 1, 2, 4 or 8 ways because serving engines need the split to divide the model's attention heads evenly; that is a software rule and applies to every board. Auto picks the smallest layout; a fixed number applies to every board.",
+  tp:"How many GPUs one copy of the model is split across (tensor parallelism). Every layer's weights are divided and the GPUs all-reduce after each layer, so splitting needs NVLink to be fast. A copy is split 1, 2, 4 or 8 ways because serving engines need the split to divide the model's attention heads evenly; that is a software rule and applies to every board. Auto picks the smallest layout; a fixed number applies to every board. On a bridged board with Pipeline across bridge groups on, a copy wider than one bridge is tensor-parallel within each group and pipelined across them.",
+  pipe:"Pipeline parallelism between a server's NVLink bridge groups. An H200 NVL bridge joins at most 4 cards, so a copy of a model normally spans at most 4 and 8 cards run two copies. On, one copy may span both groups as two pipeline stages: each stage holds half the layers on its own bridged group, tensor-parallel within it, and hands each token's activations to the next stage over PCIe. It fits a model, or a KV cache, that one group can't hold. It does not raise speed per user: each stage still reads all of its weights for every token, and the engine runs the stages on alternating halves of the batch (vLLM --pipeline-parallel-size 2). Two copies of 4 serve more users when they fit, and the page still prefers them.",
   copies:"A copy (replica) is a full, independent instance of the model on its own GPUs within the node, serving its share of the users. More copies serve more users without slowing each other down, and unlike splitting one copy across GPUs, they need no direct GPU-to-GPU link between them.",
   fleet:"Each model runs as copies of its own on GPUs of its own, sized as it would be alone; the copies of every model are then packed into the board's servers, widest first, and spare GPUs run extra copies of the models closest to their goals. Models don't share GPUs, so each one's speed is its own. The strip shows every server's GPUs, numbered by model.",
   fleetGpus:"GPUs for every model together, in as few servers as the board's sizes allow. A server that isn't full is the smallest size the board comes in that holds its copies.",
@@ -3433,7 +3511,7 @@ const TIPS = {
   usable:"The dashed line marks how much memory the model may use: 90% of each GPU. That is vLLM's default limit (gpu_memory_utilization = 0.9); the other 10% is left for the driver and anything else on the card. A setup fits only if its memory stays to the left of the line.",
   perGPU:"What each individual board must hold. This is the number that determines fit — a model can need 300 GB total and still run fine on 4 × 80 GB.",
   fit:"What one node of each board takes to serve everyone: up to 8 GPUs, as one copy of the model or several, and how much GPU memory that adds up to. If one node can't serve everyone, its row says how many users it does serve. Assumes ~90% of board memory is usable; drivers and the CUDA context claim the rest.",
-  nvlink:"NVLink is the direct GPU-to-GPU link that splitting one copy of a model across GPUs needs to be fast. On the H200 NVL card, an NVLink bridge joins 2 or 4 cards to each other, never more: a server with 8 cards has two bridged groups of 4, so it runs two copies of the model, and one copy spans at most 4. In an 8-GPU HGX system (the HGX H200, HGX B200 and HGX B300) an NVSwitch joins all 8 GPUs' NVLink lanes, so every GPU reaches every other at full speed.",
+  nvlink:"NVLink is the direct GPU-to-GPU link that splitting one copy of a model across GPUs needs to be fast. On the H200 NVL card, an NVLink bridge joins 2 or 4 cards to each other, never more: a server with 8 cards has two bridged groups of 4, so it runs two copies of the model, and one copy spans at most 4 — unless Pipeline across bridge groups is on in Advanced settings, which lets one copy span both groups as pipeline stages. In an 8-GPU HGX system (the HGX H200, HGX B200 and HGX B300) an NVSwitch joins all 8 GPUs' NVLink lanes, so every GPU reaches every other at full speed.",
   fabricAmd:"Infinity Fabric is AMD's direct GPU-to-GPU link. On the MI355X's 8-GPU board there is no switch: each GPU has one link to each of the other 7, at 76.8 GB/s each way. A copy split across all 8 uses all 7 links, 538 GB/s each way, but a copy on 2 GPUs uses only the link between them and a copy on 4 uses 3, where an NVSwitch in an HGX system gives any group of GPUs the full link speed. So splitting across 2 or 4 MI355X GPUs costs more per layer than on an HGX.",
   pcie:"PCIe-only — no NVLink. Fine for a single GPU, but tensor parallelism must all-reduce over a far slower link after every layer, so throughput suffers badly.",
   pcieSlow:"Not recommended. This board has no NVLink, and here one copy of the model has to be split across several of them, so the GPUs exchange data over PCIe after every layer. That is slower than the same number of NVLink cards, and the speed shown already reflects it. It works and can be picked, but it is never the suggestion; prefer a board that holds a copy on one GPU, or an NVLink board.",
