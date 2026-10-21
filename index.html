@@ -530,7 +530,6 @@
   @media (max-width:560px){ .fleet-t .ft{display:none} }
   @media (max-width:860px){ .rec-body{grid-template-columns:1fr} }
   @media (max-width:560px){ .bom-r{grid-template-columns:70px minmax(0, 1fr); gap:10px; padding:9px 11px} }
-  .launch{display:block; font-family:"IBM Plex Mono",monospace; font-size:12.5px; background:#14181d; color:#e6eaee; padding:11px 13px; border-radius:7px; overflow-x:auto; white-space:pre}
   .rec-foot{display:flex; flex-wrap:wrap; gap:16px 32px}
   .rec-foot > div{flex:1 1 420px; min-width:0; display:flex; flex-direction:column; gap:7px}
   .rec-acts{display:flex; flex-wrap:wrap; gap:12px 18px; align-items:center}
@@ -551,7 +550,6 @@
   .tbl .rowbtn:hover{color:var(--accent-ink); text-decoration:underline}
   .tbl .rowbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:3px}
   .tbl .pill{margin-left:6px; vertical-align:1px}
-  .tbl code.flags{font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--ink-2); white-space:nowrap}
   .sv .warnx{color:var(--warn); font-weight:500}
   .holds{display:grid; grid-template-columns:minmax(120px, 160px) minmax(0, 1fr) minmax(180px, 260px); gap:8px 16px; align-items:center; font-size:13px}
   .holds .hname{font-weight:600}
@@ -2639,13 +2637,6 @@ function wiringText(c, d){
 const wiringShort = c => { const k = linkKind(c.x);
   return k==="bridge" ? `${c.x.link.bridge}-way NVLink` : k==="nvswitch" ? "NVSwitch" : k==="fabric" ? "Infinity Fabric" : "PCIe only"; };
 const layoutLine = d => d.reps>1 ? `${d.reps} copies × ${layoutName(d.L)}` : `1 copy · ${layoutName(d.L)}`;
-/* the launch line for a layout: one vllm serve per copy, each on its own cards */
-function launchText(d){
-  const flags = `--tensor-parallel-size ${d.tpw}` + (d.pp>1 ? ` --pipeline-parallel-size ${d.pp}` : "");
-  if(d.reps===1) return `vllm serve <model> ${flags}`;
-  return Array.from({length: d.reps}, (_, i)=> `CUDA_VISIBLE_DEVICES=${Array.from({length: d.L.n}, (_, j)=> i*d.L.n + j).join(",")} `
-    + `vllm serve <model> ${flags} --port ${8000 + i}`).join("\n");
-}
 /* what the speed figure rests on: a board with no benchmark of its own, a pipeline, a split over PCIe */
 const speedBasis = d => [d.g.bench ? "" : "extrapolated", d.modeled ? "pipeline modeled" : "", d.nr ? "split over PCIe" : ""].filter(Boolean);
 const flagPills = d => (d.nr ? ` <span class="pill bad">split over PCIe</span>` : "")
@@ -2809,7 +2800,7 @@ function renderPick(A, c){
     + `${fmtTps(d.t.perUser)} vs ${fmtTps(r.t.perUser)} tok/s per user, room for ${commas(d.room)} vs ${commas(r.room)}, ${boxTotal(d.memGB)} vs ${boxTotal(r.memGB)} of GPU memory${c.sv.u && A.rec.sv.u && c.sv.u!==A.rec.sv.u ? `, ${c.sv.u}U vs ${A.rec.sv.u}U` : ""}.`;
   $('svRec').innerHTML = configCard(c, eyebrow, cmp, back);
 }
-/* one configuration's card: server, GPUs and wiring, bays, figures, launch line and build checks */
+/* one configuration's card: server, GPUs and wiring, bays, figures, layout and build checks */
 function configCard(c, eyebrow, cmp, back = ""){
   const d = c.best, sv = c.sv, grow = growOf(c);
   if(!d) return `<div class="rec-top"><div class="rec-main">${eyebrow}`
@@ -2831,7 +2822,7 @@ function configCard(c, eyebrow, cmp, back = ""){
     + `<section class="rec-col"><h3 class="colh">Performance</h3>${statsHtml(d)}`
     + (extrap ? `<p class="cap">Speeds are extrapolated: the ${esc(d.g.n.replace(" Blackwell", ""))} has no published benchmark here <span class="i" data-tip="extrap" tabindex="0">i</span>. Load-test before quoting them.</p>` : "")
     + (grow ? `<p class="rec-grow">Room to grow: ${growText(grow)} in this server serve up to ${commas(grow.room)} users.</p>` : "")
-    + `<h3 class="colh">Run it</h3><p class="rec-why">${layoutWhy(c, d)}</p><code class="launch">${esc(launchText(d))}</code>`
+    + `<h3 class="colh">Layout</h3><p class="rec-why">${layoutWhy(c, d)}</p>`
     + `</section></div>`
     + `<div class="rec-acts">${back}<button type="button" class="tool-btn" data-copylink>Copy link</button></div>`;
 }
@@ -2893,12 +2884,12 @@ function renderCfg(A, cfgs){
     }).join("") + `</div>`;
   const opts = c.opts.slice().sort((a, b)=> a.gpus - b.gpus || b.reps - a.reps || a.L.pp - b.L.pp);
   const table = opts.length ? `<div class="tbl"><table><thead><tr><th scope="col">Cards</th><th scope="col">Layout</th><th scope="col" class="num">Per user</th><th scope="col" class="num">First token</th>`
-      + `<th scope="col" class="num">Room for</th><th scope="col" class="num">Cache room</th><th scope="col" class="num">Per card</th><th scope="col">Launch</th></tr></thead><tbody>`
+      + `<th scope="col" class="num">Room for</th><th scope="col" class="num">Cache room</th><th scope="col" class="num">Per card</th></tr></thead><tbody>`
       + opts.map(o=> `<tr class="${o===d ? "sel" : ""}${o.meets && !o.partial ? "" : " dim"}"><td>${o.gpus}</td>`
           + `<th scope="row">${layoutLine(o)}${o===d ? ` <span class="pill sugg">${c.ok ? "Best for your goal" : "Closest"}</span>` : ""}${flagPills(o)}</th>`
           + `<td class="num">${fmtTps(o.t.perUser)} tok/s${star(o)}</td><td class="num">${fmtTime(o.t.ttft).join(" ")}</td>`
           + `<td class="num">${o.partial ? `<span class="warnx">${commas(o.served)} of ${commas(all)}</span>` : commas(o.room)}</td><td class="num">${commas(o.memRoom)}</td>`
-          + `<td class="num">${fmtMem(o.perGB)}</td><td><code class="flags">--tensor-parallel-size ${o.tpw}${o.pp>1 ? ` --pipeline-parallel-size ${o.pp}` : ""}${o.reps>1 ? ` ×${o.reps}` : ""}</code></td></tr>`).join("")
+          + `<td class="num">${fmtMem(o.perGB)}</td></tr>`).join("")
       + `</tbody></table></div>` : `<p class="note-warn">No layout on this server holds one copy: it needs about ${fmtMem(needGB())} of GPU memory, and the server carries ${fmtMem(c.usable)} at most.</p>`;
   el.innerHTML = `<div class="svhead"><span class="eyebrow-s">Configuration</span></div>`
     + `<h2 class="rec-name">${esc(sv.name)} · ${esc(c.x.board)}</h2>`
@@ -2955,19 +2946,6 @@ function fleetAnswer(cfgs){
 }
 /* which models run where on one server, in words */
 const onServer = (f, s) => f.models.map((m, i)=> [m, s.slots.filter(x=> x===i).length]).filter(([, n])=> n);
-/* the launch lines for one server: one vllm serve per copy, each on its own GPUs and port */
-function fleetLaunch(f, s){
-  let port = 8000; const out = [];
-  f.models.forEach((m, i)=>{
-    const at = s.slots.map((x, k)=> x===i ? k : -1).filter(k=> k>=0);
-    if(!at.length) return;
-    out.push(`# ${specName(m.spec)}`);
-    const n = m.d.tp, flags = `--tensor-parallel-size ${m.d.tpw}` + (m.d.pp>1 ? ` --pipeline-parallel-size ${m.d.pp}` : "");
-    for(let k = 0; k + n <= at.length; k += n)
-      out.push(`CUDA_VISIBLE_DEVICES=${at.slice(k, k + n).join(",")} vllm serve <model> ${flags} --port ${port++}`);
-  });
-  return out.join("\n");
-}
 /* identical servers in a fleet, together: [{s, from, to}] */
 function serverGroups(f){
   const out = [];
@@ -2996,8 +2974,6 @@ function fleetCard(c, eyebrow, cmp, back = ""){
       + `<td class="num">${d.gpus}</td><td class="num">${t ? `${fmtTps(t.perUser)} tok/s${star(d)}` : "—"}</td><td class="num ft">${t ? fmtTime(t.ttft).join(" ") : "—"}</td><td>${st}</td></tr>`;
   }).join("");
   const extrap = f.g.bench ? "" : `<p class="cap">Speeds are extrapolated: the ${esc(f.g.n.replace(" Blackwell", ""))} has no published benchmark here <span class="i" data-tip="extrap" tabindex="0">i</span>. Load-test before quoting them.</p>`;
-  const runs = groups.map(({s, from, to})=> (many ? `<span class="sublbl">${from===to ? `Server ${from + 1}` : `Servers ${from + 1} to ${to + 1}, each`}</span>` : "")
-    + `<code class="launch">${esc(fleetLaunch(f, s))}</code>`).join("");
   return `<div class="rec-head">${eyebrow}<h2 class="rec-name">${many ? `${k} × ` : ""}${hostLink(HPE_HOSTS.find(h=> h.id===sv.id))}</h2>`
     + `<p class="rec-spec">${all} models, ${plural(S.models.reduce((n, x)=> n + specUsers(x), 0), "user")} in all · ${f.gpus} × ${esc(f.g.n)}, ${boxTotal(f.memGB)} of GPU memory${many ? ` · ${fleetRack(c)}U` : ""}</p></div>`
     + (cmp ? `<p class="rec-cmp">${cmp}</p>` : "")
@@ -3008,7 +2984,6 @@ function fleetCard(c, eyebrow, cmp, back = ""){
     + `<section class="rec-col"><h3 class="colh">Performance</h3>`
     + `<div class="tbl"><table class="fleet-t"><thead><tr><th scope="col">Model</th><th scope="col" class="num">GPUs</th><th scope="col" class="num">Per user</th><th scope="col" class="num ft">First token</th><th scope="col">Goal</th></tr></thead><tbody>${rows}</tbody></table></div>`
     + extrap
-    + `<h3 class="colh">Run it</h3><p class="rec-why">Each model runs as copies of its own, each copy on its own GPUs and port.</p>${runs}`
     + `</section></div>`
     + `<div class="rec-acts">${back}<button type="button" class="tool-btn" data-copylink>Copy link</button></div>`;
 }
@@ -3783,14 +3758,14 @@ function renderPipeNote(active){
   if(active && active.pp>1) t += ` The deployment shown uses it.`;
   $('pipenote').innerHTML = t;
 }
-/* the headline's sentence on the HPE server and, for a copy that spans bridge groups, how to launch it */
+/* the headline's sentence on the HPE server and, on a board with NVLink bridge groups, how a copy sits in them */
 function hostSentence(d){
   const g = d.g;
   if(!g.host) return "";
   const s = `In an <b>${hostLink(g.host)}</b> (${g.host.spec}). `
     + (g.est ? `<span class="warnx">Card count to confirm: ${g.est}.</span> ` : "");
-  if(d.pp>1) return s + `One copy spans its ${d.pp} NVLink bridge groups${g.bridge ? ` (${d.pp} × ${g.bridge})` : ""}: tensor-parallel across the ${d.tpw} cards of each group and ${d.pp} pipeline stages between them, as <code>vllm serve --tensor-parallel-size ${d.tpw} --pipeline-parallel-size ${d.pp}</code>. `;
-  if(g.split && d.tp>1) return s + `Each copy sits inside one NVLink bridge group${g.bridge ? ` (${g.bridge})` : ""}: <code>vllm serve --tensor-parallel-size ${d.tp}</code>${d.reps>1 ? `, one instance per group` : ""}. `;
+  if(d.pp>1) return s + `One copy spans its ${d.pp} NVLink bridge groups${g.bridge ? ` (${d.pp} × ${g.bridge})` : ""}: tensor-parallel across the ${d.tpw} cards of each group and ${d.pp} pipeline stages between them. `;
+  if(g.split && d.tp>1) return s + `Each copy sits inside one NVLink bridge group${g.bridge ? ` (${g.bridge})` : ""}, tensor-parallel across its ${d.tp} cards${d.reps>1 ? `, one copy per group` : ""}. `;
   return s;
 }
 
