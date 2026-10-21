@@ -521,6 +521,13 @@
   .bom dd span{font-size:12.5px; color:var(--ink-2)}
   .bom-r.flag dt{color:var(--warn)} .bom-r.flag dt::before{content:"! "; font-weight:700}
   .bom-notes{display:flex; flex-direction:column; gap:5px}
+  .sv .srvh{margin:6px 0 -2px; font-size:13px; font-weight:600; color:var(--ink)}
+  .sv .okx{color:var(--good); font-weight:500}
+  .tbl table.fleet-t{min-width:0}
+  .fleet-t th, .fleet-t td{padding:9px 10px}
+  .fleet-t tbody th .cap{font-weight:400}
+  .fleet-t td:last-child{white-space:nowrap}
+  @media (max-width:560px){ .fleet-t .ft{display:none} }
   @media (max-width:860px){ .rec-body{grid-template-columns:1fr} }
   @media (max-width:560px){ .bom-r{grid-template-columns:70px minmax(0, 1fr); gap:10px; padding:9px 11px} }
   .launch{display:block; font-family:"IBM Plex Mono",monospace; font-size:12.5px; background:#14181d; color:#e6eaee; padding:11px 13px; border-radius:7px; overflow-x:auto; white-space:pre}
@@ -2673,24 +2680,28 @@ function cpusFor(sv, d, cores){
 /* The build for a layout, as one bill of materials: chassis, GPUs and how they're joined, CPUs, memory,
    storage and power, in the order they go on a quote. CPU cores by the fixed per-GPU ratio (coresPerGpu), memory
    and storage by NVIDIA's certified-server guidance. Rows that need a decision are flagged. */
-function buildRows(c, d){
-  const x = c.x, sv = c.sv, rows = [];
+function buildRows(c, d){ return bomRows(c, d.g, d.gpus, [[d, d.gpus]], flagPills(d)); }
+/* the bill of materials for n cards of board g in configuration c, running parts ([deployment, GPUs here] for
+   each model on the server); extra: rows after the GPUs, as [label, value, sub] */
+function bomRows(c, g, n, parts, pills = "", extra = []){
+  const x = c.x, sv = c.sv, rows = [], d = {g, gpus: n};
   const row = (k, v, sub = "", flag = false) => rows.push(`<div class="bom-r${flag ? " flag" : ""}"><dt>${k}</dt><dd><b>${v}</b>${sub ? `<span>${sub}</span>` : ""}</dd></div>`);
-  const k = linkKind(x), more = d.gpus < c.max ? `the server takes up to ${c.max}` : `the most this server takes`;
+  const k = linkKind(x), more = n < c.max ? `the server takes up to ${c.max}` : `the most this server takes`;
   row("Chassis", esc(sv.short), esc(sv.form));
-  row("GPUs", `${d.gpus} × ${esc(d.g.n)}${flagPills(d)}`, d.gpus>1 ? `${esc(wiringText(c, d))} · ${more}` : `${k==="pcie" ? "PCIe Gen5 x16 · " : ""}${more}`);
-  if(k==="bridge" && d.gpus>1){ const n = groupsUsed(c, d);
-    row("NVLink", `${n} × ${esc(x.link.kit)}`, `${x.link.bridge}-way NVLink bridge${n===1 ? "" : "s"}`); }
+  row("GPUs", `${n} × ${esc(g.n)}${pills}`, n>1 ? `${esc(wiringText(c, d))} · ${more}` : `${k==="pcie" ? "PCIe Gen5 x16 · " : ""}${more}`);
+  for(const [lbl, v, sub] of extra) row(lbl, v, sub);
+  if(k==="bridge" && n>1){ const groups = groupsUsed(c, d);
+    row("NVLink", `${groups} × ${esc(x.link.kit)}`, `${x.link.bridge}-way NVLink bridge${groups===1 ? "" : "s"}`); }
   if(x.unconfirmed) row("Card count", "To confirm", esc(x.unconfirmed), true);
-  if(systemOf(d.g)){ row("Platform", "Comes with the system", `CPUs, memory and storage: ${esc(sv.cpu)}`); }
+  if(systemOf(g)){ row("Platform", "Comes with the system", `CPUs, memory and storage: ${esc(sv.cpu)}`); }
   else {
-    const sr = serverOf(d.g, d.gpus, [[d, d.gpus]]), per = sr.cores/d.gpus, cp = cpusFor(sv, d, sr.cores);
-    const why = LIGHT_GPUS.includes(d.g.n) ? `, for the ${esc(d.g.n.replace(" Blackwell", ""))}` : "";
+    const sr = serverOf(g, n, parts), per = sr.cores/n, cp = cpusFor(sv, d, sr.cores);
+    const why = LIGHT_GPUS.includes(g.n) ? `, for the ${esc(g.n.replace(" Blackwell", ""))}` : "";
     const value = cp.n===2 ? `2 × ${esc(sv.cpu)}, ${commas(sr.cores/2)} physical cores each` : `1 × ${esc(sv.cpu)}, ${commas(sr.cores)} physical cores`;
     const tally = cp.n===2 ? `${commas(sr.cores)} physical cores in total · ${per} per GPU${why}` : `${per} physical cores per GPU${why}`;
     row(cp.n===2 ? "CPUs" : "CPU", value, `${tally}</span><span>${cp.why}`, cp.short);
     row("Memory", `${commas(Math.ceil(sr.ram))} GB`, `2 × GPU memory, every channel ${cp.n===2 ? "of both CPUs " : ""}populated`);
-    row("Storage", `${capParts(sr.diskGB).join(" ")} NVMe`, `Required usable capacity: 2 × model weights + 100 GB for images, caches and logs</span><span>Doesn't include boot storage, request logs or KV cache offload`);
+    row("Storage", `${capParts(sr.diskGB).join(" ")} NVMe`, `Required usable capacity: 2 × ${parts.length>1 ? "each model's" : "model"} weights + 100 GB for images, caches and logs</span><span>Doesn't include boot storage, request logs or KV cache offload`);
   }
   row("Power", "Size in HPE Power Advisor", "PSUs and redundancy for this load", true);
   return `<dl class="bom">${rows.join("")}</dl>`;
@@ -2861,17 +2872,176 @@ function renderCfg(A, cfgs){
     + `<p class="cap">Sources: <a href="${CATALOG.matrix.url}" target="_blank" rel="noopener">${esc(CATALOG.matrix.title)}, version ${esc(CATALOG.matrix.version)}</a> for which GPUs and bridges the server takes; <a href="${esc(sv.quickspecs.url)}" target="_blank" rel="noopener">this server's US QuickSpecs, version ${esc(sv.quickspecs.version)} (${esc(sv.quickspecs.date)})</a> for the card count and constraints. Confirm a build against the current QuickSpecs.</p>`;
   return d || null;
 }
+/* ---------------- the Servers view with several models ----------------
+   Every model is sized together, as the GPU view does (fleetFor): each runs as copies of its own, the copies
+   are packed into servers of one kind with one kind of board, and spare GPUs run extra copies of the models
+   furthest from their goals. A configuration here is a server and a board; its answer is that fleet. */
+const FLEET_SRV_MEMO = new Map();
+function fleetConfigs(){
+  const key = JSON.stringify([S.models, S.srv, S.ovpct, S.cache, CAL, S.pipe, S.tpo]);
+  if(!FLEET_SRV_MEMO.has(key)){
+    if(FLEET_SRV_MEMO.size >= 20) FLEET_SRV_MEMO.clear();
+    FLEET_SRV_MEMO.set(key, CATALOG.servers.flatMap(sv=> sv.gpus.map(x=>{
+      const b = boardIn(sv, x); if(!b) return null;
+      const f = fleetFor(b, S.models), max = nodeMax(b);
+      const nr = f.fits && f.models.some(m=> notRecommended(m.d));
+      return {sv, x, b, f, max, id: `${sv.id}|${x.board}`, fits: f.fits, ok: f.fits && f.meets, nr,
+              k: f.servers.length, memGB: f.memGB, usable: max*b.cap*USABLE};
+    })).filter(Boolean));
+  }
+  return FLEET_SRV_MEMO.get(key);
+}
+const fleetRack = c => (c.sv.u ?? 99)*c.k;
+const fleetWithin = c => c.f.models.filter(withinGoal).length;
+/* The GPU view's order (suggestFleet): not split over PCIe, least GPU memory, fewer servers, fewer GPUs per copy,
+   faster; then the fewest rack units. bestFleet adds one rule the GPU view never needs, since it puts each board
+   in one server: on the same board, fewer servers win even with more cards (one 4-card DL380a Gen12 over
+   2 × DL380 Gen12 with 3 cards between them). */
+const fleetOrder = (a, c)=> (+a.nr - +c.nr) || a.memGB - c.memGB || a.k - c.k
+  || a.f.models.reduce((s, m)=> s + m.d.tp, 0) - c.f.models.reduce((s, m)=> s + m.d.tp, 0)
+  || Math.min(...c.f.models.map(m=> m.d.t.perUser)) - Math.min(...a.f.models.map(m=> m.d.t.perUser)) || fleetRack(a) - fleetRack(c);
+const fleetClose = (a, c)=> (+a.nr - +c.nr) || fleetWithin(c) - fleetWithin(a) || a.memGB - c.memGB || fleetRack(a) - fleetRack(c);
+function bestFleet(ok){
+  const top = ok.slice().sort(fleetOrder)[0];
+  if(!top) return null;
+  const fewer = ok.filter(c=> c.f.g.n===top.f.g.n && c.k < top.k && !c.nr).sort(fleetOrder)[0];
+  if(!fewer) return top;
+  /* then whatever needs no more servers and no more GPU memory than that, in the usual order */
+  return ok.filter(c=> c.k <= fewer.k && c.memGB <= fewer.memGB).sort(fleetOrder)[0];
+}
+function fleetAnswer(cfgs){
+  const inScope = cfgs.filter(c=> S.scope.has(c.sv.id)), fits = inScope.filter(c=> c.fits), ok = fits.filter(c=> c.ok);
+  const rec = bestFleet(ok) || fits.slice().sort(fleetClose)[0] || null;
+  return {inScope, fits, ok, rec};
+}
+/* which models run where on one server, in words */
+const onServer = (f, s) => f.models.map((m, i)=> [m, s.slots.filter(x=> x===i).length]).filter(([, n])=> n);
+/* the launch lines for one server: one vllm serve per copy, each on its own GPUs and port */
+function fleetLaunch(f, s){
+  let port = 8000; const out = [];
+  f.models.forEach((m, i)=>{
+    const at = s.slots.map((x, k)=> x===i ? k : -1).filter(k=> k>=0);
+    if(!at.length) return;
+    out.push(`# ${specName(m.spec)}`);
+    const n = m.d.tp, flags = `--tensor-parallel-size ${m.d.tpw}` + (m.d.pp>1 ? ` --pipeline-parallel-size ${m.d.pp}` : "");
+    for(let k = 0; k + n <= at.length; k += n)
+      out.push(`CUDA_VISIBLE_DEVICES=${at.slice(k, k + n).join(",")} vllm serve <model> ${flags} --port ${port++}`);
+  });
+  return out.join("\n");
+}
+/* identical servers in a fleet, together: [{s, from, to}] */
+function serverGroups(f){
+  const out = [];
+  f.servers.forEach((s, j)=>{
+    const last = out[out.length - 1];
+    if(last && last.s.n===s.n && JSON.stringify(last.s.slots)===JSON.stringify(s.slots)) last.to = j;
+    else out.push({s, from: j, to: j});
+  });
+  return out;
+}
+function fleetCard(c, eyebrow, cmp, back = ""){
+  const f = c.f, sv = c.sv, k = c.k, all = S.models.length;
+  const groups = serverGroups(f), many = k > 1;
+  const builds = groups.map(({s, from, to})=>{
+    const here = onServer(f, s), free = s.n - here.reduce((n, [, m])=> n + m, 0);
+    const lbl = !many ? "" : from===to ? `Server ${from + 1} of ${k}` : `Servers ${from + 1} to ${to + 1} of ${k}, each`;
+    const models = ["Models", here.map(([m, n])=> `${esc(specName(m.spec))} on ${plural(n, "GPU")}`).join(" · "), free ? `${plural(free, "GPU")} free` : ""];
+    return (lbl ? `<h4 class="srvh">${lbl}</h4>` : "")
+      + bomRows(c, f.g, s.n, here.map(([m, n])=> [m.d, n]), "", [models]);
+  }).join("");
+  const rows = f.models.map(m=>{
+    const d = m.d, t = d.t, st = withinGoal(m) ? `<span class="okx">within goal</span>`
+      : d.partial ? `<span class="warnx">${commas(d.served)} of ${commas(m.users)} within goal</span>` : `<span class="warnx">below goal</span>`;
+    return `<tr><th scope="row">${esc(specName(m.spec))}${notRecommended(d) ? ` <span class="pill bad">split over PCIe</span>` : ""}${d.pp>1 ? ` <span class="pill neutral">pipeline modeled</span>` : ""}`
+      + `<br><span class="cap">${layoutText(d)} · ${plural(m.users, "user")}</span></th>`
+      + `<td class="num">${d.gpus}</td><td class="num">${t ? `${fmtTps(t.perUser)} tok/s${star(d)}` : "—"}</td><td class="num ft">${t ? fmtTime(t.ttft).join(" ") : "—"}</td><td>${st}</td></tr>`;
+  }).join("");
+  const extrap = f.g.bench ? "" : `<p class="cap">Speeds are extrapolated: the ${esc(f.g.n.replace(" Blackwell", ""))} has no published benchmark here <span class="i" data-tip="extrap" tabindex="0">i</span>. Load-test before quoting them.</p>`;
+  const runs = groups.map(({s, from, to})=> (many ? `<span class="sublbl">${from===to ? `Server ${from + 1}` : `Servers ${from + 1} to ${to + 1}, each`}</span>` : "")
+    + `<code class="launch">${esc(fleetLaunch(f, s))}</code>`).join("");
+  return `<div class="rec-head">${eyebrow}<h2 class="rec-name">${many ? `${k} × ` : ""}${hostLink(HPE_HOSTS.find(h=> h.id===sv.id))}</h2>`
+    + `<p class="rec-spec">${all} models, ${plural(S.models.reduce((n, x)=> n + specUsers(x), 0), "user")} in all · ${f.gpus} × ${esc(f.g.n)}, ${boxTotal(f.memGB)} of GPU memory${many ? ` · ${fleetRack(c)}U` : ""}</p></div>`
+    + (cmp ? `<p class="rec-cmp">${cmp}</p>` : "")
+    + `<div class="rec-body">`
+    + `<section class="rec-col"><h3 class="colh">Build</h3>${builds}`
+    + ((c.x.constraints || []).length || (sv.notes || []).length ? `<div class="bom-notes"><span class="sublbl">Before you quote</span><ul class="svnotes">${[...(c.x.constraints || []), ...(sv.notes || [])].map(t=> `<li>${esc(t)}</li>`).join("")}</ul></div>` : "")
+    + `</section>`
+    + `<section class="rec-col"><h3 class="colh">Performance</h3>`
+    + `<div class="tbl"><table class="fleet-t"><thead><tr><th scope="col">Model</th><th scope="col" class="num">GPUs</th><th scope="col" class="num">Per user</th><th scope="col" class="num ft">First token</th><th scope="col">Goal</th></tr></thead><tbody>${rows}</tbody></table></div>`
+    + extrap
+    + `<h3 class="colh">Run it</h3><p class="rec-why">Each model runs as copies of its own, each copy on its own GPUs and port.</p>${runs}`
+    + `</section></div>`
+    + `<div class="rec-acts">${back}<button type="button" class="tool-btn" data-copylink>Copy link</button></div>`;
+}
+function renderRecFleet(A, cfgs){
+  const el = $('svRec'), pick = cfgById(cfgs, S.cfg), n = S.models.length;
+  if(pick && (!A.rec || pick.id!==A.rec.id)){
+    const back = `<button type="button" class="linkbtn" data-cfg="">Back to the recommendation</button>`, r = A.rec;
+    if(!pick.fits){ el.innerHTML = `<span class="eyebrow-s warn">Your pick · won't hold every model</span><h2 class="rec-name">${hostLink(HPE_HOSTS.find(h=> h.id===pick.sv.id))}</h2>`
+      + `<p class="rec-why">With ${esc(pick.x.board)}, at least one of the models needs more than one ${pick.sv.short} holds. Each model must fit on one server.</p><div class="rec-acts">${back}</div>`; return; }
+    const eyebrow = pick.ok ? `<span class="eyebrow-s">Your pick · meets every model's goal</span>` : `<span class="eyebrow-s warn">Your pick · ${fleetWithin(pick)} of ${n} models within their goals</span>`;
+    const cmp = !r ? "" : `Against the recommended ${r.k > 1 ? `${r.k} × ` : ""}${esc(r.sv.short)} (${r.f.gpus} × ${esc(r.f.g.n)}): ${boxTotal(pick.memGB)} vs ${boxTotal(r.memGB)} of GPU memory, ${fleetRack(pick)}U vs ${fleetRack(r)}U, ${fleetWithin(pick)} vs ${fleetWithin(r)} models within their goals.`;
+    el.innerHTML = fleetCard(pick, eyebrow, cmp, back); return;
+  }
+  if(!A.rec){
+    el.innerHTML = `<span class="eyebrow-s warn">${S.scope.size ? "No server in scope holds every model" : "No servers in scope"}</span>`
+      + `<h2 class="rec-name">${S.scope.size ? "Too big for every server in scope" : "Pick at least one server"}</h2>`
+      + (S.scope.size ? `<p class="rec-why">Each model must fit on one server, and the servers hold one kind of GPU. Add a larger server to the scope, or lower a model's precision or its prompt and reply lengths.</p>` : "");
+    return;
+  }
+  const c = A.rec;
+  const eyebrow = c.ok ? `<span class="eyebrow-s">Recommended · least GPU memory that meets every model's goal</span>`
+                       : `<span class="eyebrow-s warn">Closest · ${fleetWithin(c)} of ${n} models within their goals</span>`;
+  el.innerHTML = fleetCard(c, eyebrow, "");
+}
+function renderAllFleet(A, cfgs){
+  const n = S.models.length, selSv = (cfgById(cfgs, S.cfg) || A.rec || {sv: {}}).sv.id;
+  const servers = CATALOG.servers.filter(sv=> S.scope.has(sv.id)).map(sv=>{
+    const mine = A.inScope.filter(c=> c.sv.id===sv.id), fits = mine.filter(c=> c.fits), ok = fits.filter(c=> c.ok);
+    return {sv, mine, top: bestFleet(ok) || fits.slice().sort(fleetClose)[0] || null};
+  });
+  const hold = servers.filter(x=> x.top).sort((x, y)=> (+y.top.ok - +x.top.ok) || (x.top.ok ? fleetOrder(x.top, y.top) : fleetClose(x.top, y.top)));
+  const cant = servers.filter(x=> !x.top);
+  const out = CATALOG.servers.length - S.scope.size, meet = hold.filter(x=> x.top.ok).length;
+  $('svAll').innerHTML = `<div class="svhead"><h2>Every server in scope</h2><span class="cap">${meet} meet${meet===1 ? "s" : ""} every model's goal`
+      + `${hold.length - meet ? ` · ${hold.length - meet} hold${hold.length - meet===1 ? "s" : ""} them below it` : ""}${cant.length ? ` · ${cant.length} can't hold them` : ""}${out ? ` · ${out} out of scope` : ""}. Click a server to see it in place of the recommendation.</span></div>`
+    + (hold.length ? `<div class="tbl"><table><thead><tr><th scope="col">Server</th><th scope="col">Best configuration</th><th scope="col" class="num">Within goal</th><th scope="col" class="num">Rack</th><th scope="col" class="num">GPU memory</th></tr></thead><tbody>`
+      + hold.map(x=>{ const c = x.top;
+          const tag = A.rec && c.id===A.rec.id ? ` <span class="pill sugg">Recommended</span>` : "";
+          return `<tr class="${x.sv.id===selSv ? "sel" : ""}${c.ok ? "" : " dim"}"><th scope="row"><button type="button" class="rowbtn" data-cfg="${esc(c.id)}">${esc(x.sv.short)}</button>${tag}<br><span class="cap">${esc(x.sv.form)}</span></th>`
+            + `<td>${c.k > 1 ? `${c.k} servers · ` : ""}${c.f.gpus} × ${esc(c.f.g.n)}${c.nr ? ` <span class="pill bad">split over PCIe</span>` : ""}${star(c.f.models[0].d)}</td>`
+            + `<td class="num">${c.ok ? "" : `<span class="warnx">`}${fleetWithin(c)} of ${n}${c.ok ? "" : "</span>"}</td><td class="num">${fleetRack(c)}U</td><td class="num">${boxTotal(c.memGB)}</td></tr>`; }).join("")
+      + `</tbody></table></div><p class="cap">* Speed extrapolated: no published benchmark for this board; it applies the shares fitted on other boards' runs.</p>` : "")
+    + (cant.length ? `<div class="svsub"><h3>Won't hold them</h3><span class="cap">With every GPU it takes, at least one model needs more than one of these servers holds. Each model must fit on one server.</span></div>`
+      + `<p class="cap">${cant.map(x=> esc(x.sv.short)).join(" · ")}</p>` : "");
+}
 /* the whole Servers view, and Show the math for the configuration it details */
 function renderServerView(){
+  if(S.models.length > 1) return renderServerFleet();
   const cfgs = allConfigs(), A = serverAnswer(cfgs);
   if(S.cfg && !cfgById(cfgs, S.cfg)) S.cfg = null;
   renderScope(A); renderRec(A, cfgs); renderAll(A, cfgs);
   const d = renderCfg(A, cfgs);
-  const many = S.models.length > 1;
-  $('viewhint').textContent = many ? `Sizing ${specName(S.models[S.edit])}: the Servers view sizes one model at a time. GPUs sizes them together.` : "";
+  $('viewhint').textContent = "";
   if(d){
     S.tp = d.tp; S.pp = d.pp;
     $('mathState').textContent = `${(cfgById(cfgs, S.cfg) || A.rec).sv.short} · ${d.gpus} × ${d.g.n}: speed · model architecture · memory breakdown · how it's calculated`;
+    renderBreakdown(d.r, d.tp, d.reps, d);
+    renderChunkOptions(d);
+    renderThroughput(d);
+  }
+}
+function renderServerFleet(){
+  saveSpec();
+  const cfgs = fleetConfigs(), A = fleetAnswer(cfgs);
+  if(S.cfg && !cfgById(cfgs, S.cfg)) S.cfg = null;
+  renderScope(A); renderRecFleet(A, cfgs); renderAllFleet(A, cfgs);
+  $('svCfg').hidden = true;
+  $('viewhint').textContent = `Sizing all ${S.models.length} models together, each on GPUs of its own.`;
+  const c = cfgById(cfgs, S.cfg) || A.rec, d = c && c.fits ? c.f.models[S.edit].d : null;
+  if(d && d.fits){
+    S.tp = d.tp; S.pp = d.pp;
+    $('mathState').textContent = `${specName(S.models[S.edit])} on ${c.sv.short} · ${d.gpus} × ${d.g.n}: speed · model architecture · memory breakdown · how it's calculated`;
     renderBreakdown(d.r, d.tp, d.reps, d);
     renderChunkOptions(d);
     renderThroughput(d);
@@ -3004,7 +3174,7 @@ function serverRows(s){
    For one model that is exactly the layout deploymentFor gives (validation/fleet.mjs checks it). */
 const FLEET_MEMO = new Map();   // planFor's results, by the model's settings, the page's and the board
 function planFor(g, spec){      // run under withSpec(spec)
-  const key = JSON.stringify([{...spec, tp: null}, S.srv, S.ovpct, S.cache, CAL, g.n]);   // the split on screen doesn't change the search
+  const key = JSON.stringify([{...spec, tp: null}, S.srv, S.ovpct, S.cache, CAL, g.n, g.host && g.host.id, nodeMax(g), g.split, g.link]);   // the split on screen doesn't change the search
   if(!FLEET_MEMO.has(key)){
     if(FLEET_MEMO.size >= 2000) FLEET_MEMO.clear();
     const alone = deploymentFor(g), best = (alone.options || []).slice().sort((a, b)=> a.need - b.need || a.tp - b.tp)[0];
