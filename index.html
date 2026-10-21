@@ -3,8 +3,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<meta name="description" content="Sizing estimate: how many GPUs it takes to serve open LLMs to your users, one node per model at most, on NVIDIA and AMD boards.">
-<title>LLM Inference Estimator</title>
+<meta name="description" content="Sizing estimate: the HPE ProLiant server and GPUs it takes to serve open LLMs to your users, each model within one server, on NVIDIA and AMD boards.">
+<title>HPE Server Inference Estimator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
@@ -58,9 +58,7 @@
   /* ---- header ---- */
   header.top{display:flex; align-items:flex-end; justify-content:space-between; gap:18px; flex-wrap:wrap; margin-bottom:22px}
   .brand{display:flex; align-items:center; gap:13px; flex:1 1 320px; min-width:0}   /* a long subtitle wraps instead of pushing the controls down */
-  .glyph{width:40px; height:40px; border-radius:10px; background:linear-gradient(150deg,var(--w),var(--accent)); position:relative; flex:none; box-shadow:var(--shadow)}
-  .glyph::before,.glyph::after{content:""; position:absolute; left:8px; right:8px; height:3px; border-radius:2px; background:rgba(255,255,255,.9)}
-  .glyph::before{top:13px} .glyph::after{top:24px; right:16px}
+  .logo{height:30px; width:auto; flex:none; color:var(--ink); display:block}   /* HPE logo: black parts follow the theme, the green stays #03A883 */
   h1{font-size:21px; font-weight:700; margin:0; letter-spacing:-.01em}
   .sub{color:var(--muted); font-size:12.5px; margin-top:1px}
   .theme-btn{border:1px solid var(--line-2); background:var(--panel); color:var(--ink-2); border-radius:9px; padding:8px 13px; font:inherit; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:7px}
@@ -459,15 +457,137 @@
   .math-body .cfgnote{margin:0 18px; padding-top:0; border-top:none}
   .h3sub{font-weight:400; color:var(--muted); font-size:12px; margin-left:4px}
   @media (prefers-reduced-motion:reduce){ details.more > summary::before{transition:none} }
+
+  /* ---- Servers view ---- */
+  .viewbar{display:flex; gap:6px; align-items:center; flex-wrap:wrap}
+  .viewbar button{min-height:40px; padding:0 18px; border:1px solid var(--line-2); background:var(--panel); color:var(--ink-2); border-radius:8px; font:inherit; font-size:14px; font-weight:600; cursor:pointer}
+  .viewbar button[aria-pressed=true]{background:var(--ink); border-color:var(--ink); color:var(--bg)}
+  .viewbar button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  .viewhint{font-size:12.5px; color:var(--muted); margin-left:6px}
+  .sview{display:flex; flex-direction:column; gap:18px}
+  .sview[hidden]{display:none}
+  .sv{padding:20px 22px; display:flex; flex-direction:column; gap:14px}
+  .sv h2{margin:0; font-size:15px; font-weight:600}
+  .sv h3{margin:0; font-size:13px; font-weight:600; color:var(--ink-2)}
+  .sv .cap{color:var(--muted); font-size:12.5px; margin:0}
+  .svhead{display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 14px}
+  .svhead .svacts{margin-left:auto; display:flex; gap:14px}
+  .svhead .linkbtn{margin:0; font-size:13px; min-height:32px}
+  .svsub{display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 14px; margin-top:6px}
+  .chipgroups{display:grid; gap:8px}
+  .chipgroup{display:grid; grid-template-columns:128px 1fr; gap:12px; align-items:center}
+  .chipgroup .gl{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted)}
+  .chipgroup .chiprow{display:flex; flex-wrap:wrap; gap:6px}
+  @media (max-width:560px){ .chipgroup{grid-template-columns:1fr; gap:5px} .chipgroups{gap:12px} }
+  .chip{min-height:36px; padding:0 13px; border-radius:18px; border:1px solid var(--line-2); background:var(--panel-2); color:var(--ink-2); font:inherit; font-size:13px; font-weight:500; cursor:pointer}
+  .chip[aria-pressed=true]{border-color:var(--accent); background:color-mix(in srgb, var(--accent) 13%, var(--panel)); color:var(--ink)}
+  .chip:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  .eyebrow-s{font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase; font-weight:600; color:var(--accent-ink)}
+  .eyebrow-s.warn{color:var(--warn)} .eyebrow-s.up{color:var(--tp)}
+  .rec-top{display:flex; flex-wrap:wrap; gap:18px 36px; justify-content:space-between; align-items:flex-start}
+  .rec-main{flex:1 1 480px; min-width:0; display:flex; flex-direction:column; gap:5px}
+  .sv .rec-name{margin:2px 0 0; font-size:30px; font-weight:700; line-height:1.15; letter-spacing:-.01em}   /* the card's focal point; .sv h2 would otherwise win */
+  .sv#svCfg .rec-name{font-size:22px}
+  .rec-name a{color:inherit; text-decoration:none} .rec-name a:hover{text-decoration:underline}
+  .rec-spec{font-size:14px; color:var(--muted)}
+  .rec-cfg{margin:6px 0 0; font-size:16.5px; font-weight:500}
+  .rec-why{margin:0; font-size:14px; color:var(--ink-2); max-width:700px}
+  .rec-grow{margin:2px 0 0; font-size:13.5px; color:var(--ink-2)}
+  .rec-cmp{margin:4px 0 0; font-size:13px; color:var(--ink-2); background:var(--panel-2); border:1px solid var(--line); border-radius:7px; padding:8px 10px; max-width:720px}
+  .rec-grow .linkbtn{margin:0 0 0 6px; font-size:13px}
+  .rec-bays{display:flex; flex-direction:column; gap:7px}
+  .sublbl{font-size:12px; font-weight:600; color:var(--ink-2)}
+  .bays{display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap}
+  .bgroup{display:flex; flex-direction:column; gap:4px}
+  .bgroup .kit{font-family:"IBM Plex Mono",monospace; font-size:10.5px; color:var(--muted); text-align:center}
+  .bgroup .bridge{display:block; height:4px; border-radius:2px; background:var(--accent)}
+  .bgroup .bridge.off{background:none; border-top:2px dashed var(--line-2); height:0; margin-top:2px}
+  .bgroup .slots{display:flex; gap:4px}
+  .bay{display:block; width:18px; height:30px; border-radius:3px; border:1px dashed var(--muted)}
+  .bay.on{background:var(--accent); border:1px solid var(--accent)}
+  .rec .statstrip{margin-top:0}
+  .rec-head{display:flex; flex-direction:column; gap:4px}
+  .rec-body{display:grid; grid-template-columns:minmax(0, 1.05fr) minmax(0, 1fr); gap:20px 32px; align-items:start}
+  .rec-col{display:flex; flex-direction:column; gap:10px; min-width:0}
+  .sv .colh{margin:4px 0 0; font-size:11px; font-family:"IBM Plex Mono",monospace; letter-spacing:.08em; text-transform:uppercase; font-weight:600; color:var(--muted)}
+  .rec-col .statstrip{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:0}
+  .rec-col .statstrip .cell{min-width:0}
+  .bom{margin:0; border:1px solid var(--line); border-radius:9px; overflow:hidden}
+  .bom-r{display:grid; grid-template-columns:96px minmax(0, 1fr); gap:12px; padding:9px 13px; border-top:1px solid var(--line)}
+  .bom-r:first-child{border-top:0}
+  .bom dt{font-size:12px; color:var(--muted); padding-top:1px}
+  .bom dd{margin:0; display:flex; flex-direction:column; gap:2px; min-width:0}
+  .bom dd b{font-size:14px; font-weight:600; color:var(--ink)}
+  .bom dd span{font-size:12.5px; color:var(--ink-2)}
+  .bom-r.flag dt{color:var(--warn)} .bom-r.flag dt::before{content:"! "; font-weight:700}
+  .bom-notes{display:flex; flex-direction:column; gap:5px}
+  .sv .srvh{margin:6px 0 -2px; font-size:13px; font-weight:600; color:var(--ink)}
+  .sv .okx{color:var(--good); font-weight:500}
+  .tbl table.fleet-t{min-width:0}
+  .fleet-t th, .fleet-t td{padding:9px 10px}
+  .fleet-t tbody th .cap{font-weight:400}
+  .fleet-t td:last-child{white-space:nowrap}
+  @media (max-width:560px){ .fleet-t .ft{display:none} }
+  @media (max-width:860px){ .rec-body{grid-template-columns:1fr} }
+  @media (max-width:560px){ .bom-r{grid-template-columns:70px minmax(0, 1fr); gap:10px; padding:9px 11px} }
+  .rec-foot{display:flex; flex-wrap:wrap; gap:16px 32px}
+  .rec-foot > div{flex:1 1 420px; min-width:0; display:flex; flex-direction:column; gap:7px}
+  .rec-acts{display:flex; flex-wrap:wrap; gap:12px 18px; align-items:center}
+  .rec-acts .linkbtn{margin:0; font-size:13.5px; font-weight:600}
+  .checks{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px; font-size:13px}
+  .checks li{display:flex; gap:8px}
+  .checks .ok{color:var(--good); font-weight:700} .checks .no{color:var(--warn); font-weight:700}
+  .note-warn{margin:0; font-size:13px; color:var(--ink-2); background:var(--warn-bg); border:1px solid color-mix(in srgb, var(--warn) 40%, transparent); padding:9px 11px; border-radius:7px}
+  .tbl{overflow-x:auto; border:1px solid var(--line); border-radius:9px}
+  .tbl table{width:100%; border-collapse:collapse; font-size:13.5px; min-width:760px}
+  .tbl th, .tbl td{padding:10px 12px; text-align:left; border-top:1px solid var(--line); vertical-align:middle}
+  .tbl thead th{border-top:0; font-size:11.5px; font-weight:500; color:var(--muted); background:var(--panel-2)}
+  .tbl tbody th{font-weight:600}
+  .tbl .num{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
+  .tbl tr.sel{background:color-mix(in srgb, var(--accent) 9%, var(--panel))}
+  .tbl tr.dim td{color:var(--muted)}
+  .tbl .rowbtn{font:inherit; font-weight:600; background:none; border:0; padding:6px 0; color:var(--ink); cursor:pointer; text-align:left}
+  .tbl .rowbtn:hover{color:var(--accent-ink); text-decoration:underline}
+  .tbl .rowbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:3px}
+  .tbl .pill{margin-left:6px; vertical-align:1px}
+  .sv .warnx{color:var(--warn); font-weight:500}
+  .holds{display:grid; grid-template-columns:minmax(120px, 160px) minmax(0, 1fr) minmax(180px, 260px); gap:8px 16px; align-items:center; font-size:13px}
+  .holds .hname{font-weight:600}
+  .holds .hname.sel .rowbtn{color:var(--accent-ink); text-decoration:underline}
+  .holds .rowbtn{font:inherit; font-weight:600; background:none; border:0; padding:4px 0; color:var(--ink); cursor:pointer; text-align:left}
+  .holds .rowbtn:hover{color:var(--accent-ink); text-decoration:underline}
+  .holds .rowbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:3px}
+  .hbar{position:relative; display:block; height:9px; background:var(--panel-2); border:1px solid var(--line); border-radius:5px}
+  .hbar i{display:block; height:100%; background:var(--ov); border-radius:5px}
+  .hbar b{position:absolute; right:-1px; top:-4px; width:2px; height:15px; background:var(--ink)}
+  .wiring{display:flex; flex-wrap:wrap; gap:12px; align-items:stretch}
+  .wgroup{flex:1 1 260px; min-width:0; border:1px solid var(--line); border-radius:9px; padding:13px; display:flex; flex-direction:column; gap:9px}
+  .wgroup.on{border-color:var(--accent); background:color-mix(in srgb, var(--accent) 7%, var(--panel))}
+  .wgroup .wtop{display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 10px; font-size:13px}
+  .wgroup .cards{display:grid; grid-template-columns:repeat(var(--n), minmax(0, 1fr)); gap:6px}
+  .wgroup .card{border-radius:5px; padding:10px 3px; text-align:center; font-size:11px; font-weight:600; border:1px dashed var(--line-2); color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .wgroup .card.on{background:var(--accent); border:1px solid var(--accent); color:#06110f}
+  .wlink{flex:0 1 190px; display:flex; flex-direction:column; justify-content:center; gap:5px; text-align:center; font-size:12px; color:var(--muted); border-top:2px dashed var(--line-2); border-bottom:2px dashed var(--line-2); padding:8px}
+  .wlink b{color:var(--ink); font-size:13px}
+  .gpuswitch{display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:4px}
+  .gpuswitch .sublbl{width:100%}
+  .chipnote{font-size:11px; color:var(--muted); font-weight:400; margin-left:4px}
+  .svnotes{margin:0; padding-left:18px; font-size:12.5px; color:var(--ink-2); display:flex; flex-direction:column; gap:3px}
+  @media (max-width:640px){
+    .holds{grid-template-columns:1fr; gap:4px}
+    .holds .hname{margin-top:8px}
+    .sv .rec-name{font-size:23px}
+    .sv#svCfg .rec-name{font-size:19px}
+  }
 </style>
 
 <div class="wrap">
   <header class="top">
     <div class="brand">
-      <div class="glyph" aria-hidden="true"></div>
+      <svg class="logo" viewBox="27 539 3787 1082" role="img" aria-label="HPE"><path fill="currentColor" d="M27 539h216v427h710V539h216v1082H953v-439H243v439H27z"/><path fill="currentColor" fill-rule="evenodd" d="M1422 539h717.5a408.5 408.5 0 0 1 0 817H1638v265h-216zM1638 755v385h501.5a192.5 192.5 0 0 0 0-385z"/><path fill="currentColor" d="M2756 539h1058v216H2972v90h-216z"/><path fill="#03A883" fill-rule="evenodd" d="M2756 948h1058v673H2756zM2972 1164v241h842v-241z"/></svg>
       <div>
-        <h1>LLM Inference Estimator</h1>
-        <div class="sub">How many GPUs your models and users need. One node per model at most.</div>
+        <h1>HPE Server Inference Estimator</h1>
+        <div class="sub">The HPE server and GPUs your models and users need. Each model runs within one server.</div>
       </div>
     </div>
     <div class="top-actions">
@@ -600,8 +720,23 @@
       </div>
     </section>
 
-    <!-- ============ THE ANSWER ============ -->
-    <section class="panel verdict" aria-label="Answer">
+    <!-- ============ WHICH ANSWER: by server, or by GPU ============ -->
+    <div class="viewbar" id="viewbar" role="group" aria-label="Answer by">
+      <button type="button" data-view="srv" aria-pressed="true">Servers</button>
+      <button type="button" data-view="gpu" aria-pressed="false">GPUs</button>
+      <span class="viewhint" id="viewhint"></span>
+    </div>
+
+    <!-- ============ THE SERVERS VIEW ============ -->
+    <div class="sview" id="serverView">
+      <section class="panel sv" id="svScope" aria-label="Servers in scope"></section>
+      <section class="panel sv rec" id="svRec" aria-label="Recommended server"></section>
+      <section class="panel sv" id="svAll" aria-label="Every server in scope"></section>
+      <section class="panel sv" id="svCfg" aria-label="Configuration"></section>
+    </div>
+
+    <!-- ============ THE ANSWER (GPU view) ============ -->
+    <section class="panel verdict" id="gpuAnswer" aria-label="Answer">
       <div class="v-note" id="vnote" role="status" hidden></div>
       <div class="v-top">
         <div>
@@ -648,7 +783,7 @@
       <div id="srvbody"></div>
     </section>
 
-    <section class="panel fit">
+    <section class="panel fit" id="gpuBoards">
       <h2>Every board</h2>
       <div class="cap" id="fitcap"></div>
       <div class="boards" id="gpucards"></div>
@@ -677,6 +812,14 @@
             <button data-v="8" aria-pressed="false">8</button>
           </div>
           <div class="hint" id="tpnote"></div>
+        </div>
+        <div>
+          <p class="eyebrow">Pipeline across bridge groups <span class="i" data-tip="pipe" tabindex="0">i</span></p>
+          <div class="seg" id="pipe" role="group" aria-label="Pipeline parallelism across NVLink bridge groups">
+            <button data-v="0" aria-pressed="true">Off</button>
+            <button data-v="1" aria-pressed="false">On</button>
+          </div>
+          <div class="hint" id="pipenote"></div>
         </div>
         <div>
           <div class="sliderhead">
@@ -746,6 +889,7 @@
             <details class="mitem"><summary>Activations</summary><div class="mtext"><p><b>Activations</b> = <code>T × (hidden × 4 + ffn × 2) × 2 B</code> plus <code>users × vocab × 4 B</code> of fp32 logits, where <code>T</code> is tokens per step — the prompt piece size set by <b>Optimize for</b>, or the number of users, whichever is larger. The <b>MLP intermediate</b> (<code>ffn</code>, 3.5–4× hidden for SwiGLU) dominates, which is why activations track the piece size rather than context length. Compute stays bf16 even when weights are quantized, and FlashAttention keeps the T² score matrix off HBM — so there is no quadratic term. Genuinely the smallest of the four on most configs; choose Fast first reply to see it grow.</p></div></details>
             <details class="mitem"><summary>Overhead</summary><div class="mtext"><p><b>Overhead</b> = a fixed <code>~1.0 GB</code> CUDA/driver context plus a slider % of the three above, standing in for allocator fragmentation, framework buffers, and CUDA graphs.</p></div></details>
             <details class="mitem"><summary>Tensor-parallel overhead</summary><div class="mtext"><p>The page picks TP for you as part of the smallest layout, fixed in Advanced settings if you prefer. One copy of a model is split 1, 2, 4 or 8 ways: serving engines need the split to divide the model's attention heads and layer sizes evenly, and these are the splits production deployments run. This is a software rule that applies to every board, and it is separate from how many cards a server can hold. With TP &gt; 1 the model is sharded across GPUs: weights and activations divide by TP, and the KV cache divides by <code>min(TP, kv_heads)</code>. Sharding <i>adds</i> memory: every GPU carries its own <code>~1 GB</code> CUDA context, plus NCCL all-reduce workspace and comm buffers (<code>~0.3 GB + users × hidden × 8 B</code> per GPU).</p><p>When <b>TP exceeds a layer's KV heads</b>, that part of the cache can't split further and copies to every GPU — watch it stop shrinking. Models with latent or compressed attention (DeepSeek, GLM, Kimi, Mistral Small 4) have a single cache head, so a plain split would copy their whole cache to every GPU. SGLang and vLLM serve them with <b>data-parallel attention</b> instead, where each GPU keeps only its own users' cache, and the page sizes them that way. Linear-attention state splits cleanly.</p></div></details>
+            <details class="mitem"><summary>Pipeline across bridge groups</summary><div class="mtext"><p>An NVLink bridge joins at most 4 H200 NVL cards, so a copy of a model spans at most one bridged group and 8 cards run two copies. With <b>Pipeline across bridge groups</b> on in Advanced settings, a copy may span both groups as <b>pipeline stages</b>: each stage holds <code>layers ÷ stages</code> on its own bridged group, tensor-parallel within it, so weights land at <code>÷ stages ÷ TP</code> per GPU and each GPU holds only its own layers' share of the KV cache. The engine runs one microbatch per stage (vLLM's <code>--pipeline-parallel-size</code>), so a stage's pass holds a half of the batch and a stage hands each microbatch's activations (<code>requests × hidden × 2 B</code>, kilobytes to a few megabytes) to the next over PCIe at <code>64 GB/s</code> — one crossing per layer boundary, never an all-reduce, which is why the bridge groups needn't be linked. Speed is modeled as <code>stages</code> passes of a stage back to back, each reading that stage's weights and its microbatch's cache, plus the pipeline fill of <code>(stages − 1)</code> crossings: a GPU still reads all of its weights for every token, so pipelining holds a model or a cache that one group can't, at about one group's speed per user, rather than making anyone faster. The page keeps preferring two copies of 4 when they fit, since copies leave more room for users and lose nothing if a card fails. The PCIe crossing and the pass accounting are modeled, not fitted: no benchmark in the validation set runs pipeline stages, so treat a pipelined figure as ±30% until one does.</p></div></details>
             <details class="mitem"><summary>Units</summary><div class="mtext"><p>Every amount is computed in bytes and shown in the unit picked at the top: <b>GB</b> is 10⁹ bytes (spec sheets, download pages), <b>GiB</b> is 2³⁰ bytes (nvidia-smi, PyTorch and vLLM's logs). Switching changes the labels, never the answer. Board capacities are the size on the box, counted as GB, so an H200 is 141 GB or 131 GiB. Real boards expose that much or slightly more, so a fit here errs on the safe side.</p></div></details>
           </div>
           <div class="mgroup">
@@ -761,10 +905,10 @@
           <div class="mgroup">
             <p class="mhead">Sizing</p>
             <details class="mitem"><summary>Single node</summary><div class="mtext"><p>This estimates one server of up to 8 GPUs for each model. Every model's result is at most a single node; multi-node deployments and NVL rack-scale systems are not covered. With several models, their copies share servers (see Several models). If one node of a board can't serve every user, its row says how many it does serve. For production, plan at least one more node (or replica) than this, so the service keeps running if one fails or is being updated.</p></div></details>
-            <details class="mitem"><summary>Suggestion and capacity</summary><div class="mtext"><p>Every board is tried at 1, 2, 4 and 8 GPUs per copy (splitting a copy only across NVLink boards), with as many copies as the node's 8 GPUs allow. The suggestion is the node that serves every user within the speed goal at the cautious end of the estimate (speed per user at the low end of its likely range, first token at the slow end), with the least GPU memory in total (on any one board, the fewest GPUs). If no node serves everyone within the goal, it is the full node that serves the most users. GPU counts round up to what can be bought: H200 NVL servers take 1, 2, 4 or 8 cards, so 3 rounds up to 4 and 5 to 7 round up to 8; but an NVLink bridge joins at most 4 of them, so one copy of a model spans at most 4, and 8 cards run two copies.</p><p>The HGX H200, HGX B200 and HGX B300 ship only as 8-GPU systems, with all 8 GPUs joined through NVSwitch. RTX PRO 4500 servers hold any number of cards up to 5 (HPE's limit); because of the split rule above, one copy of a model uses at most 4 of them, and the fifth can run another copy. Spare GPUs run extra copies of the model. <b>Room for</b> (<b>Handles up to</b> in the summary) is the most users the node holds at the current prompt and reply lengths while fitting in memory and, with a goal, still reaching it on the estimate; when the goal is the limit, it also says how many memory alone would hold.</p></div></details>
+            <details class="mitem"><summary>Suggestion and capacity</summary><div class="mtext"><p>Every board is tried at 1, 2, 4 and 8 GPUs per copy (splitting a copy only across NVLink boards), with as many copies as the node's 8 GPUs allow. The suggestion is the node that serves every user within the speed goal at the cautious end of the estimate (speed per user at the low end of its likely range, first token at the slow end), with the least GPU memory in total (on any one board, the fewest GPUs). If no node serves everyone within the goal, it is the full node that serves the most users. GPU counts round up to what can be bought: H200 NVL servers take 1, 2, 4 or 8 cards, so 3 rounds up to 4 and 5 to 7 round up to 8; but an NVLink bridge joins at most 4 of them, so one copy of a model spans at most 4, and 8 cards run two copies (unless Pipeline across bridge groups is on: then one copy may span all 8 as two pipeline stages, and 8 is also tried).</p><p>The HGX H200, HGX B200 and HGX B300 ship only as 8-GPU systems, with all 8 GPUs joined through NVSwitch. RTX PRO 4500 servers hold any number of cards up to 5 (HPE's limit); because of the split rule above, one copy of a model uses at most 4 of them, and the fifth can run another copy. Spare GPUs run extra copies of the model. <b>Room for</b> (<b>Handles up to</b> in the summary) is the most users the node holds at the current prompt and reply lengths while fitting in memory and, with a goal, still reaching it on the estimate; when the goal is the limit, it also says how many memory alone would hold.</p></div></details>
             <details class="mitem"><summary>Copies (replicas)</summary><div class="mtext"><p>For more users, the page runs more copies of the model on the node's GPUs instead of splitting one copy wider. Each copy has its own GPUs and an even share of the users, so memory, the bar and the breakdown describe one copy, while GPU count, output and capacity add up across all of them. Copies don't exchange data while generating, so they need no direct GPU-to-GPU link between them; that's why PCIe boards run several copies well even though they split a single copy poorly. When two layouts use the same GPUs, the page takes more copies over splitting one wider, on every board: both reach the goal, and copies leave room for more users. A copy is split wider only when memory or the speed goal needs it. When a board needs more GPUs than memory alone calls for, the extra ones are there to reach the speed goal, and the page says so. This assumes requests are spread evenly across the copies.</p></div></details>
             <details class="mitem"><summary>Several models</summary><div class="mtext"><p>Add up to four models, each with its own users, workloads, precision and speed goal; the controls above set the model whose tab is selected, while overhead, prompt caching and Server apply to all. Every model runs as copies of its own on GPUs of its own, sized as it would be alone but before rounding up to a server size. All the copies are then packed into servers of the board, the widest first, and a server that isn't full shrinks to the smallest size the board comes in; a copy of 4 on H200 NVL cards stays within one bridged group. Spare GPUs run extra copies of the models closest to missing their goals, and each model then uses the fewest GPUs per copy that still meet its goal. A model that one node can't serve keeps a node of its own.</p><p>The suggestion is the board where every model meets its goal with the least GPU memory in all, then the fewest servers; every model runs on the same kind of board. Models don't share GPUs, so each one's speed is its own; they share the servers' CPUs, memory and storage, and each server's storage holds the weights of every model it runs, once each.</p></div></details>
-            <details class="mitem"><summary>Server (beta)</summary><div class="mtext"><p>The server sizing is in beta: its rules and figures are still being worked on and may change. Set <b>Server</b> to NVIDIA guidance in Advanced settings and the page follows the inference server recommendations in NVIDIA's Certified Systems Configuration Guide. GPU counts round up to <code>2, 4 or 8</code> per server, split evenly across two CPU sockets (2 or 4 for the RTX PRO 4500, whose servers hold 5), which can change which board is suggested; the HGX systems stay whole 8-GPU systems. Around the GPUs the guide asks for CPUs with PCIe Gen5 and a base clock of 2.0 GHz or more and at least 6 physical cores per GPU, but the page sizes cores as HPE builds the AI worker nodes of HPE Private Cloud AI, its inference platform with NVIDIA: <code>32 physical cores per GPU</code> in a 2- or 4-GPU server and <code>16 per GPU</code> in an 8-GPU one (2 × 32-core CPUs for 2 GPUs, 2 × 64-core for 4 or 8).</p><p>The guide also asks for system memory of at least <code>2 × the GPU memory</code> spread over every memory channel of both sockets, each GPU in an x16 slot of its own PCIe generation, PCIe Gen5 switches with 8 GPUs (with one or two per socket the CPUs' own lanes may be enough), one NVMe drive of at least 1 TB per socket and, in NVIDIA's reference architectures, a 1 TB NVMe boot drive, with drives under the same switch or root complex as the GPUs. The guide also covers network cards, remote management and TPM; the page leaves those to the conversation with the customer. The storage figure is the page's own: the <b>usable capacity</b> the model needs, <code>(2 × weights + 100 GB) ÷ 0.8</code>, rounded up (to 10 GB, or a tenth of a TB above 1 TB).</p><p>That is two copies of the weights (the version serving and the next one downloading) and 100 GB for container images, compile caches and logs, kept under 80% full, beside a separate boot volume for the OS. How it is made from drives and RAID is the vendor's choice, so the page doesn't size drives. KV cache offloaded to disk, as NVIDIA Dynamo's KV block manager does, needs a disk tier at least as large as its CPU tier, which should be 100 GB or more and larger than the GPUs' KV cache; the page gives that figure in the storage tooltip only, since few single servers offload to disk. Server amounts are in GB as sold, whatever unit is picked at the top.</p><p>All of these are minimums for planning, and the guide adds that LLM servers should aim above them. An HGX system's CPUs, memory and storage come with it from its manufacturer, so the page leaves them to its spec sheet. The AMD boards are left out of the comparison while Server is set to NVIDIA guidance, since the guide is written for NVIDIA GPUs. A server is NVIDIA-Certified only if it is on NVIDIA's list of certified systems.</p></div></details>
+            <details class="mitem"><summary>Server (beta)</summary><div class="mtext"><p>The server sizing is in beta: its rules and figures are still being worked on and may change. Set <b>Server</b> to NVIDIA guidance in Advanced settings and the page follows the inference server recommendations in NVIDIA's Certified Systems Configuration Guide. GPU counts round up to <code>2, 4 or 8</code> per server, split evenly across two CPU sockets (2 or 4 for the RTX PRO 4500, whose servers hold 5), which can change which board is suggested; the HGX systems stay whole 8-GPU systems. Around the GPUs the guide asks for CPUs with PCIe Gen5 and a base clock of 2.0 GHz or more and at least 6 physical cores per GPU, but the page sizes cores as HPE builds the AI worker nodes of HPE Private Cloud AI, its inference platform with NVIDIA: <code>32 physical cores per GPU</code> in a 2- or 4-GPU server and <code>16 per GPU</code> in an 8-GPU one (2 × 32-core CPUs for 2 GPUs, 2 × 64-core for 4 or 8), and <code>16 per GPU</code> at any count for the L4 and RTX PRO 4500.</p><p>The guide also asks for system memory of at least <code>2 × the GPU memory</code> spread over every memory channel of both sockets, each GPU in an x16 slot of its own PCIe generation, PCIe Gen5 switches with 8 GPUs (with one or two per socket the CPUs' own lanes may be enough), one NVMe drive of at least 1 TB per socket and, in NVIDIA's reference architectures, a 1 TB NVMe boot drive, with drives under the same switch or root complex as the GPUs. The guide also covers network cards, remote management and TPM; the page leaves those to the conversation with the customer. The storage figure is the page's own: the <b>usable capacity</b> the model needs, <code>(2 × weights + 100 GB) ÷ 0.8</code>, rounded up (to 10 GB, or a tenth of a TB above 1 TB).</p><p>That is two copies of the weights (the version serving and the next one downloading) and 100 GB for container images, compile caches and logs, kept under 80% full, beside a separate boot volume for the OS. How it is made from drives and RAID is the vendor's choice, so the page doesn't size drives. KV cache offloaded to disk, as NVIDIA Dynamo's KV block manager does, needs a disk tier at least as large as its CPU tier, which should be 100 GB or more and larger than the GPUs' KV cache; the page gives that figure in the storage tooltip only, since few single servers offload to disk. Server amounts are in GB as sold, whatever unit is picked at the top.</p><p>All of these are minimums for planning, and the guide adds that LLM servers should aim above them. An HGX system's CPUs, memory and storage come with it from its manufacturer, so the page leaves them to its spec sheet. The AMD boards are left out of the comparison while Server is set to NVIDIA guidance, since the guide is written for NVIDIA GPUs. A server is NVIDIA-Certified only if it is on NVIDIA's list of certified systems.</p></div></details>
             <details class="mitem"><summary>Concurrent users from traffic</summary><div class="mtext"><p>Requests in progress at once = requests per second × seconds each one takes. A request takes the wait before its first token plus its thinking and reply, streamed at your speed goal's rate; the goal is a minimum speed, so this errs on the high side. The busiest-hour multiple covers traffic that isn't spread evenly through the day; 2× suits a typical workday.</p></div></details>
           </div>
           <div class="mgroup">
@@ -782,6 +926,633 @@
   <footer class="foot" id="asof"></footer>
 </div>
 
+<!-- ============ SERVER CATALOG ============
+     Every current HPE ProLiant server that takes one of the boards, as data: edit this block when HPE
+     revises its QuickSpecs; nothing else in the page needs to change. See "servers" in README.md. -->
+<script type="application/json" id="catalog-hpe">
+{
+ "vendor": "HPE",
+ "checked": "2026-10-20",
+ "about": "Every current HPE ProLiant server that takes one of the estimator's boards, for the US. Which GPU and NVLink bridge each server takes: the matrix. How many cards, and each constraint: the server's US QuickSpecs (quickspecs: URL, version, date). max is per server; a node here is at most 8, so larger counts are capped at 8. Gen11 servers with a Gen12 successor that takes the same GPUs are left out.",
+ "memAbout": "mem: memory channels per CPU (ch), DIMMs per channel (dpc), the RDIMM sizes HPE sells for the server in GB (gb), from its US QuickSpecs; pop: how many DIMMs one CPU may hold, from the population table for the server in HPE's memory population rules for its processor family (rules; checked 2026-10-21). Xeon 6 servers take no 6-DIMM population; AMD servers with 2 DIMMs per channel go 12, 16, 20, 24.",
+ "matrix": {
+  "title": "NVIDIA Accelerators for HPE QuickSpecs",
+  "version": "83",
+  "date": "2026-09-08",
+  "url": "https://www.hpe.com/us/en/collaterals/collateral.c04123180.html"
+ },
+ "servers": [
+  {
+   "id": "dl380a-g12",
+   "name": "HPE ProLiant Compute DL380a Gen12",
+   "short": "DL380a Gen12",
+   "group": "GPU-dense",
+   "u": 4,
+   "form": "4U rack",
+   "sockets": 2,
+   "cpu": "Intel Xeon 6",
+   "url": "https://www.hpe.com/us/en/products/compute/proliant/dl380a-gen12.html",
+   "notes": [
+    "Up to 10 double-wide or 16 single-wide cards; sized here at 8.",
+    "GPUs install in pairs, split evenly between the sockets."
+   ],
+   "gpus": [
+    {
+     "board": "L4",
+     "max": 8,
+     "link": "pcie"
+    },
+    {
+     "board": "L40S",
+     "max": 8,
+     "link": "pcie"
+    },
+    {
+     "board": "RTX PRO 6000 Blackwell",
+     "max": 8,
+     "link": "pcie"
+    },
+    {
+     "board": "H200 NVL",
+     "max": 8,
+     "link": {
+      "bridge": 4,
+      "kit": "S4A91C"
+     },
+     "constraints": [
+      "NVLink bridges are not supported in the 10-card layout."
+     ]
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a00047453enw.html",
+    "version": "20",
+    "date": "2026-09-08"
+   },
+   "mem": {"ch": 8, "dpc": 2, "gb": [16, 32, 64, 96, 128, 256], "pop": [1, 2, 4, 8, 12, 16], "rules": "https://www.hpe.com/psnow/doc/a50012949enw"},
+   "maxCores": 86,
+   "coreNote": "Xeon 6787P",
+   "cpu1": {
+    "*": 0
+   },
+   "cpu1Why": "The DL380a Gen12 takes two processors only."
+  },
+  {
+   "id": "dl380-g12",
+   "name": "HPE ProLiant Compute DL380 Gen12",
+   "short": "DL380 Gen12",
+   "group": "Mainstream 2U",
+   "u": 2,
+   "form": "2U rack",
+   "sockets": 2,
+   "cpu": "Intel Xeon 6",
+   "url": "https://www.hpe.com/us/en/products/compute/proliant/dl380-gen12.html",
+   "notes": [
+    "Double-wide cards: one per riser, two slots each.",
+    "GPUs and a rear drive cage can't be combined."
+   ],
+   "gpus": [
+    {
+     "board": "L4",
+     "max": 8,
+     "link": "pcie"
+    },
+    {
+     "board": "L40S",
+     "max": 3,
+     "link": "pcie"
+    },
+    {
+     "board": "RTX PRO 4500 Blackwell",
+     "max": 5,
+     "link": "pcie",
+     "constraints": [
+      "Not in the half-length slots 3 and 6."
+     ]
+    },
+    {
+     "board": "RTX PRO 6000 Blackwell",
+     "max": 3,
+     "link": "pcie",
+     "constraints": [
+      "Power-capped at 450 W.",
+      "27 °C maximum ambient."
+     ]
+    },
+    {
+     "board": "H200 NVL",
+     "max": 2,
+     "link": "pcie",
+     "constraints": [
+      "Power-capped at 450 W (iLO Advanced with Advanced Power Management).",
+      "NVLink bridges are not supported on the DL380 Gen12: the cards reach each other over PCIe.",
+      "27 °C maximum ambient."
+     ]
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a00073551enw.html",
+    "version": "20",
+    "date": "2026-10-05"
+   },
+   "mem": {"ch": 8, "dpc": 2, "gb": [16, 32, 64, 96, 128, 256], "pop": [1, 2, 4, 8, 12, 16], "rules": "https://www.hpe.com/psnow/doc/a50012949enw"},
+   "maxCores": 86,
+   "coreNote": "Xeon 6787P",
+   "cpu1": {
+    "*": 1,
+    "L4": 3,
+    "RTX PRO 4500 Blackwell": 2
+   },
+   "cpu1Why": "GPUs past the primary riser (slots 1 to 3) sit on CPU 2."
+  },
+  {
+   "id": "dl385-g11",
+   "name": "HPE ProLiant DL385 Gen11",
+   "short": "DL385 Gen11",
+   "group": "Mainstream 2U",
+   "u": 2,
+   "form": "2U rack",
+   "sockets": 2,
+   "cpu": "AMD EPYC 9004/9005",
+   "url": "https://www.hpe.com/us/en/collaterals/collateral.a50004300enw.html",
+   "notes": [
+    "GPU base unit: front GPU bays and high-performance fans; HPE spreads the GPUs evenly across CPU 1 and CPU 2."
+   ],
+   "gpus": [
+    {
+     "board": "L4",
+     "max": 8,
+     "link": "pcie",
+     "constraints": [
+      "8 cards need the 8 single-wide GPU kit; the 4 double-wide kit takes 4."
+     ]
+    },
+    {
+     "board": "L40S",
+     "max": 4,
+     "link": "pcie"
+    },
+    {
+     "board": "RTX PRO 4500 Blackwell",
+     "max": 4,
+     "link": "pcie"
+    },
+    {
+     "board": "RTX PRO 6000 Blackwell",
+     "max": 4,
+     "link": "pcie"
+    },
+    {
+     "board": "H200 NVL",
+     "max": 4,
+     "link": {
+      "bridge": 2,
+      "kit": "S4A90C"
+     },
+     "constraints": [
+      "iLO GPU power capping is required for 3 or 4 cards."
+     ]
+    },
+    {
+     "board": "AMD MI350P",
+     "max": 4,
+     "link": "pcie",
+     "constraints": [
+      "450 W iLO GPU power capping is required.",
+      "HPE targets shipping from December 2026."
+     ]
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a50004300enw.html",
+    "version": "49",
+    "date": "2026-10-05"
+   },
+   "mem": {"ch": 12, "dpc": 1, "gb": [16, 32, 64, 96, 128, 256], "pop": [1, 2, 4, 6, 8, 10, 12], "rules": "https://www.hpe.com/psnow/doc/a50007481enw"},
+   "maxCores": 160,
+   "coreNote": "EPYC 9845; 128 on EPYC 9004",
+   "cpu1": {
+    "*": 1
+   },
+   "cpu1Why": "HPE installs GPUs evenly across CPU 1 and CPU 2."
+  },
+  {
+   "id": "dl345-g12",
+   "name": "HPE ProLiant Compute DL345 Gen12",
+   "short": "DL345 Gen12",
+   "group": "Mainstream 2U",
+   "u": 2,
+   "form": "2U rack",
+   "sockets": 1,
+   "cpu": "AMD EPYC 9005",
+   "url": "https://www.hpe.com/us/en/collaterals/collateral.a50009233enw.html",
+   "notes": [
+    "The GPU chassis takes cards in its front slots; 4 need the Front 4xGPU Enablement Kit (P84160-B21)."
+   ],
+   "gpus": [
+    {
+     "board": "L4",
+     "max": 6,
+     "link": "pcie",
+     "constraints": [
+      "6 in the rear of the SFF, EDSFF or LFF chassis; 4 in the front of the GPU chassis."
+     ]
+    },
+    {
+     "board": "L40S",
+     "max": 4,
+     "link": "pcie"
+    },
+    {
+     "board": "RTX PRO 4500 Blackwell",
+     "max": 4,
+     "link": "pcie"
+    },
+    {
+     "board": "RTX PRO 6000 Blackwell",
+     "max": 2,
+     "link": "pcie"
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a50009233enw.html",
+    "version": "13",
+    "date": "2026-10-05"
+   },
+   "mem": {"ch": 12, "dpc": 2, "gb": [32, 64, 96, 128, 256], "pop": [1, 2, 4, 6, 8, 10, 12, 16, 20, 24], "rules": "https://www.hpe.com/psnow/doc/a50012817enw"},
+   "maxCores": 192,
+   "coreNote": "EPYC 9965"
+  },
+  {
+   "id": "dl340-g12",
+   "name": "HPE ProLiant Compute DL340 Gen12",
+   "short": "DL340 Gen12",
+   "group": "Mainstream 2U",
+   "u": 2,
+   "form": "2U rack",
+   "sockets": 1,
+   "cpu": "Intel Xeon 6",
+   "url": "https://www.hpe.com/us/en/collaterals/collateral.a50004261enw.html",
+   "notes": [
+    "Front GPU chassis: the 4x GPU kit needs a Rich I/O Xeon 6xx1P; the 2x kit doesn't take one."
+   ],
+   "gpus": [
+    {
+     "board": "L4",
+     "max": 4,
+     "link": "pcie"
+    },
+    {
+     "board": "L40S",
+     "max": 4,
+     "link": "pcie",
+     "constraints": [
+      "GPU chassis only; needs the Front GPU L40S power cable kit."
+     ]
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a50004261enw.html",
+    "version": "16",
+    "date": "2026-10-05"
+   },
+   "mem": {"ch": 8, "dpc": 2, "gb": [16, 32, 64, 96, 128, 256], "pop": [1, 2, 4, 8, 12, 16], "rules": "https://www.hpe.com/psnow/doc/a50012949enw"},
+   "maxCores": 80,
+   "coreNote": "Rich I/O Xeon 6781P, for the 4x GPU kit"
+  },
+  {
+   "id": "ml350-g12",
+   "name": "HPE ProLiant Compute ML350 Gen12",
+   "short": "ML350 Gen12",
+   "group": "Tower",
+   "u": 5,
+   "form": "4U tower, 5U racked",
+   "sockets": 2,
+   "cpu": "Intel Xeon 6",
+   "url": "https://www.hpe.com/us/en/collaterals/collateral.a50006995enw.html",
+   "notes": [
+    "GPU configurations need the redundant and second-CPU fan kits."
+   ],
+   "gpus": [
+    {
+     "board": "L4",
+     "max": 4,
+     "link": "pcie"
+    },
+    {
+     "board": "L40S",
+     "max": 2,
+     "link": "pcie",
+     "constraints": [
+      "Slots 2 and 6 only."
+     ]
+    },
+    {
+     "board": "RTX PRO 4500 Blackwell",
+     "max": 4,
+     "link": "pcie",
+     "constraints": [
+      "Needs the external GPU fan kit for 30 °C; without it, 2 cards at 23 °C."
+     ]
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a50006995enw.html",
+    "version": "18",
+    "date": "2026-10-05"
+   },
+   "mem": {"ch": 8, "dpc": 2, "gb": [32, 64, 96, 128, 256], "pop": [1, 2, 4, 8, 12, 16], "rules": "https://www.hpe.com/psnow/doc/a50012949enw"},
+   "maxCores": 86,
+   "coreNote": "Xeon 6787P",
+   "cpu1": {
+    "*": 2,
+    "L40S": 1
+   },
+   "cpu1Why": "Slots 5 to 10 need CPU 2."
+  },
+  {
+   "id": "ml110-g11",
+   "name": "HPE ProLiant ML110 Gen11",
+   "short": "ML110 Gen11",
+   "group": "Tower",
+   "u": null,
+   "form": "tower",
+   "sockets": 1,
+   "cpu": "Intel Xeon",
+   "url": "https://www.hpe.com/us/en/collaterals/collateral.a00054055enw.html",
+   "notes": [
+    "The L4 needs the GPU riser and L4 support kits; the CPU is limited to 150 W; 25 °C maximum ambient."
+   ],
+   "gpus": [
+    {
+     "board": "L4",
+     "max": 2,
+     "link": "pcie"
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a00054055enw.html",
+    "version": "36",
+    "date": "2026-07-13"
+   },
+   "mem": {"ch": 8, "dpc": 2, "gb": [16, 32, 64, 96], "pop": [1, 2, 4, 6, 8, 12, 16], "rules": "https://www.hpe.com/psnow/doc/a50010242enw"},
+   "maxCores": 28,
+   "coreNote": "5th Gen Xeon, per the QuickSpecs"
+  },
+  {
+   "id": "dl320-g12",
+   "name": "HPE ProLiant Compute DL320 Gen12",
+   "short": "DL320 Gen12",
+   "group": "1U",
+   "u": 1,
+   "form": "1U rack",
+   "sockets": 1,
+   "cpu": "Intel Xeon 6",
+   "url": "https://www.hpe.com/us/en/collaterals/collateral.a50004283enw.html",
+   "notes": [
+    "The GPU server needs a Rich I/O Xeon 6xx1P (16 to 80 cores); CPUs above 270 W need the closed-loop liquid cooling fan kit."
+   ],
+   "gpus": [
+    {
+     "board": "L4",
+     "max": 4,
+     "link": "pcie"
+    },
+    {
+     "board": "L40S",
+     "max": 2,
+     "link": "pcie"
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a50004283enw.html",
+    "version": "21",
+    "date": "2026-10-05"
+   },
+   "mem": {"ch": 8, "dpc": 2, "gb": [16, 32, 64, 96, 128, 256], "pop": [1, 2, 4, 8, 12, 16], "rules": "https://www.hpe.com/psnow/doc/a50012949enw"},
+   "maxCores": 80,
+   "coreNote": "Rich I/O Xeon 6781P"
+  },
+  {
+   "id": "dl325-g12",
+   "name": "HPE ProLiant Compute DL325 Gen12",
+   "short": "DL325 Gen12",
+   "group": "1U",
+   "u": 1,
+   "form": "1U rack",
+   "sockets": 1,
+   "cpu": "AMD EPYC 9005",
+   "url": "https://www.hpe.com/us/en/collaterals/collateral.a50009232enw.html",
+   "notes": [
+    "GPU base unit; L4 cards go in its front slots."
+   ],
+   "gpus": [
+    {
+     "board": "L4",
+     "max": 4,
+     "link": "pcie"
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a50009232enw.html",
+    "version": "13",
+    "date": "2026-10-05"
+   },
+   "mem": {"ch": 12, "dpc": 2, "gb": [32, 64, 96, 128, 256], "pop": [1, 2, 4, 6, 8, 10, 12, 16, 20, 24], "rules": "https://www.hpe.com/psnow/doc/a50012817enw"},
+   "maxCores": 192,
+   "coreNote": "EPYC 9965"
+  },
+  {
+   "id": "dl360-g12",
+   "name": "HPE ProLiant Compute DL360 Gen12",
+   "short": "DL360 Gen12",
+   "group": "1U",
+   "u": 1,
+   "form": "1U rack",
+   "sockets": 2,
+   "cpu": "Intel Xeon 6",
+   "url": "https://www.hpe.com/us/en/collaterals/collateral.a50006984enw.html",
+   "notes": [
+    "Up to three low-profile single-wide GPUs of 75 W or less, in the rear slots."
+   ],
+   "gpus": [
+    {
+     "board": "L4",
+     "max": 3,
+     "link": "pcie"
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a50006984enw.html",
+    "version": "20",
+    "date": "2026-10-05"
+   },
+   "mem": {"ch": 8, "dpc": 2, "gb": [16, 32, 64, 96, 128, 256], "pop": [1, 2, 4, 8, 12, 16], "rules": "https://www.hpe.com/psnow/doc/a50012949enw"},
+   "maxCores": 86,
+   "coreNote": "Xeon 6787P",
+   "cpu1": {
+    "*": 2
+   },
+   "cpu1Why": "The third GPU, in the secondary riser, needs CPU 2."
+  },
+  {
+   "id": "dl365-g11",
+   "name": "HPE ProLiant DL365 Gen11",
+   "short": "DL365 Gen11",
+   "group": "1U",
+   "u": 1,
+   "form": "1U rack",
+   "sockets": 2,
+   "cpu": "AMD EPYC 9004/9005",
+   "url": "https://www.hpe.com/us/en/collaterals/collateral.a50004299enw.html",
+   "notes": [
+    "GPU base unit: two front GPU slots, slot 5 on CPU 1 and slot 4 on CPU 2."
+   ],
+   "gpus": [
+    {
+     "board": "L4",
+     "max": 2,
+     "link": "pcie"
+    },
+    {
+     "board": "RTX PRO 4500 Blackwell",
+     "max": 2,
+     "link": "pcie"
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a50004299enw.html",
+    "version": "46",
+    "date": "2026-10-05"
+   },
+   "mem": {"ch": 12, "dpc": 1, "gb": [16, 32, 64, 96, 128, 256], "pop": [1, 2, 4, 6, 8, 10, 12], "rules": "https://www.hpe.com/psnow/doc/a50007481enw"},
+   "maxCores": 160,
+   "coreNote": "EPYC 9845; 128 on EPYC 9004",
+   "cpu1": {
+    "*": 1
+   },
+   "cpu1Why": "The second GPU slot (slot 4) sits on CPU 2."
+  },
+  {
+   "id": "dl145-g11",
+   "name": "HPE ProLiant DL145 Gen11",
+   "short": "DL145 Gen11",
+   "group": "Edge",
+   "u": 2,
+   "form": "2U short-depth edge",
+   "sockets": 1,
+   "cpu": "AMD EPYC 8004",
+   "url": "https://www.hpe.com/us/en/collaterals/collateral.a50009217enw.html",
+   "notes": [],
+   "gpus": [
+    {
+     "board": "L4",
+     "max": 3,
+     "link": "pcie"
+    },
+    {
+     "board": "L40S",
+     "max": 1,
+     "link": "pcie"
+    },
+    {
+     "board": "RTX PRO 4500 Blackwell",
+     "max": 1,
+     "link": "pcie",
+     "constraints": [
+      "Needs the 1U heat sink and GPU cable kits; double-wide and single-wide cards can't be mixed."
+     ]
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a50009217enw.html",
+    "version": "23",
+    "date": "2026-10-05"
+   },
+   "mem": {"ch": 6, "dpc": 1, "gb": [16, 32, 64, 96, 128], "pop": [1, 2, 4, 6], "rules": "https://www.hpe.com/psnow/doc/a50007481enw"},
+   "maxCores": 84,
+   "coreNote": "EPYC 8635P"
+  },
+  {
+   "id": "xd685",
+   "name": "HPE ProLiant Compute XD685",
+   "short": "XD685",
+   "group": "8-GPU systems",
+   "u": 6,
+   "form": "5U liquid or 6U air",
+   "sockets": 2,
+   "cpu": "AMD EPYC 9005",
+   "url": "https://www.hpe.com/us/en/collaterals/collateral.a00073553enw.html",
+   "notes": [
+    "Whole 8-GPU systems; CPUs, memory and storage come with the system."
+   ],
+   "gpus": [
+    {
+     "board": "HGX H200",
+     "max": 8,
+     "link": "nvswitch",
+     "constraints": [
+      "Air-cooled (6U) or direct liquid cooling (5U)."
+     ]
+    },
+    {
+     "board": "HGX B200",
+     "max": 8,
+     "link": "nvswitch",
+     "constraints": [
+      "Direct liquid cooling only (5U)."
+     ]
+    },
+    {
+     "board": "HGX B300",
+     "max": 8,
+     "link": "nvswitch",
+     "constraints": [
+      "Direct liquid cooling only (5U)."
+     ]
+    },
+    {
+     "board": "AMD MI355X",
+     "max": 8,
+     "link": "fabric",
+     "constraints": [
+      "Direct liquid cooling only (5U)."
+     ]
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a00073553enw.html",
+    "version": "16",
+    "date": "2026-08-03"
+   },
+   "mem": {"ch": 12, "dpc": 1, "gb": [64, 96, 128], "pop": [1, 2, 4, 6, 8, 10, 12], "rules": "https://www.hpe.com/psnow/doc/a50012817enw"},
+   "maxCores": 96,
+   "coreNote": "EPYC 9655",
+   "cpu1": {
+    "*": 0
+   },
+   "cpu1Why": "The XD685 is a two-processor system."
+  }
+ ],
+ "unsized": [
+  {
+   "name": "HPE ProLiant EL2000 EL240 Gen12",
+   "boards": [
+    "RTX PRO 4500 Blackwell",
+    "RTX PRO 6000 Blackwell"
+   ]
+  },
+  {
+   "name": "HPE Edge Server e930t",
+   "boards": [
+    "RTX PRO 4500 Blackwell",
+    "RTX PRO 6000 Blackwell"
+   ]
+  }
+ ],
+ "market": "US"
+}
+</script>
 <script>
 /* ---------------- model library ----------------
    The most-used open models on Hugging Face as of September 2026. Architecture comes from each
@@ -960,8 +1731,11 @@ const THINK_LABEL = {always:"always thinks before answering", default:"thinks be
    pop = how many GPUs a server of this board can be populated with. H200 NVL servers take 1, 2, 4 or 8;
    the HGX H200, HGX B200, HGX B300 and AMD MI355X ship only as 8-GPU systems (NVL rack-scale
    systems are out of scope). linkLbl = the link column's text, when the default doesn't fit.
-   split = the most cards one copy of a model can span, where that is fewer than the server holds: an
-   NVLink bridge joins at most 4 H200 NVL cards, so 8 cards are two bridged groups running two copies.
+   split = the most cards one NVLink bridge joins, where that is fewer than the server holds: an NVLink
+   bridge joins at most 4 H200 NVL cards, so 8 cards are two bridged groups. One copy of a model spans
+   at most one group, unless Pipeline across bridge groups is on (S.pipe): then a copy can span both,
+   tensor-parallel inside each group and pipeline-parallel between them, the stages handing activations
+   over PCIe (PCIE_BW).
    A deployment's GPU count rounds up to one that can be bought: see buyable().
    max = the most GPUs one server of this board holds, where that is fewer than a node's 8: HPE servers
    take up to 5 RTX PRO 4500 Blackwell cards.
@@ -998,11 +1772,56 @@ const systemOf = g => g.pop && g.pop.length===1 ? g.pop[0] : 0;
 const GUIDE_POP = [2,4,8];
 const popOf    = g => S.srv && !systemOf(g) ? GUIDE_POP.filter(n=> n <= (g.max || NODE)) : g.pop;
 const popText  = g => { const p = popOf(g); return p.length>1 ? `${p.slice(0, -1).join(", ")} or ${p[p.length-1]}` : String(p[0]); };
-/* the boards compared: all of them, or by NVIDIA's guidance only those it covers */
-const boardsInPlay = () => S.srv ? GPUS.filter(g=> g.guide!==false) : GPUS;
+/* ---------------- HPE servers ----------------
+   The server catalog is the JSON block above the script (id="catalog-hpe"): one record per server, with
+   each board it takes, how many, how those cards are wired (link: "pcie", "nvswitch", "fabric" or an NVLink
+   bridge {bridge: cards it joins, kit}), constraints, and where each figure comes from. Gen11 servers with a
+   Gen12 successor that takes the same GPUs are left out of it.
+   CATALOG is that block, read once. HPE_HOSTS is the shape the GPU view uses: per board, only what the
+   server changes from the board's own figures (max, pop, split, bridge, nolink, est), so with each board
+   in its default server (the first that sells it) the GPU view's figures are the board's own, except the
+   MI350P, whose only HPE server holds 4. The Servers view reads CATALOG directly. */
+const CATALOG = JSON.parse(document.getElementById('catalog-hpe').textContent);
+const boardMax = g => g.pop ? Math.max(...g.pop) : g.max || 8;   // the most cards a node of this board holds, before any server
+const HPE_HOSTS = CATALOG.servers.map(sv=> ({
+  id: sv.id, n: sv.name, short: sv.short, group: sv.group, url: sv.url, u: sv.u, sockets: sv.sockets,
+  spec: `${sv.form} · ${sv.sockets} × ${sv.cpu}`,
+  boards: Object.fromEntries(sv.gpus.map(x=>{
+    const g = GPUS.find(b=> b.n===x.board), o = {};
+    if(!g) return [x.board, o];
+    if(x.max < boardMax(g)) o.max = x.max;
+    if(x.pop) o.pop = x.pop;
+    if(x.link && x.link.bridge){ if(x.link.bridge < boardMax(g)) o.split = x.link.bridge; o.bridge = `${x.link.kit} ${x.link.bridge}-way NVLink bridge`; }
+    if(x.link==="pcie" && g.link) o.nolink = true;   // a board that normally has NVLink, sold here without a bridge
+    if(x.unconfirmed) o.est = x.unconfirmed;
+    return [x.board, o];
+  })),
+}));
+const HPE_UNSIZED = CATALOG.unsized;
+const findHost = id => HPE_HOSTS.find(h=> h.id===id);
+/* the HPE server a board is sized in, in the GPU view: its default, the first that sells it; null if none */
+const hostOf = g => HPE_HOSTS.find(h=> h.boards[g.n]) || null;
+/* a board as its HPE server holds it: fewer cards, a narrower bridge, and the server's name with it */
+const inHost = g => boardWith(g, hostOf(g));
+function boardWith(g, h){
+  if(!h) return g;
+  const o = h.boards[g.n], max = o.max;
+  return Object.assign({}, g, {host: h, bridge: o.bridge || null, est: o.est || null},
+    o.split ? {split: o.split, linkLbl: `NVLink bridge · up to ${o.split}`} : {},
+    // no bridge for it in this server: the cards reach each other over PCIe Gen5 only
+    o.nolink ? {link: false, lbw: 64, lname: "PCIe Gen5 (no NVLink bridge in this server)", linkLbl: undefined, split: undefined} : {},
+    max ? {max, pop: o.pop || (g.pop ? g.pop.filter(n=> n <= max) : undefined)} : {});
+}
+/* the boards compared: all of them, or by NVIDIA's guidance only those it covers, each in its HPE server */
+const boardsInPlay = () => (S.srv ? GPUS.filter(g=> g.guide!==false) : GPUS).map(inHost);
 const leftOut      = () => S.srv ? GPUS.filter(g=> g.guide===false) : [];
+/* "in an HPE ProLiant Compute DL380a Gen12", linked, for the headline and the panels */
+const hostLink = (h, short) => `<a href="${h.url}" target="_blank" rel="noopener">${short ? h.short : h.n}</a>`;
 
 const USABLE = 0.90; // share of board memory the server may use (vLLM's gpu_memory_utilization default)
+/* The path between two bridged groups in one server: PCIe Gen5 x16 at 64 GB/s each way (through the
+   host or a PCIe switch). Only pipeline stages cross it, once per layer boundary, never an all-reduce. */
+const PCIE_BW = 64;
 const BIGGEST = GPUS.reduce((a,b)=> b.cap>a.cap ? b : a);   // what "too big" is measured against
 
 /* ---------------- speed goals ----------------
@@ -1068,8 +1887,9 @@ const DATA_AS_OF = "October 2026";   // when the model and board figures were la
 /* The estimator's version, carried in every shared link and summary. A link made under an older
    version opens with the changes since then listed, so a sizing never shifts without saying so.
    Bump it with each release tag; add to CHANGES whenever a release changes what the figures come to. */
-const VERSION = "1.6.0";
+const VERSION = "1.7.0";
 const CHANGES = [
+  {v:"1.7.0", what:"The answer now opens by server: the Servers view sizes the model on every current GPU-capable HPE ProLiant server, recommends one configuration, tags the smaller and bigger servers that also work, and shows every layout its wiring allows, including pipelining across NVLink groups and over PCIe. The GPU view is one click away, and links made before 1.7.0 open in it. Pipeline across bridge groups, off by default, in Advanced settings: on H200 NVL servers one copy of a model may span both bridged groups of 4 as two pipeline stages, tensor-parallel within each, so a model or a KV cache too big for one group fits on 8 cards. With it off nothing changes. With it on, a board that could only run two copies of 4 can also be suggested as one copy of 8 when that is the only layout that holds everyone; speed per user is sized as one group's, since each stage still reads all of its weights per token, and the figures for pipelined copies are modeled, not yet fitted to a benchmark. Each board is now named with the HPE server it is sized in, and any of 13 current GPU-capable HPE ProLiant servers can be picked in Advanced settings to compare only the boards it takes, at its limits (on the DL385 Gen11, 4 double-wide cards and 2-way H200 NVL bridges; on the DL380 Gen12, H200 NVL with no bridge). Server sizing gives the L4 and RTX PRO 4500 16 CPU cores per GPU at any count (other boards keep 32 per GPU, 16 at 8 GPUs). On Auto the figures are unchanged, except the AMD MI350P: its only HPE server, the DL385 Gen11, holds 4, so it is now sized at 4 cards. In the Servers view, system memory is built from the server's own modules: the smallest it takes, as few as reach 2 × GPU memory, one per channel, rather than filling every channel."},
   {v:"1.5.0", what:"The AMD MI355X joins the boards: 288 GB per GPU, sold only as 8-GPU systems, with published benchmarks of its own. Its GPUs are wired to each other with no switch, one Infinity Fabric link per pair, so a copy split across 2 or 4 of them uses only the links among them. Counting AMD's MI355X benchmark runs the same way, AMD's software reaches 0.75 of the hardware shares rather than 0.68, so the MI350P's figures come out up to 10% faster."},
   {v:"1.4.0", what:"When two layouts use the same GPUs, the suggestion runs more copies of the model rather than splitting one copy wider, on NVLink boards too, since both reach the goal and copies leave room for more users. A small model on an 8-GPU HGX system now runs as 8 copies, not one copy across all 8: speed per user comes out lower but still within the goal. The number of GPUs is unchanged."},
   {v:"1.2.0", what:"Speed and first-token estimates are calibrated against 295 published benchmark points: board compute is now each datasheet's dense figure, and the shares of it serving reaches are fitted, as are vLLM's fixed costs per step and per request, with a further factor for AMD's software stack fitted to MI355X runs. Speed per user, which ran about 20% slow, now lands near the measured figures, prompts read about twice as fast, and a likely range sits beside both. The speed goal is judged at the cautious end of that range. The RTX PRO 6000's memory bandwidth is corrected to the Server Edition's 1,597 GB/s."},
@@ -1095,14 +1915,20 @@ function loadUnit(){ try { return localStorage.getItem(UNIT_KEY)==="GiB" ? "GiB"
 
 
 /* ---------------- state ---------------- */
-/* tpo = TP override ("auto" or 1/2/4/8) · tp = the TP of the deployment on screen · board = "auto" or a clicked board */
+/* tpo = GPUs-per-copy override ("auto" or 1/2/4/8) · tp = GPUs per copy of the deployment on screen ·
+   pp = its pipeline stages (1 unless a copy spans two bridged groups) · board = "auto" or a clicked board
+   pipe = Pipeline across bridge groups: 0 = a copy stays within one NVLink bridge (as before),
+   1 = a copy may span both of a server's bridged groups, TP inside each and PP across them */
 /* prompt/reply = lengths in use; wantPrompt/wantReply = what the workload asked for, kept so a
    model with a shorter context trims them and switching back restores them.
    think = the Thinking switch · thinkTok = thinking tokens asked for · thinking = tokens in use (0 when off).
    A user's context is prompt + thinking + reply. */
-const S = { wq:2, wqLbl:"NATIVE", kq:2, tp:1, tpo:"auto", chunk:512, ovpct:7, users:16, board:"auto",
+const S = { wq:2, wqLbl:"NATIVE", kq:2, tp:1, pp:1, tpo:"auto", pipe:0, chunk:512, ovpct:7, users:16, board:"auto",
             goal:"smooth",
             srv:0,             // Server: 0 = GPUs only, 1 = NVIDIA's guidance for the whole server (see serverFor)
+            view:"srv",        // which answer shows: "srv" = the Servers view (configurations of HPE servers), "gpu" = boards
+            scope:null,        // the Servers view's servers in scope: a Set of catalog ids (every server, set at start)
+            cfg:null,          // the configuration its detail shows: "<server id>|<board>", or null for the recommendation
             workload:"chat", prompt:2048, reply:512, wantPrompt:2048, wantReply:512,
             think:false, thinkTok:4096, thinking:0,
             seeThink:true,     // Users see the thinking: the speed goal's wait is to the first token; off, to the answer
@@ -1117,6 +1943,8 @@ const S = { wq:2, wqLbl:"NATIVE", kq:2, tp:1, tpo:"auto", chunk:512, ovpct:7, us
 let M = findModel("l31-8b");
 let LAST = null;   // what the last render showed, for the downloadable summary
 
+S.scope = new Set(CATALOG.servers.map(sv=> sv.id));   // every server in scope to start
+
 /* ---------------- one model's settings ----------------
    The settings that belong to a model (PER_MODEL) sit on S while it is the model the controls show, so
    everything that sizes it reads S and M as it always has. A spec is one model's own copy of them, with
@@ -1124,7 +1952,7 @@ let LAST = null;   // what the last render showed, for the downloadable summary
    puts another spec on S for as long as fn runs, to size that model without touching the page, and
    puts S back as it was. The rest of S (Server, overhead, prompt caching, the board picked, the unit)
    belongs to the page, whatever the model. */
-const PER_MODEL = ["custom", "wq", "wqLbl", "kq", "tp", "tpo", "chunk", "chunkBase", "users", "goal", "workload",
+const PER_MODEL = ["custom", "wq", "wqLbl", "kq", "tp", "pp", "tpo", "pipe", "chunk", "chunkBase", "users", "goal", "workload",
   "prompt", "reply", "wantPrompt", "wantReply", "think", "thinkTok", "thinking", "seeThink", "shared", "fresh",
   "traffic", "trafficApplied", "extra"];
 const specOf   = () => structuredClone({m: M.id, ...Object.fromEntries(PER_MODEL.map(k=> [k, S[k]]))});
@@ -1276,9 +2104,12 @@ function cacheFor(m, tokens, tp){
 }
 const precClass = m => S.wqLbl==="NATIVE" ? m.nat.cls : S.wqLbl;
 
-function compute(tpOverride, usersOverride){
+/* tp = GPUs one copy is split across by tensor parallelism (one bridged group, or the whole copy) ·
+   pp = pipeline stages: with 2, each stage holds half the layers on its own tp GPUs, so a copy is
+   tp × pp GPUs. Every per-GPU figure is for one GPU of one stage; the aggregate is the whole copy. */
+function compute(tpOverride, usersOverride, pp = 1){
   const m = activeModel();
-  const users = usersOverride ?? allUsers(), tp = tpOverride ?? S.tp;
+  const users = usersOverride ?? allUsers(), tp = tpOverride ?? S.tp, n = tp*pp;
   const cuda = 1.0 * GB;                                            // per-GPU CUDA/driver context
 
   // aggregate core (whole deployment, before sharding)
@@ -1295,38 +2126,42 @@ function compute(tpOverride, usersOverride){
      intermediates, which dominate. Compute dtype is bf16 (2 B) even when weights are
      quantized. FlashAttention keeps scores off-HBM, so there is no T² term.
      Logits are materialized in fp32 for the last token of each sequence. */
-  const T        = Math.max(S.chunk, users);                        // tokens per forward pass
+  /* With pipeline stages the engine runs pp microbatches, one per stage at a time, so a stage's pass
+     holds a pp-th of the batch (a prompt piece stays whole). The last stage alone holds the logits;
+     every GPU is sized as if it did, so the tightest one fits. */
+  const T        = Math.max(S.chunk, Math.ceil(users/pp));          // tokens per forward pass, per stage
   const ffn      = m.ffn, vocab = m.v;
   const actBuf   = T * (m.h*4 + ffn*2) * 2;                         // hidden + MLP intermediates
   const actLogit = users * vocab * 4;                               // fp32 logits, one row per seq
   const act      = actBuf + actLogit;
 
-  // tensor-parallel sharding
-  const w_pg       = weights / tp;
-  const onGpu = cache.dp ? Math.ceil(users/tp) : users;            // users whose cache sits on each GPU
+  // sharding: weights and cache split by layers across stages (÷ pp), then within a stage by TP
+  const w_pg       = weights / n;
+  const onGpu = cache.dp ? Math.ceil(users/tp) : users;            // users whose cache sits on each GPU of a stage
   const kv_pg      = sum(x=>{
     const u = x.users*onGpu/users;                                  // this workload's share of them
     return cache.dp ? x.cache.req*u - x.sh.req*Math.max(0, u-1)     // data-parallel: this GPU's own users, whole caches
                     : x.cache.pg*u - x.sh.pg*Math.max(0, u-1);
-  });
+  }) / pp;                                                          // and only this stage's layers of it
   const act_pg     = act / tp;
   const frag_pg    = (w_pg + kv_pg + act_pg) * (S.ovpct/100);
   const tpcomm_pg  = tp>1 ? (0.3*GB + users*m.h*2*4) : 0;           // NCCL workspace + comm buffers
-  const perGPU     = w_pg + kv_pg + act_pg + cuda + frag_pg + tpcomm_pg;
+  const ppcomm_pg  = pp>1 ? (0.1*GB + 2*T*m.h*2) : 0;               // send/recv buffers for the activations handed to the next stage
+  const perGPU     = w_pg + kv_pg + act_pg + cuda + frag_pg + tpcomm_pg + ppcomm_pg;
 
-  // aggregate components for the bar/table (sum across all GPUs)
+  // aggregate components for the bar/table (sum across all n GPUs of the copy)
   const kvReq        = sum(x=> x.cache.req*x.users);                // everyone's cache, counted once
   const kv_agg       = cache.dp ? sum(x=> x.cache.req*x.users - x.sh.req*Math.max(0, x.users - Math.min(x.users, tp)))
-                                : kv_pg * tp;                       // inflates when tp > kv_heads (replication)
-  const kv_saved     = (cache.dp ? kvReq : sum(x=> x.cache.pg*x.users)*tp) - kv_agg;   // what sharing the prompt start saves
-  const act_agg      = act_pg * tp;
-  const overhead_agg = cuda + frag_pg*tp;                           // one base context + fragmentation on every GPU
-  const tp_agg       = tp>1 ? (tp-1)*cuda + tpcomm_pg*tp : 0;       // extra contexts + all comm buffers
+                                : kv_pg * n;                        // inflates when tp > kv_heads (replication)
+  const kv_saved     = (cache.dp ? kvReq : sum(x=> x.cache.pg*x.users)*n/pp) - kv_agg;   // what sharing the prompt start saves
+  const act_agg      = act_pg * n;
+  const overhead_agg = cuda + frag_pg*n;                            // one base context + fragmentation on every GPU
+  const tp_agg       = n>1 ? (n-1)*cuda + (tpcomm_pg + ppcomm_pg)*n : 0;   // extra contexts + all comm buffers
   const total        = weights + kv_agg + act_agg + overhead_agg + tp_agg;
 
-  return {m, ctx, users, tp, cache, mix, kvReq, T, ffn, vocab, actBuf, actLogit,
+  return {m, ctx, users, tp, pp, n, cache, mix, kvReq, T, ffn, vocab, actBuf, actLogit,
           weights, kv:kv_agg, act:act_agg, overhead:overhead_agg, tpov:tp_agg,
-          w_pg, kv_pg, act_pg, tpcomm_pg, perGPU, total, kv_saved};
+          w_pg, kv_pg, act_pg, tpcomm_pg, ppcomm_pg, perGPU, total, kv_saved};
 }
 
 /* ---------------- throughput model ----------------
@@ -1356,8 +2191,18 @@ const PREC = {                  // d = share of the bandwidth saving realized ·
   INT8:{d:0.85, p:0.8},  INT4:{d:0.75, p:0.8}, INT3:{d:0.7, p:0.75}, INT2:{d:0.65, p:0.7},
 };
 
-function throughput(g, tp, chunk = S.chunk, users = allUsers()){
+/* Pipeline stages (pp > 1). The engine (vLLM, SGLang) runs pp microbatches, each a pp-th of the
+   requests, and every stage works on a different one at a time, so a token for everyone takes pp
+   passes of each stage. A stage holds a pp-th of the layers, so one pass reads a pp-th of the
+   weights — but pp passes read them all again: pipelining does not cut the weight bytes a GPU reads per
+   token, which is why it adds memory and users rather than speed per user. A pass reads only its
+   microbatch's cache for its own layers (÷ pp²), compute spreads over every GPU of the copy, and the
+   TP all-reduces run within a stage, over its bridged group. Between passes a microbatch's activations
+   cross to the next stage over PCIe; the pp − 1 crossings of a token for everyone are added to the
+   step as pipeline fill, the rest overlapping the other stages' work. */
+function throughput(g, tp, chunk = S.chunk, users = allUsers(), pp = 1){
   const m = activeModel();
+  const n = tp*pp;
   const mix = mixAt(users);
   const cls = precClass(m);
   let {d, p} = cls==="FP8" ? {d:CAL.fp8d, p:CAL.fp8p} : PREC[cls];
@@ -1388,16 +2233,28 @@ function throughput(g, tp, chunk = S.chunk, users = allUsers()){
     // attention is two matmuls (scores, then values) over the span, 2 FLOPs per multiply-add
     flops += x.users * (2*paramsActive + 4*live.span*m.h);
   }
-  const readBytes = paramsRead*S.wq/tp + cacheRead;
   const eff       = g.stack==="rocm" ? CAL.rocm : 1;     // AMD's stack reaches less of the same hardware shares
-  const tMem      = readBytes / (g.bw*GB * CAL.mbu * eff * d);
-  const tCompute  = flops / (g.flops*1e12 * CAL.mfuDecode * eff * p * tp);
-  const tComm     = 2*m.L * allReduce(users*m.h*2);
-  const tStep     = Math.max(tMem, tCompute) + tComm + CAL.step;   // a step with no prompt to read
+  /* one pass of one stage over one microbatch (with pp = 1, the whole step's memory and compute) */
+  const uPass     = Math.ceil(users/pp);                 // requests in a microbatch
+  const readPass  = paramsRead*S.wq/n + cacheRead/(pp*pp);
+  const tMemPass  = readPass / (g.bw*GB * CAL.mbu * eff * d);
+  const tCompPass = flops/pp / (g.flops*1e12 * CAL.mfuDecode * eff * p * n);
+  const tCommPass = 2*m.L/pp * allReduce(uPass*m.h*2);
+  // a microbatch's activations handed to the next stage: fixed latency + the tensor at PCIe speed
+  const hop       = pp>1 ? CAL.pcieLatency + uPass*m.h*2/(PCIE_BW*GB) : 0;
+  const tPipe     = (pp-1)*hop;
+  /* the step: pp passes of a stage, back to back, plus the pipeline fill. Reported as the whole step's
+     parts (what each GPU spends on memory, compute and links for one token for everyone). */
+  const tMem      = pp*tMemPass, tCompute = pp*tCompPass, tComm = pp*tCommPass;
+  const tStep     = pp*(Math.max(tMemPass, tCompPass) + tCommPass + CAL.step) + tPipe;   // a step with no prompt to read
   /* A step that also reads k prompt tokens (chunked prefill). They add compute to a step that is
      usually waiting on memory, so a small piece rides along almost free and a big one makes the step
-     compute-bound; their activations join the batch's all-reduces. */
-  const stepWith = (k, secTok) => Math.max(tMem, tCompute + k*secTok) + 2*m.L * allReduce((users + k)*m.h*2) + CAL.step;
+     compute-bound; their activations join the batch's all-reduces. With stages, the piece rides in one
+     microbatch and crosses every stage, each adding its pp-th of the piece's compute, so the step grows
+     by the same amount on every stage: one pass carries the piece, the other pp − 1 do not. */
+  const stepWith = (k, secTok) => (pp-1)*(Math.max(tMemPass, tCompPass) + tCommPass + CAL.step)
+                                + Math.max(tMemPass, tCompPass + k*secTok/pp) + 2*m.L/pp * allReduce((uPass + k)*m.h*2) + CAL.step
+                                + tPipe + (pp>1 ? (pp-1)*k*m.h*2/(PCIE_BW*GB) : 0);
 
   /* Reading one prompt, in pieces, each in a step shared with everyone else's next token:
        · more, smaller pieces → the prompt takes more steps to read (slower first reply)
@@ -1461,12 +2318,12 @@ function throughput(g, tp, chunk = S.chunk, users = allUsers()){
   const slow  = per.reduce((a, b)=> b.ttft > a.ttft ? b : a);
   const stall = per.reduce((a, b)=> b.pause > a.pause ? b : a);
 
-  const core = Math.max(tMem, tCompute);
-  const bottleneck = busy >= 0.5 ? "prompts" : tComm > core ? "interconnect" : CAL.step > core ? "scheduler"
+  const core = Math.max(tMem, tCompute), tOver = pp*CAL.step;
+  const bottleneck = busy >= 0.5 ? "prompts" : tComm + tPipe > core ? "interconnect" : tOver > core ? "scheduler"
                    : tCompute > tMem ? "compute" : "memory";
   return { perUser, total: users*perUser, ttft: slow.ttft, pause: stall.pause, prefillTps: slow.prefillTps, prompt: slow.prompt,
            between: 1/tStep, wait, busy, rate: per.reduce((s, x)=> s + x.rate, 0),
-           per, slow, stall, tMem, tCompute, tComm, tOver: CAL.step, tStep, bottleneck };
+           per, slow, stall, tMem, tCompute, tComm, tPipe, tOver, tStep, bottleneck, pp };
 }
 
 const fitsOn = (g, perGB) => perGB <= g.cap*USABLE;
@@ -1484,17 +2341,25 @@ const fitsOn = (g, perGB) => perGB <= g.cap*USABLE;
 const TP_OPTIONS = [1,2,4,8];
 const NODE = 8;   // GPUs in one node
 const nodeMax = g => popOf(g) ? Math.max(...popOf(g)) : g.max || NODE;   // fewer on a board whose servers hold fewer
-const splitMax = g => Math.min(nodeMax(g), g.split || NODE);   // and a copy spans no more than its link joins
-function evaluate(g, tp, reps, upr = Math.ceil(allUsers()/reps)){   // upr = users on each copy
-  const r = compute(tp, upr), perGB = r.perGPU/GB, fits = fitsOn(g, perGB);
-  const t = fits ? throughput(g, tp, S.chunk, upr) : null, gpus = tp*reps;
-  return {g, tp, reps, upr, gpus, r, perGB, fits, t, meets: !!t && meetsGoal(t), memGB: gpus*g.cap};   // memGB = GPU memory bought
+/* and a copy spans no more than its link joins — unless it may pipeline across the server's bridged groups */
+const splitMax = g => Math.min(nodeMax(g), g.split && !S.pipe ? g.split : NODE);
+/* How a copy of n GPUs on board g is parallelized: tensor-parallel within one bridged group, and
+   pipeline-parallel across the groups when the copy is wider than one group (pipe on). A board with no
+   bridge limit (an NVSwitch system, or PCIe cards) is all tensor-parallel, as before. */
+const partsOf = (g, n) => g.split && n > g.split ? {tp: g.split, pp: n/g.split} : {tp: n, pp: 1};
+function evaluate(g, n, reps, upr = Math.ceil(allUsers()/reps)){   // n = GPUs per copy · upr = users on each copy
+  const {tp, pp} = partsOf(g, n);
+  const r = compute(tp, upr, pp), perGB = r.perGPU/GB, fits = fitsOn(g, perGB);
+  const t = fits ? throughput(g, tp, S.chunk, upr, pp) : null, gpus = n*reps;
+  // tp = GPUs per copy, as every layout and packing rule counts it; tpw × pp is how they are used
+  return {g, tp: n, tpw: tp, pp, reps, upr, gpus, r, perGB, fits, t, meets: !!t && meetsGoal(t), memGB: gpus*g.cap};   // memGB = GPU memory bought
 }
-/* The most users one copy (tp GPUs of g) can serve, up to upTo: memory must fit and, unless memOnly,
+/* The most users one copy (n GPUs of g) can serve, up to upTo: memory must fit and, unless memOnly,
    every user must still reach the goal. Both only get worse as users grow, so bisect. */
-function copyCapacity(g, tp, upTo, memOnly){
-  const ok = n => fitsOn(g, compute(tp, n).perGPU/GB)
-               && (memOnly || S.goal==="any" || meetsGoal(throughput(g, tp, S.chunk, n)));
+function copyCapacity(g, n, upTo, memOnly){
+  const {tp, pp} = partsOf(g, n);
+  const ok = u => fitsOn(g, compute(tp, u, pp).perGPU/GB)
+               && (memOnly || S.goal==="any" || meetsGoal(throughput(g, tp, S.chunk, u, pp)));
   if(!ok(1)) return 0;
   if(ok(upTo)) return upTo;
   let lo = 1, hi = upTo;
@@ -1587,16 +2452,18 @@ function memoryReason(d){
     const holds = copyCapacity(d.g, d.tp, 1e6, true);
     return holds < allUsers() ? {holds, on: d.tp===1 ? "one GPU" : "one copy", verb:"has"} : null;
   }
-  const n = d.tp/2, holds = copyCapacity(d.g, n, 1e6, true);
+  const n = d.tp/2, holds = copyCapacity(d.g, n, 1e6, true), half = partsOf(d.g, n);
   const r = {holds, on: n===1 ? "one GPU" : `${n} GPUs`, verb: n===1 ? "has" : "have"};
-  if(!holds) r.over = {need: compute(n, 1).perGPU*n/GB, usable: d.g.cap*USABLE*n};
+  if(!holds) r.over = {need: compute(half.tp, 1, half.pp).perGPU*n/GB, usable: d.g.cap*USABLE*n};
   return r;
 }
 /* how the node's GPUs are used, in words: the model can run once per GPU, as a few copies of several
    GPUs each, or as one copy spread across them */
+/* a copy that spans two bridged groups says how: "TP 4 × 2 stages" */
+const splitText = d => d.pp>1 ? ` (TP ${d.tpw} × ${d.pp} stages)` : "";
 function layoutText(d){
-  if(d.reps===1) return d.tp===1 ? "Fits on one GPU" : `1 copy across ${d.tp} GPUs`;
-  return d.tp===1 ? "1 copy per GPU" : `${d.reps} copies, ${d.tp} GPUs each`;
+  if(d.reps===1) return d.tp===1 ? "Fits on one GPU" : `1 copy across ${d.tp} GPUs${splitText(d)}`;
+  return d.tp===1 ? "1 copy per GPU" : `${d.reps} copies, ${d.tp} GPUs each${splitText(d)}`;
 }
 /* the deployment by name: "2 × H200 NVL", or "1 × 8-GPU HGX H200 system" once it's a whole system */
 function deployName(d){
@@ -1615,9 +2482,10 @@ const notRecommended = d => d.fits && d.tp>1 && !d.g.link;
 const pickable = d => d.fits;                             // a board that can't hold the model is greyed out
 const suggestable = deps => [...deps.values()].filter(d=> pickable(d) && !notRecommended(d));
 function suggestDeployment(deps){
-  const ok = suggestable(deps), whole = ok.filter(d=> !d.partial), part = ok.filter(d=> d.partial);
   const most = ds => ds.sort((a,b)=> b.served-a.served || a.memGB-b.memGB)[0];
-  return smallest(whole.filter(d=>d.meets)) || most(part.filter(d=>d.meets)) || closest(whole) || most(part) || null;
+  const best = ok => { const whole = ok.filter(d=> !d.partial), part = ok.filter(d=> d.partial);
+    return smallest(whole.filter(d=>d.meets)) || most(part.filter(d=>d.meets)) || closest(whole) || most(part) || null; };
+  return best(suggestable(deps));
 }
 /* How many users the deployment could serve at these lengths: what one copy holds, times copies.
    memory = what fits, whatever the speed; users = what also reaches the goal, by the speed estimate. */
@@ -1625,6 +2493,609 @@ function capacityFor(d){
   const byMem = copyCapacity(d.g, d.tp, 1e6, true);
   const both  = S.goal==="any" ? byMem : copyCapacity(d.g, d.tp, 1e6, false);
   return {perCopy: both, users: both*d.reps, memory: byMem*d.reps, limit: both < byMem ? "speed" : "memory"};
+}
+
+/* ---------------- the Servers view: configurations ----------------
+   A configuration is one HPE server from CATALOG with one board in it, at the count and wiring the
+   catalog gives. The Servers view sizes the model the controls show (S.edit) on every configuration of
+   every server in scope (S.scope), and recommends one of them.
+   On each configuration the search tries every card count and every layout the wiring allows (layoutsOn),
+   with as many copies as the server holds, and keeps them all: the best becomes the configuration's
+   answer, the rest are its alternatives (the detail panel shows them). Pipelining is part of the search
+   here, whatever Pipeline across bridge groups says, since the server's wiring decides what's possible. */
+const linkKind = x => !x.link || x.link==="pcie" ? "pcie" : x.link.bridge ? "bridge" : x.link;   // pcie | bridge | nvswitch | fabric
+/* the board as this server holds it (count, pop, bridge), as the GPU view's inHost does for a board's default server */
+function boardIn(sv, x){
+  const g = GPUS.find(b=> b.n===x.board), h = HPE_HOSTS.find(y=> y.id===sv.id);
+  return g && h ? boardWith(g, h) : null;
+}
+/* Every way to run one copy on n of these cards, as the wiring allows: tensor-parallel within one NVLink
+   group, or across an NVSwitch or fabric; tensor-parallel within each group and pipelined across groups;
+   and on PCIe cards, tensor-parallel over PCIe (an all-reduce crosses PCIe after every layer, so it is
+   flagged) or pipelined over PCIe (one hand-off per stage; modeled, not benchmarked). */
+function layoutsOn(b){
+  const out = [], max = nodeMax(b);
+  for(const n of TP_OPTIONS){
+    if(n > max) break;
+    if(b.split && n > b.split){ if(n % b.split===0) out.push({n, tp: b.split, pp: n/b.split}); continue; }
+    out.push({n, tp: n, pp: 1});
+    if(!b.link && n > 1) out.push({n, tp: 1, pp: n});
+  }
+  return out;
+}
+const layoutName = L => L.pp>1 ? (L.tp>1 ? `TP ${L.tp} × PP ${L.pp}` : `PP ${L.pp}`) : `TP ${L.tp}`;
+/* one layout with reps copies, upr users on each: memory, speed, goal (as evaluate does for the GPU view) */
+function evalLayout(b, L, reps, upr = Math.ceil(allUsers()/reps)){
+  const r = compute(L.tp, upr, L.pp), perGB = r.perGPU/GB, fits = fitsOn(b, perGB);
+  const t = fits ? throughput(b, L.tp, S.chunk, upr, L.pp) : null, gpus = L.n*reps;
+  return {g: b, L, tp: L.n, tpw: L.tp, pp: L.pp, reps, upr, gpus, r, perGB, fits, t, meets: !!t && meetsGoal(t),
+          memGB: gpus*b.cap, nr: L.n>1 && !b.link, modeled: L.pp>1};
+}
+/* the most users one copy of layout L holds (memOnly) or serves within the goal, up to upTo */
+function layoutCapacity(b, L, upTo, memOnly){
+  const ok = u => fitsOn(b, compute(L.tp, u, L.pp).perGPU/GB)
+               && (memOnly || S.goal==="any" || meetsGoal(throughput(b, L.tp, S.chunk, u, L.pp)));
+  if(!ok(1)) return 0;
+  if(ok(upTo)) return upTo;
+  let lo = 1, hi = upTo;
+  while(hi-lo > 1){ const mid = (lo+hi) >> 1; if(ok(mid)) lo = mid; else hi = mid; }
+  return lo;
+}
+const ROOM_MAX = 100000;   // capacity is counted up to this many users
+/* Every option on one configuration: each layout, at each number of copies the server holds (rounded to
+   counts it is bought in), with its users spread evenly over the copies. room = users it serves within
+   the goal, memRoom = users whose caches it holds at all. */
+function configFor(sv, x){
+  const b = boardIn(sv, x);
+  if(!b) return null;
+  const all = allUsers(), max = nodeMax(b), opts = [];
+  for(const L of layoutsOn(b)){
+    const capMem = layoutCapacity(b, L, ROOM_MAX, true);
+    if(!capMem) continue;
+    const capGoal = S.goal==="any" ? capMem : layoutCapacity(b, L, ROOM_MAX, false);
+    for(let k = 1; L.n*k <= max; k++){
+      if(popOf(b) && !popOf(b).includes(L.n*k)) continue;
+      const d = evalLayout(b, L, k);
+      if(!d.fits) continue;
+      Object.assign(d, {room: capGoal*k, memRoom: capMem*k, served: Math.min(all, capGoal*k)});
+      d.partial = d.room < all;
+      opts.push(d);
+    }
+  }
+  /* best: meets the goal for everyone, not split over PCIe, fewest cards, copies over width, then faster;
+     else the option that serves the most within the goal */
+  const okOf = d => d.meets && !d.partial;
+  const best = opts.slice().sort((a, c)=> (+okOf(c) - +okOf(a)) || (okOf(a)
+      ? (+a.nr - +c.nr) || a.gpus - c.gpus || a.L.n - c.L.n || c.t.perUser - a.t.perUser
+      : (c.served - a.served) || (+a.nr - +c.nr) || a.gpus - c.gpus))[0] || null;
+  return {sv, x, b, opts, best, fits: !!best, usable: max*b.cap*USABLE, max,
+          ok: !!best && best.meets && !best.partial, id: `${sv.id}|${x.board}`};
+}
+const SERVER_MEMO = new Map();
+/* every configuration of every server in the catalog, for the model and settings on screen */
+function allConfigs(){
+  const key = JSON.stringify([specOf(), S.srv, S.ovpct, S.cache, CAL]);
+  if(!SERVER_MEMO.has(key)){
+    if(SERVER_MEMO.size >= 50) SERVER_MEMO.clear();
+    SERVER_MEMO.set(key, CATALOG.servers.flatMap(sv=> sv.gpus.map(x=> configFor(sv, x))).filter(Boolean));
+  }
+  return SERVER_MEMO.get(key);
+}
+/* The answer for the servers in scope:
+   rec      the configuration that serves everyone within the goal with the least GPU memory, then not split
+            over PCIe, then not pipelined (its speed is modeled, not fitted), then the most room, then the
+            fewest rack units; failing that, the one serving the most
+   down     a smaller server (fewer rack units) that also meets the goal, or else serves the most
+   upSame   the recommended server with more cards: the option with the most room, and the one that holds
+            the most context when that is a different layout
+   upBig    another server whose answer has more room than the recommendation: its leanest configuration
+            within the goal and its roomiest */
+const rackU = c => c.sv.u ?? 99;
+/* the recommendation's order: least GPU memory, then not over PCIe, not pipelined, most room, fewest rack units */
+/* The same order as the GPU view's suggestion: a copy split over PCIe last (the GPU view never suggests one),
+   then the least GPU memory, then not pipelined, fewer GPUs per copy and faster; then most room, fewest rack units. */
+const leanOrder = (a, c)=> (+a.best.nr - +c.best.nr) || a.best.memGB - c.best.memGB || (+a.best.modeled - +c.best.modeled)
+                       || a.best.L.n - c.best.L.n || c.best.t.perUser - a.best.t.perUser || c.best.room - a.best.room || rackU(a) - rackU(c);
+function serverAnswer(cfgs){
+  const inScope = cfgs.filter(c=> S.scope.has(c.sv.id)), fits = inScope.filter(c=> c.fits);
+  const ok = fits.filter(c=> c.ok);
+  const lean = leanOrder;
+  const rec = ok.slice().sort(lean)[0] || fits.slice().sort((a, c)=> (+a.best.nr - +c.best.nr) || c.best.served - a.best.served || lean(a, c))[0] || null;
+  if(!rec) return {inScope, fits, rec: null};
+  const others = fits.filter(c=> c.sv.id!==rec.sv.id);
+  const down = rec.sv.u ? (others.filter(c=> c.ok && rackU(c) < rec.sv.u).sort((a, c)=> rackU(a) - rackU(c) || lean(a, c))[0]
+                       || others.filter(c=> rackU(c) < rec.sv.u && c.best.served > 0).sort((a, c)=> (+a.best.nr - +c.best.nr) || c.best.served - a.best.served)[0] || null) : null;
+  const more = rec.opts.filter(d=> d.gpus > rec.best.gpus && d.meets && !d.partial && !d.nr);
+  const roomy = more.slice().sort((a, c)=> c.room - a.room || a.gpus - c.gpus)[0] || null;
+  const context = more.slice().sort((a, c)=> c.memRoom - a.memRoom || c.room - a.room)[0] || null;
+  const upSame = roomy ? {roomy, context: context && context!==roomy && context.memRoom > roomy.memRoom*1.5 ? context : null} : null;
+  const bigger = others.filter(c=> c.ok && c.best.room > rec.best.room && c.sv.id!==(down && down.sv.id));
+  const bigSv = bigger.sort((a, c)=> c.best.room - a.best.room)[0];
+  const upBig = bigSv ? (()=>{
+    const on = bigger.filter(c=> c.sv.id===bigSv.sv.id);
+    const leanest = on.slice().sort(lean)[0], roomiest = on.slice().sort((a, c)=> c.best.room - a.best.room)[0];
+    return {sv: bigSv.sv, configs: leanest===roomiest ? [leanest] : [leanest, roomiest]};
+  })() : null;
+  return {inScope, fits, ok, rec, down, upSame, upBig};
+}
+/* GPU memory one user needs at the least: the whole model on one GPU's worth of overhead */
+const needGB = () => compute(1, 1, 1).total/GB;
+
+/* ---------------- the Servers view: on the page ----------------
+   Five parts, top to bottom: the servers in scope (chips), the recommendation, the alternatives (step down,
+   step up), every configuration in scope (those that hold the model, then bars for the servers that can't),
+   and the detail of one configuration (its wiring, every layout on its cards, its build). */
+const cfgById = (cfgs, id) => cfgs.find(c=> c.id===id) || null;
+const groupsUsed = (c, d) => linkKind(c.x)==="bridge" ? Math.ceil(d.gpus / c.x.link.bridge) : 0;
+/* how the cards in use are wired, in words: "one 4-way NVLink group (S4A91C)" */
+function wiringText(c, d){
+  const k = linkKind(c.x);
+  if(k==="bridge"){ const n = groupsUsed(c, d), w = c.x.link.bridge;
+    return `${["one", "two", "three", "four"][n-1] || n} ${w}-way NVLink group${n===1 ? "" : "s"} (${n>1 ? `${n} × ` : ""}${c.x.link.kit})`; }
+  return k==="nvswitch" ? "NVSwitch" : k==="fabric" ? "Infinity Fabric, one link per pair" : "PCIe only, no GPU-to-GPU link";
+}
+const wiringShort = c => { const k = linkKind(c.x);
+  return k==="bridge" ? `${c.x.link.bridge}-way NVLink` : k==="nvswitch" ? "NVSwitch" : k==="fabric" ? "Infinity Fabric" : "PCIe only"; };
+const layoutLine = d => d.reps>1 ? `${d.reps} copies × ${layoutName(d.L)}` : `1 copy · ${layoutName(d.L)}`;
+/* what the speed figure rests on: a board with no benchmark of its own, a pipeline, a split over PCIe */
+const speedBasis = d => [d.g.bench ? "" : "extrapolated", d.modeled ? "pipeline modeled" : "", d.nr ? "split over PCIe" : ""].filter(Boolean);
+const flagPills = d => (d.nr ? ` <span class="pill bad">split over PCIe</span>` : "")
+  + (d.modeled ? ` <span class="pill neutral" data-tip="svModeled" tabindex="0">pipeline modeled</span>` : "");
+const star = d => d.g.bench ? "" : `<span class="tipl" data-tip="extrap" tabindex="0">*</span>`;
+
+/* the server's GPU bays: bridged groups with their kit, the cards in use filled */
+function baysHtml(c, d){
+  const k = linkKind(c.x), size = k==="bridge" ? c.x.link.bridge : c.max, groups = Math.ceil(c.max / size);
+  const kit = k==="bridge" ? c.x.link.kit : k==="nvswitch" ? "NVSwitch" : k==="fabric" ? "Infinity Fabric" : "PCIe";
+  const label = `${c.max} GPU bays, ${d ? d.gpus : 0} in use` + (k==="bridge" ? `, in ${groups} groups of ${size} joined by ${kit} NVLink bridges` : `, ${kit}`);
+  return `<div class="bays" role="img" aria-label="${label}">` + Array.from({length: groups}, (_, gi)=>{
+    const from = gi*size, n = Math.min(size, c.max - from), used = d ? Math.max(0, Math.min(n, d.gpus - from)) : 0;
+    const linked = k!=="pcie" && used > 1;
+    return `<div class="bgroup"><span class="kit">${used ? kit : "open"}</span><span class="bridge${linked ? "" : " off"}"></span>`
+      + `<span class="slots">${Array.from({length: n}, (_, i)=> `<span class="bay${i < used ? " on" : ""}"></span>`).join("")}</span></div>`;
+  }).join("") + `</div>`;
+}
+/* the four figures for a layout */
+function statsHtml(d){
+  const t = d.t, all = allUsers(), g = GOALS[S.goal], basis = speedBasis(d);
+  return `<div class="statstrip">`
+    + statCell("tpsUser", "Speed per user", fmtTps(t.perUser), "tok/s", `${likelyTps(t.perUser)}${S.goal!=="any" ? ` · goal ${g.tps}+` : ""}${basis.length ? ` · ${basis.join(" · ")}` : ""}`, basis.length ? "warn" : "")
+    + statCell("ttft", "First token", fmtTime(t.ttft)[0], fmtTime(t.ttft)[1], `${likelyTime(t.ttft)}${S.goal!=="any" ? ` · goal under ${g.ttft} s` : ""}`)
+    + statCell("capacity", "Room for", commas(d.room), d.room===1 ? "user" : "users", d.room < all ? `of your ${commas(all)}: below the goal past that` : `you have ${commas(all)}${d.memRoom > d.room ? ` · cache holds ${commas(d.memRoom)}` : ""}`, d.room < all ? "warn" : "")
+    + statCell("srvGpu", "GPU memory", boxTotal(d.memGB).split(" ")[0], S.unit, `${fmtMem(d.perGB)} used of ${boxMem(d.g)} per card`)
+    + `</div>`;
+}
+/* One CPU or two. One keeps the GPUs, their memory and the serving process on one NUMA node, so it's the
+   default; a second CPU is added only when the build needs it: the server takes two processors only, a GPU sits
+   in a slot wired to CPU 2 (sv.cpu1: how many of each board one CPU reaches), or the cores won't fit in one CPU
+   (sv.maxCores: the most physical cores one CPU offers in the server's GPU configuration). With two, the GPUs
+   split evenly across the sockets. short: even the CPUs the server takes can't give the cores. */
+function cpusFor(sv, d, cores){
+  const max = sv.maxCores || Infinity, cap = `one CPU here has at most ${max} cores (${esc(sv.coreNote || "")})`;
+  const one = "One CPU keeps the GPUs and memory on one NUMA node";
+  if(sv.sockets < 2) return cores <= max ? {n: 1, why: one}
+                                         : {n: 1, short: true, why: `Needs ${cores} cores, but ${cap}: fewer cores per GPU, or another server`};
+  const reach = sv.cpu1 ? (sv.cpu1[d.g.n] ?? sv.cpu1["*"]) : Infinity;
+  if(reach > 0 && d.gpus <= reach && cores <= max) return {n: 1, why: one};
+  const because = reach===0 ? esc(sv.cpu1Why) : d.gpus > reach ? `${esc(sv.cpu1Why)} One CPU reaches ${reach} ${esc(d.g.n.replace(" Blackwell", ""))}${reach===1 ? "" : "s"}.`
+                : `Two CPUs for the cores: ${cap}.`;
+  if(cores > 2*max) return {n: 2, short: true, why: `Needs ${cores} cores, but two CPUs here give at most ${2*max}: fewer cores per GPU`};
+  return {n: 2, why: because + (d.gpus > 1 ? ` Split the GPUs evenly across the two; keep each copy on one CPU's GPUs where it fits.` : "")};
+}
+/* System memory from the server's own modules (sv.mem): NVIDIA's minimum, 2 × GPU memory, rounded up only as far
+   as the modules make it, since memory is the costly part, not every channel filled. The smallest modules the server takes, as
+   few as reach the minimum, so they land on as many channels as that much memory can: one per channel, a larger
+   module only when the smallest can't reach it that way, and two per channel only when one can't. Each CPU holds
+   the same DIMMs, a count its population rules allow (pop). null: the server can't hold that much. */
+function memFor(sv, cpus, minGB){
+  const m = sv.mem;
+  if(!m) return null;
+  for(const most of [m.ch, m.ch*m.dpc]) for(const gb of m.gb){
+    const k = m.pop.find(k=> k <= most && cpus*k*gb >= minGB);
+    if(k) return {k, gb, total: cpus*k*gb, ch: Math.min(k, m.ch), of: m.ch, dimms: cpus*k};
+  }
+  return null;
+}
+/* the Memory row's lines for memFor's pick: the modules, then how many channels they fill, called out when not all */
+function memLines(mm, cpus, minGB){
+  const each = cpus===2 ? " on each CPU" : "", mods = `${mm.dimms} × ${mm.gb} GB` + (cpus===2 ? `, ${mm.k} per CPU` : "");
+  const floor = `NVIDIA's minimum is 2 × GPU memory, ${commas(Math.ceil(minGB))} GB`;
+  if(mm.ch === mm.of) return {sub: `${mods} · every channel${each} populated`, extra: floor, flag: false};
+  return {sub: `${mods} · ${mm.ch} of ${mm.of} memory channels${each} populated, so about ${Math.round(100*mm.ch/mm.of)}% of the CPU's memory bandwidth`,
+          extra: `${floor}. Fill more channels if the CPU offloads KV cache or does heavy work of its own`, flag: true};
+}
+/* The build for a layout, as one bill of materials: chassis, GPUs and how they're joined, CPUs, memory,
+   storage and power, in the order they go on a quote. CPU cores by the fixed per-GPU ratio (coresPerGpu), memory
+   and storage by NVIDIA's certified-server guidance. Rows that need a decision are flagged. */
+function buildRows(c, d){ return bomRows(c, d.g, d.gpus, [[d, d.gpus]], flagPills(d)); }
+/* the bill of materials for n cards of board g in configuration c, running parts ([deployment, GPUs here] for
+   each model on the server); extra: rows after the GPUs, as [label, value, sub] */
+function bomRows(c, g, n, parts, pills = "", extra = []){
+  const x = c.x, sv = c.sv, rows = [], d = {g, gpus: n};
+  const row = (k, v, sub = "", flag = false) => rows.push(`<div class="bom-r${flag ? " flag" : ""}"><dt>${k}</dt><dd><b>${v}</b>${sub ? `<span>${sub}</span>` : ""}</dd></div>`);
+  const k = linkKind(x), more = n < c.max ? `the server takes up to ${c.max}` : `the most this server takes`;
+  row("Chassis", esc(sv.short), esc(sv.form));
+  row("GPUs", `${n} × ${esc(g.n)}${pills}`, n>1 ? `${esc(wiringText(c, d))} · ${more}` : `${k==="pcie" ? "PCIe Gen5 x16 · " : ""}${more}`);
+  for(const [lbl, v, sub] of extra) row(lbl, v, sub);
+  if(k==="bridge" && n>1){ const groups = groupsUsed(c, d);
+    row("NVLink", `${groups} × ${esc(x.link.kit)}`, `${x.link.bridge}-way NVLink bridge${groups===1 ? "" : "s"}`); }
+  if(x.unconfirmed) row("Card count", "To confirm", esc(x.unconfirmed), true);
+  if(systemOf(g)){ row("Platform", "Comes with the system", `CPUs, memory and storage: ${esc(sv.cpu)}`); }
+  else {
+    const sr = serverOf(g, n, parts), per = sr.cores/n, cp = cpusFor(sv, d, sr.cores);
+    const why = LIGHT_GPUS.includes(g.n) ? `, for the ${esc(g.n.replace(" Blackwell", ""))}` : "";
+    const value = cp.n===2 ? `2 × ${esc(sv.cpu)}, ${commas(sr.cores/2)} physical cores each` : `1 × ${esc(sv.cpu)}, ${commas(sr.cores)} physical cores`;
+    const tally = cp.n===2 ? `${commas(sr.cores)} physical cores in total · ${per} per GPU${why}` : `${per} physical cores per GPU${why}`;
+    row(cp.n===2 ? "CPUs" : "CPU", value, `${tally}</span><span>${cp.why}`, cp.short);
+    const mm = memFor(sv, cp.n, sr.ram);
+    if(!sv.mem) row("Memory", `${commas(Math.ceil(sr.ram))} GB`, `2 × GPU memory`);
+    else if(!mm) row("Memory", `${commas(Math.ceil(sr.ram))} GB`, `2 × GPU memory, more than ${cp.n===2 ? "two CPUs" : "one CPU"} here can hold`, true);
+    else { const ml = memLines(mm, cp.n, sr.ram); row("Memory", `${commas(mm.total)} GB`, `${ml.sub}</span><span>${ml.extra}`, ml.flag); }
+    row("Storage", `${capParts(sr.diskGB).join(" ")} NVMe`, `Required usable capacity: 2 × ${parts.length>1 ? "each model's" : "model"} weights + 100 GB for images, caches and logs</span><span>Doesn't include boot storage, request logs or KV cache offload`);
+  }
+  row("Power", "Size in HPE Power Advisor", "PSUs and redundancy for this load", true);
+  return `<dl class="bom">${rows.join("")}</dl>`;
+}
+/* the sentence under a configuration: how its copy is laid out, and what's left in the server */
+function layoutWhy(c, d){
+  const bridged = linkKind(c.x)==="bridge";
+  const how = d.pp>1 ? `One copy across ${d.pp} ${bridged ? "NVLink groups" : "cards"} as pipeline stages${d.tpw>1 ? `, tensor-parallel across the ${d.tpw} cards of each` : ""}.`
+            : d.reps>1 ? `${d.reps} copies of the model${d.tpw>1 ? `, each tensor-parallel across ${d.tpw} ${bridged ? "bridged " : ""}cards` : ", one per card"}, sharing the users.`
+            : d.tpw>1 ? `One copy, tensor-parallel across ${d.tpw} ${bridged ? "bridged " : ""}cards.` : `One copy on one card.`;
+  const pcie = !d.nr ? "" : d.tpw>1 ? ` The cards have no direct link, so an all-reduce crosses PCIe after every layer; the speed shown reflects that.`
+             : ` The cards have no direct link, so each hand-off between stages crosses PCIe.`;
+  return how + pcie;
+}
+/* a layout with more cards, in words: "8 cards as 2 copies of TP 4" */
+const growText = d => `${d.gpus} cards as ` + (d.reps>1 ? (d.tpw===1 && d.pp===1 ? "one copy per card" : `${d.reps} copies of ${layoutName(d.L)}`) : `one copy, ${layoutName(d.L)}`);
+/* The bay picture, only where it shows something fixed: which cards an NVLink bridge joins. PCIe slots move with
+   risers, front GPU cages and enablement kits, and an NVSwitch joins every GPU alike, so those get words instead. */
+const bridgeBays = (c, d) => linkKind(c.x)==="bridge" ? `<div class="rec-bays"><span class="sublbl">NVLink groups</span>${baysHtml(c, d)}</div>` : "";
+/* how a configuration's cards talk to each other, in one sentence, where there's no bridge to draw */
+function wiringSentence(c){
+  const k = linkKind(c.x), n = `${c.max} × ${esc(c.x.board)}`;
+  return k==="nvswitch" ? `An NVSwitch joins all ${c.max} GPUs, each to every other at full NVLink speed, so any split runs at the same speed.`
+       : k==="fabric" ? `Infinity Fabric wires each GPU straight to each of the other ${c.max - 1}, one link per pair, with no switch: a copy split across fewer GPUs uses only the links among them.`
+       : `No GPU-to-GPU link: the cards reach each other over PCIe Gen5 through the host, so a copy split across cards waits on PCIe. Up to ${n} in this server; which slots they use depends on its risers and GPU enablement kits.`;
+}
+const openBtn = (id, txt) => `<button type="button" class="linkbtn" data-cfg="${esc(id)}">${txt}</button>`;
+
+function renderScope(A){
+  const n = S.scope.size, all = CATALOG.servers.length;
+  $('svScope').innerHTML = `<div class="svhead"><h2>Servers in scope <span class="i" data-tip="svScope" tabindex="0">i</span></h2>`
+    + `<span class="cap">${n===all ? `All ${all} current GPU-capable HPE servers` : `${n} of ${all}`}. Pick the customer's standard builds to size only those.</span>`
+    + `<span class="svacts"><button type="button" class="linkbtn" data-scope-all>All</button><button type="button" class="linkbtn" data-scope-none>None</button></span></div>`
+    + `<div class="chipgroups">` + [...new Set(CATALOG.servers.map(sv=> sv.group))].map(grp=>
+        `<div class="chipgroup" role="group" aria-label="${esc(grp)}"><span class="gl">${esc(grp)}</span><span class="chiprow">`
+        + CATALOG.servers.filter(sv=> sv.group===grp).map(sv=>
+            `<button type="button" class="chip" data-scope="${sv.id}" aria-pressed="${S.scope.has(sv.id)}">${esc(sv.short)}</button>`).join("")
+        + `</span></div>`).join("") + `</div>`;
+}
+/* the same server with more cards: the option with the most room that meets the goal for everyone */
+const growOf = c => c.best ? c.opts.filter(d=> d.gpus > c.best.gpus && d.meets && !d.partial && !d.nr).sort((a, b)=> b.room - a.room || a.gpus - b.gpus)[0] || null : null;
+/* The main card: the configuration picked from the list (S.cfg), or else the recommendation. A pick is labelled
+   as such, with how it compares and the way back. */
+function renderRec(A, cfgs){
+  const el = $('svRec'), all = allUsers(), pick = cfgById(cfgs, S.cfg);
+  if(pick && (!A.rec || pick.id!==A.rec.id)) return renderPick(A, pick);
+  if(!A.rec){
+    el.innerHTML = `<span class="eyebrow-s warn">${S.scope.size ? "No server in scope holds it" : "No servers in scope"}</span>`
+      + `<h2 class="rec-name">${S.scope.size ? "Too big for every server in scope" : "Pick at least one server"}</h2>`
+      + (S.scope.size ? `<p class="rec-why">One copy of the model needs about ${fmtMem(needGB())} of GPU memory. Add a larger server to the scope, or lower the precision or the prompt and reply lengths.</p>` : "");
+    return;
+  }
+  const c = A.rec;
+  const eyebrow = c.ok ? `<span class="eyebrow-s">Recommended · least GPU memory that meets your goal</span>`
+                       : `<span class="eyebrow-s warn">Closest · serves ${commas(c.best.served)} of ${commas(all)} within your goal</span>`;
+  el.innerHTML = configCard(c, eyebrow, "");
+}
+/* a picked configuration: as the recommendation's card, labelled, with the comparison and the way back */
+function renderPick(A, c){
+  const all = allUsers(), back = `<button type="button" class="linkbtn" data-cfg="">Back to the recommendation</button>`;
+  const r = A.rec && A.rec.best, d = c.best;
+  const eyebrow = !d ? `<span class="eyebrow-s warn">Your pick · won't hold the model</span>`
+                : c.ok ? `<span class="eyebrow-s">Your pick · meets your goal</span>`
+                : `<span class="eyebrow-s warn">Your pick · ${d.served ? `serves ${commas(d.served)} of ${commas(all)} within your goal` : "too slow for your goal"}</span>`;
+  const cmp = !r || !d ? "" : `Against the recommended ${esc(A.rec.sv.short)} (${r.gpus} × ${esc(r.g.n)}): `
+    + `${fmtTps(d.t.perUser)} vs ${fmtTps(r.t.perUser)} tok/s per user, room for ${commas(d.room)} vs ${commas(r.room)}, ${boxTotal(d.memGB)} vs ${boxTotal(r.memGB)} of GPU memory${c.sv.u && A.rec.sv.u && c.sv.u!==A.rec.sv.u ? `, ${c.sv.u}U vs ${A.rec.sv.u}U` : ""}.`;
+  $('svRec').innerHTML = configCard(c, eyebrow, cmp, back);
+}
+/* one configuration's card: server, GPUs and wiring, bays, figures, layout and build checks */
+function configCard(c, eyebrow, cmp, back = ""){
+  const d = c.best, sv = c.sv, grow = growOf(c);
+  if(!d) return `<div class="rec-top"><div class="rec-main">${eyebrow}`
+    + `<h2 class="rec-name">${hostLink(HPE_HOSTS.find(h=> h.id===sv.id))}</h2>`
+    + `<span class="rec-spec">${esc(sv.form)} · ${sv.sockets} × ${esc(sv.cpu)}</span>`
+    + `<p class="rec-cfg">Up to ${c.max} × ${esc(c.x.board)}, ${wiringShort(c)}</p>`
+    + `<p class="rec-why">One copy needs about ${fmtMem(needGB())} of GPU memory; this server carries ${fmtMem(c.usable)} at most with this GPU.</p></div>`
+    + bridgeBays(c, null) + `</div>`
+    + `<div class="rec-acts">${back}</div>`;
+  const extrap = !d.g.bench;
+  return `<div class="rec-head">${eyebrow}<h2 class="rec-name">${hostLink(HPE_HOSTS.find(h=> h.id===sv.id))}</h2>`
+    + `</div>`
+    + (cmp ? `<p class="rec-cmp">${cmp}</p>` : "")
+    + `<div class="rec-body">`
+    + `<section class="rec-col"><h3 class="colh">Build</h3>${buildRows(c, d)}`
+    + bridgeBays(c, d)
+    + ((c.x.constraints || []).length || (sv.notes || []).length ? `<div class="bom-notes"><span class="sublbl">Before you quote</span><ul class="svnotes">${[...(c.x.constraints || []), ...(sv.notes || [])].map(t=> `<li>${esc(t)}</li>`).join("")}</ul></div>` : "")
+    + `</section>`
+    + `<section class="rec-col"><h3 class="colh">Performance</h3>${statsHtml(d)}`
+    + (extrap ? `<p class="cap">Speeds are extrapolated: the ${esc(d.g.n.replace(" Blackwell", ""))} has no published benchmark here <span class="i" data-tip="extrap" tabindex="0">i</span>. Load-test before quoting them.</p>` : "")
+    + (grow ? `<p class="rec-grow">Room to grow: ${growText(grow)} in this server serve up to ${commas(grow.room)} users.</p>` : "")
+    + `<h3 class="colh">Layout</h3><p class="rec-why">${layoutWhy(c, d)}</p>`
+    + `</section></div>`
+    + `<div class="rec-acts">${back}<button type="button" class="tool-btn" data-copylink>Copy link</button></div>`;
+}
+/* Every server in scope, one line each: the servers that meet the goal, in the recommendation's order, each at
+   its best configuration (its other GPUs are in its detail); then those that hold the model below the goal;
+   then those that can't hold it, as bars against what one copy needs. */
+function renderAll(A, cfgs){
+  const all = allUsers(), need = needGB(), selSv = (cfgById(cfgs, S.cfg) || A.rec || {sv: {}}).sv.id;
+  const servers = CATALOG.servers.filter(sv=> S.scope.has(sv.id)).map(sv=>{
+    const mine = A.inScope.filter(c=> c.sv.id===sv.id), fits = mine.filter(c=> c.fits), ok = fits.filter(c=> c.ok);
+    const top = ok.slice().sort(leanOrder)[0] || fits.slice().sort((x, y)=> y.best.served - x.best.served || leanOrder(x, y))[0] || null;
+    return {sv, mine, fits, ok, top, n: mine.length};
+  });
+  const meet = servers.filter(x=> x.ok.length).sort((x, y)=> leanOrder(x.top, y.top));
+  const below = servers.filter(x=> !x.ok.length && x.fits.length).sort((x, y)=> y.top.best.served - x.top.best.served);
+  const cant = servers.filter(x=> !x.fits.length).map(x=>{
+    const most = Math.max(...x.mine.map(c=> c.usable)), at = x.mine.filter(c=> c.usable >= most*0.999);
+    return {sv: x.sv, usable: most, how: at.map(c=> `${c.max} × ${esc(c.x.board)}`).join(" or "), est: at.some(c=> c.x.unconfirmed)};
+  }).sort((x, y)=> y.usable - x.usable);
+  const out = CATALOG.servers.length - S.scope.size;
+  const tagOf = c => A.rec && c.sv.id===A.rec.sv.id ? ` <span class="pill sugg">Recommended</span>`
+    : A.down && c.sv.id===A.down.sv.id ? ` <span class="pill neutral" data-tip="svSmaller" tabindex="0">Smaller server</span>`
+    : A.upBig && c.sv.id===A.upBig.sv.id ? ` <span class="pill neutral" data-tip="svMoreRoom" tabindex="0">More room</span>` : "";
+  const others = x => x.n > 1 ? `<span class="cap">${x.ok.length > 1 ? `${x.ok.length - 1} other GPU${x.ok.length===2 ? "" : "s"} also meet the goal` : `${x.n - 1} other GPU${x.n===2 ? "" : "s"} in this server`}</span>` : "";
+  const closestOf = mine => mine.slice().sort((a, b)=> b.usable - a.usable)[0];
+  const line = (x, body) => `<span class="hname${hl(x.sv.id)}"><button type="button" class="rowbtn" data-cfg="${esc(x.top ? x.top.id : closestOf(x.mine).id)}">${esc(x.sv.short)}</button></span>${body}`;
+  const hl = id => id===selSv ? " sel" : "";
+  $('svAll').innerHTML = `<div class="svhead"><h2>Every server in scope</h2><span class="cap">${meet.length} meet${meet.length===1 ? "s" : ""} your goal`
+      + `${below.length ? ` · ${below.length} hold${below.length===1 ? "s" : ""} it below the goal` : ""}${cant.length ? ` · ${cant.length} can't hold it` : ""}${out ? ` · ${out} out of scope` : ""}. Click a server to see it in place of the recommendation.</span></div>`
+    + (meet.length ? `<div class="tbl"><table><thead><tr><th scope="col">Server</th><th scope="col">Best configuration</th><th scope="col">Layout</th>`
+      + `<th scope="col" class="num">Per user</th><th scope="col" class="num">Room for</th><th scope="col" class="num">GPU memory</th></tr></thead><tbody>`
+      + meet.map(x=>{ const c = x.top, d = c.best;
+          return `<tr class="${x.sv.id===selSv ? "sel" : ""}"><th scope="row"><button type="button" class="rowbtn" data-cfg="${esc(c.id)}">${esc(x.sv.short)}</button>${tagOf(c)}<br><span class="cap">${esc(x.sv.form)}</span></th>`
+            + `<td>${d.gpus} × ${esc(d.g.n)} · ${wiringShort(c)}<br>${others(x)}</td><td>${layoutLine(d)}${flagPills(d)}</td>`
+            + `<td class="num">${fmtTps(d.t.perUser)} tok/s${star(d)}</td><td class="num">${commas(d.room)}</td><td class="num">${boxTotal(d.memGB)}</td></tr>`; }).join("")
+      + `</tbody></table></div><p class="cap">* Speed extrapolated: no published benchmark for this board; it applies the shares fitted on other boards' runs.</p>` : "")
+    + (below.length ? `<div class="svsub"><h3>Below your goal</h3><span class="cap">They hold the model, but can't serve all ${commas(all)} users within your speed goal.</span></div>`
+      + `<div class="holds">` + below.map(x=> line(x, `<span class="cap">${x.top.best.gpus} × ${esc(x.top.best.g.n)} · ${layoutLine(x.top.best)}</span>`
+          + `<span class="cap"><span class="warnx">${x.top.best.served ? `serves ${commas(x.top.best.served)} of ${commas(all)}` : "too slow for your goal, even for one user"}</span>${x.top.best.nr ? " · split over PCIe" : ""}</span>`)).join("") + `</div>` : "")
+    + (cant.length ? `<div class="svsub"><h3>Won't hold it</h3><span class="cap">One copy needs about ${fmtMem(need)} of GPU memory for one user. Bars show the most each server carries.</span></div>`
+      + `<div class="holds">` + cant.map(h=> line({sv: h.sv, top: null, mine: A.inScope.filter(c=> c.sv.id===h.sv.id)},
+            `<span class="hbar" role="img" aria-label="${Math.round(h.usable)} of ${Math.round(need)} GB"><i style="width:${Math.min(100, h.usable/need*100).toFixed(1)}%"></i><b></b></span>`
+          + `<span class="cap">${h.how} · ${fmtMem(h.usable)}${h.est ? ` · <span class="warnx">count to confirm</span>` : ""}</span>`)).join("") + `</div>` : "")
+    + `<p class="cap">Also sold with these GPUs, but HPE publishes no card count, so not sized: ${HPE_UNSIZED.map(u=> `${esc(u.name)} (${u.boards.map(esc).join(", ")})`).join("; ")}.</p>`;
+}
+function renderCfg(A, cfgs){
+  const el = $('svCfg'), c = cfgById(cfgs, S.cfg) || A.rec;
+  el.hidden = !c;
+  if(!c) return null;
+  const sv = c.sv, d = c.best, all = allUsers(), k = linkKind(c.x), siblings = cfgs.filter(o=> o.sv.id===sv.id);
+  const size = k==="bridge" ? c.x.link.bridge : c.max, groups = Math.ceil(c.max/size), used = d ? d.gpus : 0;
+  const wire = k!=="bridge" ? `<p class="rec-why">${wiringSentence(c)}</p>` : `<div class="wiring">` + Array.from({length: groups}, (_, gi)=>{
+      const from = gi*size, n = Math.min(size, c.max - from), on = Math.max(0, Math.min(n, used - from));
+      const title = groups>1 ? `Group ${String.fromCharCode(65 + gi)} · bays ${from + 1}–${from + n}` : `Bays 1–${c.max}`;
+      const link = k==="bridge" ? `${c.x.link.kit} ${c.x.link.bridge}-way bridge` : k==="nvswitch" ? "NVSwitch, every GPU to every GPU" : k==="fabric" ? "Infinity Fabric, one link per pair" : "PCIe Gen5 x16 per card";
+      return `<div class="wgroup${on ? " on" : ""}"><div class="wtop"><b>${title}</b><span class="cap">${link}</span></div>`
+        + `<div class="cards" style="--n:${Math.min(n, 8)}">${Array.from({length: n}, (_, i)=> `<span class="card${i < on ? " on" : ""}">${i < on ? esc(d.g.n.replace(" Blackwell", "")) : "open"}</span>`).join("")}</div></div>`
+        + (gi < groups - 1 ? `<div class="wlink"><b>PCIe Gen5</b><span>${PCIE_BW} GB/s each way, through the host. Only pipeline hand-offs cross here, never an all-reduce.</span></div>` : "");
+    }).join("") + `</div>`;
+  const opts = c.opts.slice().sort((a, b)=> a.gpus - b.gpus || b.reps - a.reps || a.L.pp - b.L.pp);
+  const table = opts.length ? `<div class="tbl"><table><thead><tr><th scope="col">Cards</th><th scope="col">Layout</th><th scope="col" class="num">Per user</th><th scope="col" class="num">First token</th>`
+      + `<th scope="col" class="num">Room for</th><th scope="col" class="num">Cache room</th><th scope="col" class="num">Per card</th></tr></thead><tbody>`
+      + opts.map(o=> `<tr class="${o===d ? "sel" : ""}${o.meets && !o.partial ? "" : " dim"}"><td>${o.gpus}</td>`
+          + `<th scope="row">${layoutLine(o)}${o===d ? ` <span class="pill sugg">${c.ok ? "Best for your goal" : "Closest"}</span>` : ""}${flagPills(o)}</th>`
+          + `<td class="num">${fmtTps(o.t.perUser)} tok/s${star(o)}</td><td class="num">${fmtTime(o.t.ttft).join(" ")}</td>`
+          + `<td class="num">${o.partial ? `<span class="warnx">${commas(o.served)} of ${commas(all)}</span>` : commas(o.room)}</td><td class="num">${commas(o.memRoom)}</td>`
+          + `<td class="num">${fmtMem(o.perGB)}</td></tr>`).join("")
+      + `</tbody></table></div>` : `<p class="note-warn">No layout on this server holds one copy: it needs about ${fmtMem(needGB())} of GPU memory, and the server carries ${fmtMem(c.usable)} at most.</p>`;
+  el.innerHTML = `<div class="svhead"><span class="eyebrow-s">Configuration</span></div>`
+    + `<h2 class="rec-name">${esc(sv.name)} · ${esc(c.x.board)}</h2>`
+    + `<span class="rec-spec">${esc(sv.form)} · ${sv.sockets} × ${esc(sv.cpu)} · up to ${c.max} × ${esc(c.x.board)}, ${wiringShort(c)}</span>`
+    + (siblings.length > 1 ? `<div class="gpuswitch" role="group" aria-label="GPUs in this server"><span class="sublbl">GPUs in this server</span>`
+      + siblings.map(o=> `<button type="button" class="chip" data-cfg="${esc(o.id)}" aria-pressed="${o.id===c.id}">${esc(o.x.board.replace(" Blackwell", ""))}`
+        + ` <span class="chipnote">${o.ok ? "meets goal" : o.fits ? "below goal" : "won't hold it"}</span></button>`).join("") + `</div>` : "")
+    + `<div class="svsub"><h3>How the cards are wired</h3></div>${wire}`
+    + `<div class="svsub"><h3>Layouts on this server</h3><span class="cap">Every layout the wiring allows, at each number of copies the server holds. You pick by what the customer is buying for.</span></div>${table}`
+    + `<p class="cap">Sources: <a href="${CATALOG.matrix.url}" target="_blank" rel="noopener">${esc(CATALOG.matrix.title)}, version ${esc(CATALOG.matrix.version)}</a> for which GPUs and bridges the server takes; <a href="${esc(sv.quickspecs.url)}" target="_blank" rel="noopener">this server's US QuickSpecs, version ${esc(sv.quickspecs.version)} (${esc(sv.quickspecs.date)})</a> for the card count and constraints. Confirm a build against the current QuickSpecs.</p>`;
+  return d || null;
+}
+/* ---------------- the Servers view with several models ----------------
+   Every model is sized together, as the GPU view does (fleetFor): each runs as copies of its own, the copies
+   are packed into servers of one kind with one kind of board, and spare GPUs run extra copies of the models
+   furthest from their goals. A configuration here is a server and a board; its answer is that fleet. */
+const FLEET_SRV_MEMO = new Map();
+function fleetConfigs(){
+  const key = JSON.stringify([S.models, S.srv, S.ovpct, S.cache, CAL, S.pipe, S.tpo]);
+  if(!FLEET_SRV_MEMO.has(key)){
+    if(FLEET_SRV_MEMO.size >= 20) FLEET_SRV_MEMO.clear();
+    FLEET_SRV_MEMO.set(key, CATALOG.servers.flatMap(sv=> sv.gpus.map(x=>{
+      const b = boardIn(sv, x); if(!b) return null;
+      const f = fleetFor(b, S.models), max = nodeMax(b);
+      const nr = f.fits && f.models.some(m=> notRecommended(m.d));
+      return {sv, x, b, f, max, id: `${sv.id}|${x.board}`, fits: f.fits, ok: f.fits && f.meets, nr,
+              k: f.servers.length, memGB: f.memGB, usable: max*b.cap*USABLE};
+    })).filter(Boolean));
+  }
+  return FLEET_SRV_MEMO.get(key);
+}
+const fleetRack = c => (c.sv.u ?? 99)*c.k;
+const fleetWithin = c => c.f.models.filter(withinGoal).length;
+/* The GPU view's order (suggestFleet): not split over PCIe, least GPU memory, fewer servers, fewer GPUs per copy,
+   faster; then the fewest rack units. bestFleet adds one rule the GPU view never needs, since it puts each board
+   in one server: on the same board, fewer servers win even with more cards (one 4-card DL380a Gen12 over
+   2 × DL380 Gen12 with 3 cards between them). */
+const fleetOrder = (a, c)=> (+a.nr - +c.nr) || a.memGB - c.memGB || a.k - c.k
+  || a.f.models.reduce((s, m)=> s + m.d.tp, 0) - c.f.models.reduce((s, m)=> s + m.d.tp, 0)
+  || Math.min(...c.f.models.map(m=> m.d.t.perUser)) - Math.min(...a.f.models.map(m=> m.d.t.perUser)) || fleetRack(a) - fleetRack(c);
+const fleetClose = (a, c)=> (+a.nr - +c.nr) || fleetWithin(c) - fleetWithin(a) || a.memGB - c.memGB || fleetRack(a) - fleetRack(c);
+function bestFleet(ok){
+  const top = ok.slice().sort(fleetOrder)[0];
+  if(!top) return null;
+  const fewer = ok.filter(c=> c.f.g.n===top.f.g.n && c.k < top.k && !c.nr).sort(fleetOrder)[0];
+  if(!fewer) return top;
+  /* then whatever needs no more servers and no more GPU memory than that, in the usual order */
+  return ok.filter(c=> c.k <= fewer.k && c.memGB <= fewer.memGB).sort(fleetOrder)[0];
+}
+function fleetAnswer(cfgs){
+  const inScope = cfgs.filter(c=> S.scope.has(c.sv.id)), fits = inScope.filter(c=> c.fits), ok = fits.filter(c=> c.ok);
+  const rec = bestFleet(ok) || fits.slice().sort(fleetClose)[0] || null;
+  return {inScope, fits, ok, rec};
+}
+/* which models run where on one server, in words */
+const onServer = (f, s) => f.models.map((m, i)=> [m, s.slots.filter(x=> x===i).length]).filter(([, n])=> n);
+/* identical servers in a fleet, together: [{s, from, to}] */
+function serverGroups(f){
+  const out = [];
+  f.servers.forEach((s, j)=>{
+    const last = out[out.length - 1];
+    if(last && last.s.n===s.n && JSON.stringify(last.s.slots)===JSON.stringify(s.slots)) last.to = j;
+    else out.push({s, from: j, to: j});
+  });
+  return out;
+}
+function fleetCard(c, eyebrow, cmp, back = ""){
+  const f = c.f, sv = c.sv, k = c.k, all = S.models.length;
+  const groups = serverGroups(f), many = k > 1;
+  const builds = groups.map(({s, from, to})=>{
+    const here = onServer(f, s), free = s.n - here.reduce((n, [, m])=> n + m, 0);
+    const lbl = !many ? "" : from===to ? `Server ${from + 1} of ${k}` : `Servers ${from + 1} to ${to + 1} of ${k}, each`;
+    const models = ["Models", here.map(([m, n])=> `${esc(specName(m.spec))} on ${plural(n, "GPU")}`).join(" · "), free ? `${plural(free, "GPU")} free` : ""];
+    return (lbl ? `<h4 class="srvh">${lbl}</h4>` : "")
+      + bomRows(c, f.g, s.n, here.map(([m, n])=> [m.d, n]), "", [models]);
+  }).join("");
+  const rows = f.models.map(m=>{
+    const d = m.d, t = d.t, st = withinGoal(m) ? `<span class="okx">within goal</span>`
+      : d.partial ? `<span class="warnx">${commas(d.served)} of ${commas(m.users)} within goal</span>` : `<span class="warnx">below goal</span>`;
+    return `<tr><th scope="row">${esc(specName(m.spec))}${notRecommended(d) ? ` <span class="pill bad">split over PCIe</span>` : ""}${d.pp>1 ? ` <span class="pill neutral">pipeline modeled</span>` : ""}`
+      + `<br><span class="cap">${layoutText(d)} · ${plural(m.users, "user")}</span></th>`
+      + `<td class="num">${d.gpus}</td><td class="num">${t ? `${fmtTps(t.perUser)} tok/s${star(d)}` : "—"}</td><td class="num ft">${t ? fmtTime(t.ttft).join(" ") : "—"}</td><td>${st}</td></tr>`;
+  }).join("");
+  const extrap = f.g.bench ? "" : `<p class="cap">Speeds are extrapolated: the ${esc(f.g.n.replace(" Blackwell", ""))} has no published benchmark here <span class="i" data-tip="extrap" tabindex="0">i</span>. Load-test before quoting them.</p>`;
+  return `<div class="rec-head">${eyebrow}<h2 class="rec-name">${many ? `${k} × ` : ""}${hostLink(HPE_HOSTS.find(h=> h.id===sv.id))}</h2>`
+    + `<p class="rec-spec">${all} models, ${plural(S.models.reduce((n, x)=> n + specUsers(x), 0), "user")} in all · ${f.gpus} × ${esc(f.g.n)}, ${boxTotal(f.memGB)} of GPU memory${many ? ` · ${fleetRack(c)}U` : ""}</p></div>`
+    + (cmp ? `<p class="rec-cmp">${cmp}</p>` : "")
+    + `<div class="rec-body">`
+    + `<section class="rec-col"><h3 class="colh">Build</h3>${builds}`
+    + ((c.x.constraints || []).length || (sv.notes || []).length ? `<div class="bom-notes"><span class="sublbl">Before you quote</span><ul class="svnotes">${[...(c.x.constraints || []), ...(sv.notes || [])].map(t=> `<li>${esc(t)}</li>`).join("")}</ul></div>` : "")
+    + `</section>`
+    + `<section class="rec-col"><h3 class="colh">Performance</h3>`
+    + `<div class="tbl"><table class="fleet-t"><thead><tr><th scope="col">Model</th><th scope="col" class="num">GPUs</th><th scope="col" class="num">Per user</th><th scope="col" class="num ft">First token</th><th scope="col">Goal</th></tr></thead><tbody>${rows}</tbody></table></div>`
+    + extrap
+    + `</section></div>`
+    + `<div class="rec-acts">${back}<button type="button" class="tool-btn" data-copylink>Copy link</button></div>`;
+}
+function renderRecFleet(A, cfgs){
+  const el = $('svRec'), pick = cfgById(cfgs, S.cfg), n = S.models.length;
+  if(pick && (!A.rec || pick.id!==A.rec.id)){
+    const back = `<button type="button" class="linkbtn" data-cfg="">Back to the recommendation</button>`, r = A.rec;
+    if(!pick.fits){ el.innerHTML = `<span class="eyebrow-s warn">Your pick · won't hold every model</span><h2 class="rec-name">${hostLink(HPE_HOSTS.find(h=> h.id===pick.sv.id))}</h2>`
+      + `<p class="rec-why">With ${esc(pick.x.board)}, at least one of the models needs more than one ${pick.sv.short} holds. Each model must fit on one server.</p><div class="rec-acts">${back}</div>`; return; }
+    const eyebrow = pick.ok ? `<span class="eyebrow-s">Your pick · meets every model's goal</span>` : `<span class="eyebrow-s warn">Your pick · ${fleetWithin(pick)} of ${n} models within their goals</span>`;
+    const cmp = !r ? "" : `Against the recommended ${r.k > 1 ? `${r.k} × ` : ""}${esc(r.sv.short)} (${r.f.gpus} × ${esc(r.f.g.n)}): ${boxTotal(pick.memGB)} vs ${boxTotal(r.memGB)} of GPU memory, ${fleetRack(pick)}U vs ${fleetRack(r)}U, ${fleetWithin(pick)} vs ${fleetWithin(r)} models within their goals.`;
+    el.innerHTML = fleetCard(pick, eyebrow, cmp, back); return;
+  }
+  if(!A.rec){
+    el.innerHTML = `<span class="eyebrow-s warn">${S.scope.size ? "No server in scope holds every model" : "No servers in scope"}</span>`
+      + `<h2 class="rec-name">${S.scope.size ? "Too big for every server in scope" : "Pick at least one server"}</h2>`
+      + (S.scope.size ? `<p class="rec-why">Each model must fit on one server, and the servers hold one kind of GPU. Add a larger server to the scope, or lower a model's precision or its prompt and reply lengths.</p>` : "");
+    return;
+  }
+  const c = A.rec;
+  const eyebrow = c.ok ? `<span class="eyebrow-s">Recommended · least GPU memory that meets every model's goal</span>`
+                       : `<span class="eyebrow-s warn">Closest · ${fleetWithin(c)} of ${n} models within their goals</span>`;
+  el.innerHTML = fleetCard(c, eyebrow, "");
+}
+function renderAllFleet(A, cfgs){
+  const n = S.models.length, selSv = (cfgById(cfgs, S.cfg) || A.rec || {sv: {}}).sv.id;
+  const servers = CATALOG.servers.filter(sv=> S.scope.has(sv.id)).map(sv=>{
+    const mine = A.inScope.filter(c=> c.sv.id===sv.id), fits = mine.filter(c=> c.fits), ok = fits.filter(c=> c.ok);
+    return {sv, mine, top: bestFleet(ok) || fits.slice().sort(fleetClose)[0] || null};
+  });
+  const hold = servers.filter(x=> x.top).sort((x, y)=> (+y.top.ok - +x.top.ok) || (x.top.ok ? fleetOrder(x.top, y.top) : fleetClose(x.top, y.top)));
+  const cant = servers.filter(x=> !x.top);
+  const out = CATALOG.servers.length - S.scope.size, meet = hold.filter(x=> x.top.ok).length;
+  $('svAll').innerHTML = `<div class="svhead"><h2>Every server in scope</h2><span class="cap">${meet} meet${meet===1 ? "s" : ""} every model's goal`
+      + `${hold.length - meet ? ` · ${hold.length - meet} hold${hold.length - meet===1 ? "s" : ""} them below it` : ""}${cant.length ? ` · ${cant.length} can't hold them` : ""}${out ? ` · ${out} out of scope` : ""}. Click a server to see it in place of the recommendation.</span></div>`
+    + (hold.length ? `<div class="tbl"><table><thead><tr><th scope="col">Server</th><th scope="col">Best configuration</th><th scope="col" class="num">Within goal</th><th scope="col" class="num">Rack</th><th scope="col" class="num">GPU memory</th></tr></thead><tbody>`
+      + hold.map(x=>{ const c = x.top;
+          const tag = A.rec && c.id===A.rec.id ? ` <span class="pill sugg">Recommended</span>` : "";
+          return `<tr class="${x.sv.id===selSv ? "sel" : ""}${c.ok ? "" : " dim"}"><th scope="row"><button type="button" class="rowbtn" data-cfg="${esc(c.id)}">${esc(x.sv.short)}</button>${tag}<br><span class="cap">${esc(x.sv.form)}</span></th>`
+            + `<td>${c.k > 1 ? `${c.k} servers · ` : ""}${c.f.gpus} × ${esc(c.f.g.n)}${c.nr ? ` <span class="pill bad">split over PCIe</span>` : ""}${star(c.f.models[0].d)}</td>`
+            + `<td class="num">${c.ok ? "" : `<span class="warnx">`}${fleetWithin(c)} of ${n}${c.ok ? "" : "</span>"}</td><td class="num">${fleetRack(c)}U</td><td class="num">${boxTotal(c.memGB)}</td></tr>`; }).join("")
+      + `</tbody></table></div><p class="cap">* Speed extrapolated: no published benchmark for this board; it applies the shares fitted on other boards' runs.</p>` : "")
+    + (cant.length ? `<div class="svsub"><h3>Won't hold them</h3><span class="cap">With every GPU it takes, at least one model needs more than one of these servers holds. Each model must fit on one server.</span></div>`
+      + `<p class="cap">${cant.map(x=> esc(x.sv.short)).join(" · ")}</p>` : "");
+}
+/* the whole Servers view, and Show the math for the configuration it details */
+function renderServerView(){
+  if(S.models.length > 1) return renderServerFleet();
+  const cfgs = allConfigs(), A = serverAnswer(cfgs);
+  if(S.cfg && !cfgById(cfgs, S.cfg)) S.cfg = null;
+  renderScope(A); renderRec(A, cfgs); renderAll(A, cfgs);
+  const d = renderCfg(A, cfgs);
+  $('viewhint').textContent = "";
+  if(d){
+    S.tp = d.tp; S.pp = d.pp;
+    $('mathState').textContent = `${(cfgById(cfgs, S.cfg) || A.rec).sv.short} · ${d.gpus} × ${d.g.n}: speed · model architecture · memory breakdown · how it's calculated`;
+    renderBreakdown(d.r, d.tp, d.reps, d);
+    renderChunkOptions(d);
+    renderThroughput(d);
+  }
+}
+function renderServerFleet(){
+  saveSpec();
+  const cfgs = fleetConfigs(), A = fleetAnswer(cfgs);
+  if(S.cfg && !cfgById(cfgs, S.cfg)) S.cfg = null;
+  renderScope(A); renderRecFleet(A, cfgs); renderAllFleet(A, cfgs);
+  $('svCfg').hidden = true;
+  $('viewhint').textContent = `Sizing all ${S.models.length} models together, each on GPUs of its own.`;
+  const c = cfgById(cfgs, S.cfg) || A.rec, d = c && c.fits ? c.f.models[S.edit].d : null;
+  if(d && d.fits){
+    S.tp = d.tp; S.pp = d.pp;
+    $('mathState').textContent = `${specName(S.models[S.edit])} on ${c.sv.short} · ${d.gpus} × ${d.g.n}: speed · model architecture · memory breakdown · how it's calculated`;
+    renderBreakdown(d.r, d.tp, d.reps, d);
+    renderChunkOptions(d);
+    renderThroughput(d);
+  }
+}
+/* render() for the Servers view: the view, then the parts of the page both views share */
+function renderServers(){
+  renderServerView();
+  renderAdvState(); updateGoalHint(); renderTraffic(); syncMix();
+  syncHash(); labelTips();
+}
+/* which answer shows: the Servers view, or the GPU view's panels */
+function showView(){
+  const srv = S.view==="srv";
+  $('serverView').hidden = !srv;
+  $('gpuAnswer').hidden = srv; $('gpuBoards').hidden = srv;
+  if(srv){ $('fleetPanel').hidden = true; $('srvPanel').hidden = true; }
+  document.querySelectorAll('#viewbar [data-view]').forEach(b=> b.setAttribute('aria-pressed', b.dataset.view===S.view));
+}
+/* the Servers view's clicks: the view switch, scope chips, a configuration to detail (wired at init) */
+function wireServerView(){
+$('viewbar').addEventListener('click', e=>{
+  const b = e.target.closest('[data-view]'); if(!b || b.dataset.view===S.view) return;
+  S.view = b.dataset.view; render();
+});
+$('serverView').addEventListener('click', e=>{
+  const t = e.target.closest('[data-scope],[data-scope-all],[data-scope-none],[data-cfg],[data-copylink]');
+  if(!t) return;
+  if(t.hasAttribute('data-copylink')){ $('copyLinkBtn').click(); return; }
+  if(t.hasAttribute('data-scope-all')) S.scope = new Set(CATALOG.servers.map(sv=> sv.id));
+  else if(t.hasAttribute('data-scope-none')) S.scope = new Set();
+  else if(t.dataset.scope){ const id = t.dataset.scope; S.scope.has(id) ? S.scope.delete(id) : S.scope.add(id); }
+  else if(t.hasAttribute('data-cfg')){
+    const inList = !!t.closest('#svAll');
+    S.cfg = t.dataset.cfg || null; render();
+    if(inList){ const r = $('svRec').getBoundingClientRect(); if(r.top < 0 || r.top > innerHeight*0.6) $('svRec').scrollIntoView({behavior: 'smooth', block: 'start'}); }
+    return;
+  }
+  render();
+});
 }
 
 /* ---------------- the server around the GPUs ----------------
@@ -1641,19 +3112,24 @@ function capacityFor(d){
    conversation with the customer.
    CPU cores follow the AI worker nodes HPE builds for HPE Private Cloud AI (QuickSpecs, July 2026), an
    HPE and NVIDIA inference platform on DL380a Gen12 servers: 2 × 32-core CPUs for 2 GPUs and 2 × 64-core
-   for 4 or 8, so 32 cores per GPU in a 2- or 4-GPU server and 16 per GPU in an 8-GPU one (HPE_CORES).
+   for 4 or 8, so 32 cores per GPU in a 2- or 4-GPU server and 16 per GPU in an 8-GPU one. The L4 and the
+   RTX PRO 4500 are smaller cards that the small 1U and 2U servers take, so they get 16 per GPU at any count
+   (HPE_CORES).
    Storage is the usable capacity this model needs, since drive sizes and RAID are the vendor's choice
    (NVIDIA's own 1 TB drive per socket is in the tooltip only): two copies of its weights, the version
    serving and the next one downloading, plus DISK_ALLOW for container images, compile caches and
    logs, kept under DISK_FILL full, beside a separate boot volume. KV cache offloaded to disk
    (NVIDIA Dynamo's KV block manager: a CPU tier of 100 GB or more and larger than the GPUs' KV cache,
    and a disk tier at least as large) is a tooltip note (srvDiskTip), since few single servers do it.
-   System memory is NVIDIA's recommended minimum alone: how it is made up from modules is the vendor's.
+   System memory is NVIDIA's recommended minimum alone; in the Servers view it is made up from the server's own
+   modules (memFor), filling as many channels as that minimum allows rather than every channel.
    An 8-GPU system (HGX, or AMD's MI355X platform) comes whole from its manufacturer, so its server is
    left to its spec sheet.
    Amounts are in GB as sold (10⁹ bytes), whatever unit is picked at the top. */
 const GUIDE = {sockets:2, ghz:2.0, memX:2};
-const HPE_CORES = n => (n >= 8 ? 16 : 32) * n;   // physical cores for an n-GPU server, as HPE Private Cloud AI builds it
+const LIGHT_GPUS = ["L4", "RTX PRO 4500 Blackwell"];   // 16 cores per GPU at any count
+const coresPerGpu = (n, g) => g && LIGHT_GPUS.includes(g.n) ? 16 : n >= 8 ? 16 : 32;
+const HPE_CORES = (n, g) => coresPerGpu(n, g) * n;   // physical cores for an n-GPU server of board g
 const DISK_ALLOW = 100, DISK_FILL = 0.8;          // GB for images, caches and logs; the most of the storage to fill
 const KV_TIER_MIN = 100;                          // GB: Dynamo's smallest CPU tier, which the disk tier is at least
 const GUIDE_URL = "https://docs.nvidia.com/certification-programs/latest/nvidia-certified-configuration-guide.html";
@@ -1668,7 +3144,7 @@ function serverOf(g, n, parts){
   /* the engine gives each GPU's spare usable memory to its KV cache: what's left after the weights,
      activations and overhead (the overhead on the cache itself goes with the cache) */
   const kvPoolGB = parts.reduce((s, [{r}, k])=> s + k*(g.cap*USABLE - (r.perGPU - r.kv_pg*(1 + S.ovpct/100))/GB), 0);
-  return {g, n, perSocket: n/GUIDE.sockets, cores: HPE_CORES(n), gpuGB, ram,
+  return {g, n, perSocket: n/GUIDE.sockets, cores: HPE_CORES(n, g), gpuGB, ram,
           wGB, diskGB: (2*wGB + DISK_ALLOW)/DISK_FILL,
           kvOffGB: Math.max(KV_TIER_MIN, kvPoolGB), pcieSwitch: n/GUIDE.sockets > 2};
 }
@@ -1713,7 +3189,7 @@ function serverRows(s){
    For one model that is exactly the layout deploymentFor gives (validation/fleet.mjs checks it). */
 const FLEET_MEMO = new Map();   // planFor's results, by the model's settings, the page's and the board
 function planFor(g, spec){      // run under withSpec(spec)
-  const key = JSON.stringify([{...spec, tp: null}, S.srv, S.ovpct, S.cache, CAL, g.n]);   // the split on screen doesn't change the search
+  const key = JSON.stringify([{...spec, tp: null}, S.srv, S.ovpct, S.cache, CAL, g.n, g.host && g.host.id, nodeMax(g), g.split, g.link]);   // the split on screen doesn't change the search
   if(!FLEET_MEMO.has(key)){
     if(FLEET_MEMO.size >= 2000) FLEET_MEMO.clear();
     const alone = deploymentFor(g), best = (alone.options || []).slice().sort((a, b)=> a.need - b.need || a.tp - b.tp)[0];
@@ -1774,7 +3250,7 @@ function suggestFleet(fleets){
     return fleets.find(f=> f.models[0].d===s) || null;
   }
   const sum = (f, x)=> f.models.reduce((s, m)=> s + x(m), 0), slowest = f => Math.min(...f.models.map(m=> m.d.t.perUser));
-  const ok = fleets.filter(f=> f.fits && !f.models.some(m=> notRecommended(m.d)));
+  let ok = fleets.filter(f=> f.fits && !f.models.some(m=> notRecommended(m.d)));
   const whole = ok.filter(f=> f.meets).sort((a, b)=> a.memGB - b.memGB || a.servers.length - b.servers.length
     || sum(a, m=> m.d.tp) - sum(b, m=> m.d.tp) || slowest(b) - slowest(a));
   if(whole.length) return whole[0];
@@ -1837,7 +3313,9 @@ const statCell = (tip, label, n, unit, sub, state) =>
   + `<div class="n">${n}${unit ? ` <small>${unit}</small>` : ""}</div><div class="sub">${sub}</div></div>`;
 
 function render(){
-  saveSpec(); renderTabs();
+  saveSpec(); renderTabs(); showView();
+  if(S.view==="srv") return renderServers();
+  $('viewhint').textContent = "";
   if(S.models.length > 1) return renderFleet();
   $('fleetPanel').hidden = true; showGauge(true); $('mathState').textContent = MATH_STATE;
   const deps = new Map(boardsInPlay().map(g=>[g.n, deploymentFor(g)]));
@@ -1847,6 +3325,7 @@ function render(){
   const suggested = suggestDeployment(deps);
   const active = picked ? deps.get(picked.n) : suggested;     // null only when nothing fits
   const tp = S.tp = active ? active.tp : (S.tpo==="auto" ? 8 : S.tpo);
+  S.pp = active ? active.pp : 1;
   // memory, the bar and the breakdown describe one copy; with nothing that fits, the model alone
   const r = active ? active.r : compute(tp, 1), m = r.m, tot = r.total, totGB = tot/GB, perGB = r.perGPU/GB;
   const reps = active ? active.reps : 1;
@@ -1899,11 +3378,12 @@ function renderBreakdown(r, tp, reps, active){
 }
 /* the parts of one copy's memory, each with its color, the bar segment that shows it, and how it's computed */
 function memoryParts(r, tp){
-  const m = r.m;
+  const m = r.m, pp = r.pp || 1;
+  const split = pp>1 ? `÷ ${pp} stages ÷ TP ${r.tp}` : `÷ TP ${tp}`;   // how one GPU's share is reached
   return [
     {k:"Model weights", v:r.weights, c:"var(--w)", bar:"bw", tip:"weights",
      f:`${fmtB(m.p)} params × ${+S.wq.toFixed(3)} B/param (${S.wqLbl==="NATIVE" ? m.nat.f+", as released" : S.wqLbl})`
-       + (tp>1?`<br>÷ TP ${tp} = <b>${fmtMem(r.w_pg/GB)}/GPU</b>`:``)},
+       + (tp>1?`<br>${split} = <b>${fmtMem(r.w_pg/GB)}/GPU</b>`:``)},
     {k:"KV cache", v:r.kv, c:"var(--kv)", bar:"bkv", tip:"kv", f:kvFormula(r),
      // split across more GPUs than a layer has KV heads, each GPU keeps that layer's cache: say how much that adds
      extra: r.cache.dp ? `data-parallel attention: each GPU holds its own users' cache`
@@ -1911,9 +3391,9 @@ function memoryParts(r, tp){
     {k:"Activations", v:r.act, c:"var(--act)", bar:"bact", tip:"act",
      f:`${commas(r.T)} tokens per step × (${commas(m.h)}h × 4 + ${commas(r.ffn)}ffn × 2) × 2 B = ${fmtMem(r.actBuf/GB)}`
        + `<br>+ ${commas(r.users)} × ${commas(r.vocab)} vocab × 4 B fp32 logits = ${fmtMem(r.actLogit/GB)}`
-       + (tp>1?`<br>÷ TP ${tp} = <b>${fmtMem(r.act_pg/GB)}/GPU</b>`:``)},
-    {k:"Tensor-parallel overhead", v:r.tpov, c:"var(--tp)", bar:"btp", tponly:true, tip:"tpov",
-     f:`${tp-1} extra CUDA context${tp-1>1?"s":""} + NCCL / comm buffers<br>${fmtMem(r.tpcomm_pg/GB)}/GPU comm × ${tp} GPUs`},
+       + (tp>1?`<br>÷ TP ${r.tp} = <b>${fmtMem(r.act_pg/GB)}/GPU</b>${pp>1 ? ` (a stage's pass holds a ${pp === 2 ? "half" : `${pp}th`} of the batch)` : ""}`:``)},
+    {k: pp>1 ? "Parallel overhead" : "Tensor-parallel overhead", v:r.tpov, c:"var(--tp)", bar:"btp", tponly:true, tip:"tpov",
+     f:`${tp-1} extra CUDA context${tp-1>1?"s":""} + NCCL / comm buffers<br>${fmtMem(r.tpcomm_pg/GB)}/GPU comm${pp>1 ? ` + ${fmtMem(r.ppcomm_pg/GB)}/GPU stage hand-off` : ""} × ${tp} GPUs`},
     {k:"Overhead", v:r.overhead, c:"var(--ov)", bar:"bov", tip:"overhead",
      f:`${fmtMem(1)} CUDA ctx + ${S.ovpct}% fragmentation<br>framework & allocator`},
   ];
@@ -1943,9 +3423,11 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
   if(fits){
     // what the suggestion is chosen for, beside it
     lbl = picked ? (notRecommended(active) ? "Your pick · split over PCIe" : "Your pick")
+        : notRecommended(active) ? `Best the ${g.host ? g.host.short : g.n} allows · split over PCIe`
         : active.partial ? "Closest single node · serves the most users"
         : `Suggested deployment · least GPU memory that ${hasGoal ? "meets your goal" : "fits"}`;
     main = deployName(active);
+    why += hostSentence(active);
     // what the workload needs, apart from what the server it goes in holds
     if(!systemOf(g) && popOf(g) && active.need < active.gpus)
       facts = `Workload needs <b>${active.need} GPU${active.need===1 ? "" : "s"}</b> · `
@@ -2074,11 +3556,11 @@ function renderServer(d){
   const s = serverFor(d), g = d.g;
   TIPS.srvDisk = srvDiskTip(s.fixed ? null : capParts(s.kvOffGB).join(" "));
   if(s.fixed){
-    cap.innerHTML = `Around <b>${deployName(d)}</b>.`;
-    body.innerHTML = `<div class="empty">The ${g.n} is a whole ${s.n}-GPU system: its CPUs, memory and storage come from the manufacturer's spec sheet.</div>`;
+    cap.innerHTML = `Around <b>${deployName(d)}</b>${g.host ? ` in an ${hostLink(g.host)}` : ""}.`;
+    body.innerHTML = `<div class="empty">The ${g.n} is a whole ${s.n}-GPU system: its CPUs, memory and storage come from ${g.host ? `the ${hostLink(g.host)} spec sheet (${g.host.spec})` : "the manufacturer's spec sheet"}.</div>`;
     return s;
   }
-  cap.innerHTML = `Around <b>${deployName(d)}</b>, by ${guideLink}, with CPU cores as in ${pcaiLink}.`
+  cap.innerHTML = `Around <b>${deployName(d)}</b>${g.host ? ` in an ${hostLink(g.host)}` : ""}, by ${guideLink}, with CPU cores as in ${pcaiLink}.`
     + (g.fab ? ` They are written for NVIDIA GPUs, so for the ${g.n} they are a starting point.` : "");
   body.innerHTML = `<div class="statstrip srvgrid">${serverRows(s).map(r=> statCell(r.tip, r.k, r.n, r.unit, r.sub)).join("")}</div>`
     + `<div class="hint">A starting point for a server vendor, not a certification: see ${certLink}.</div>`;
@@ -2102,7 +3584,7 @@ function renderCards(deps, active, suggested, picked){
     const d = deps.get(b.n), slow = notRecommended(d);
     const systems = systemsIn(d);          // counted in whole systems, the layout then says how they're used
     let status = "";                        // a pill only when something is wrong; a good fit is quiet
-    if(!d.fits) status = `<span class="pill bad">${S.tpo==="auto" ? "Won't fit on a node" : `Not at TP ${d.tp}`}</span>`;
+    if(!d.fits) status = `<span class="pill bad">${S.tpo==="auto" ? "Won't fit on a node" : `Not on ${d.tp} GPUs`}</span>`;
     else if(d.partial) status = `<span class="pill warn">${d.meets ? "Serves" : "Holds"} ${commas(d.served)} of ${commas(all)}</span>`;
     else if(!d.meets) status = `<span class="pill warn">Below goal</span>`;
     const layout = d.fits ? layoutText(d) : "—";
@@ -2121,10 +3603,10 @@ function renderCards(deps, active, suggested, picked){
                               : `${On} ${mr.verb} room for only ${commas(mr.holds)} of your ${commas(all)} users after the weights. Splitting the model across ${d.gpus} GPUs frees enough for everyone, and ${d.gpus===2 ? "both" : `all ${d.gpus}`} serve every user together.`;
     }
     const why = d.tooWide ? (b.split && d.tp > b.split && d.tp <= nodeMax(b)
-          ? `A copy split across ${d.tp} GPUs doesn't fit here: an NVLink bridge joins at most ${b.split} ${b.n} cards, so one copy spans at most ${b.split}. ${nodeMax(b)} cards run ${nodeMax(b)/b.split} copies instead.`
+          ? `A copy split across ${d.tp} GPUs doesn't fit here: ${b.bridge ? `in the ${b.host.short} the ${b.bridge}` : "an NVLink bridge"} joins at most ${b.split} ${b.n} cards, so one copy spans at most ${b.split}. ${nodeMax(b)} cards run ${nodeMax(b)/b.split} copies instead${S.pipe ? "" : ", unless Pipeline across bridge groups is on"}.`
           : `A copy split across ${d.tp} GPUs doesn't fit here: this board's servers hold up to ${nodeMax(b)}.`)
         : !d.fits ? `The model needs ${fmtMem(d.perGB*d.tp)}, but ${d.tp} GPU${d.tp===1 ? "" : "s"} can use only ${fmtMem(b.cap*USABLE*d.tp)} (90% of capacity).${
-            S.tpo!=="auto" ? "" : b.split ? ` Its servers hold up to ${nodeMax(b)} cards, but an NVLink bridge joins at most ${b.split}, so one copy of a model spans at most ${b.split} of them.`
+            S.tpo!=="auto" ? "" : b.split && !S.pipe ? ` Its servers hold up to ${nodeMax(b)} cards, but an NVLink bridge joins at most ${b.split}, so one copy of a model spans at most ${b.split} of them. Turn on <b>Pipeline across bridge groups</b> in Advanced settings to let a copy span all ${nodeMax(b)}.`
             : nodeMax(b) < NODE ? ` Its servers hold up to ${nodeMax(b)} cards${S.srv ? " by NVIDIA's guidance" : ""}, and one copy of a model can be split across at most ${Math.max(...TP_OPTIONS.filter(t=> t<=nodeMax(b)))} of them.` : ""}`
         : d.partial ? `This is the most one server can ${d.meets ? "serve" : "hold"}${hasGoal && d.meets ? " at your speed goal" : hasGoal ? ", and it is below your speed goal" : ""}.`
         : forSpeed(d) ? `Fits on ${d.memOnly.gpus} GPU${d.memOnly.gpus===1 ? "" : "s"}, but ${
@@ -2136,7 +3618,8 @@ function renderCards(deps, active, suggested, picked){
                : `${d.reps} copies on ${d.tp} GPUs each meet`} your speed goal.`
         : rounded ? `Needs ${d.need} GPU${d.need===1 ? "" : "s"}. ${S.srv ? "By NVIDIA's server guidance a server holds" : "Servers take"} ${popText(b)}, so it rounds up to ${d.gpus}.`
         : memWhy;
-    const slowWhy = slow ? ` Not recommended: one copy is split across cards with no ${fabric(b)}, so they coordinate over PCIe after every layer; the speed shown reflects that.` : "";
+    const slowWhy = slow ? ` Not recommended: one copy is split across cards with no ${fabric(b)}, so they coordinate over PCIe after every layer; the speed shown reflects that.`
+                  : d.fits && d.pp>1 ? ` Each copy spans the ${d.pp} bridged groups${b.host ? ` of the ${b.host.short}` : ""}${b.bridge ? ` (${d.pp} × ${b.bridge})` : ""}: tensor-parallel across the ${d.tpw} cards of a group, and ${d.pp} pipeline stages handing activations between the groups over PCIe (<code>--tensor-parallel-size ${d.tpw} --pipeline-parallel-size ${d.pp}</code>). That holds a model, or users, that one group can't, at about one group's speed per user; ${d.pp} copies of ${d.tpw} would serve more users when they fit.` : "";
     const isActive = !!active && active.g.n===b.n, isPicked = !!picked && picked.n===b.n, isSugg = !!suggested && suggested.g.n===b.n;
     const off = !pickable(d), open = isActive || OPEN_WHY.has(b.n), hasWhy = !!(why || slowWhy);
     const cls = `brow${slow ? " nr" : ""}${isActive ? " sel" : ""}${off ? " off" : ""}`;
@@ -2144,7 +3627,7 @@ function renderCards(deps, active, suggested, picked){
       <td class="board"><div class="gname">${b.n}${isSugg ? `<span class="pill sugg">${d.partial ? "Closest" : "Suggested"}</span>` : ""}</div>
         <div class="gcap">${boxMem(b)} ${b.mem}${systemOf(b) ? ` · ${systemOf(b)}-GPU systems only`
           : S.srv ? ` · ${popText(b)} per server${b.split ? `, NVLink across ${b.split}` : ""}`
-          : b.split ? ` · up to ${nodeMax(b)} per server, NVLink across ${b.split}` : b.max ? ` · up to ${b.max} per server` : ""}${b.bench ? "" : ` · <span class="tipl" data-tip="extrap">speed extrapolated</span>`}</div></td>
+          : b.split ? ` · up to ${nodeMax(b)} per server, NVLink across ${b.split}` : b.max ? ` · up to ${b.max} per server` : ""}${b.host ? ` · HPE ${b.host.short}${b.est ? ` <span class="tipl" title="${esc(b.est)}">(count to confirm)</span>` : ""}` : ""}${b.bench ? "" : ` · <span class="tipl" data-tip="extrap">speed extrapolated</span>`}</div></td>
       <td class="link col-opt tipl" data-tip="${linkTip}">${linkTxt}</td>
       <td class="num"><b>${!d.fits ? "—" : systems || d.gpus}</b> <small>× ${systems ? `${Math.max(...b.pop)}-GPU system${systems===1 ? "" : "s"}` : "GPU"}</small></td>
       <td class="layout">${status || layout}</td>
@@ -2165,7 +3648,7 @@ function renderChunkOptions(d){
   document.querySelectorAll('#chunk button').forEach(b=>{
     const num = b.querySelector('.opt-num');
     if(!d){ num.textContent = "—"; return; }
-    const t = throughput(d.g, d.tp, +b.dataset.v, d.upr);
+    const t = throughput(d.g, d.tpw, +b.dataset.v, d.upr, d.pp);
     num.textContent = `${fmtTime(t.ttft).join(" ")} · ${fmtTime(t.pause).join(" ")}`;
   });
   const fresh = Math.max(...groups().map(w=> promptParts(w).fresh));   // the most new tokens any workload's prompt brings
@@ -2197,7 +3680,7 @@ function renderThroughput(d){
   }
   const t = d.t, board = d.g;
   const [bnCls, bnTxt] = BOTTLENECK[t.bottleneck];
-  cap.innerHTML = `${d.gpus} × <b>${board.n}</b>${d.gpus>1 ? ` (${layoutText(d)})` : ""} · ${commas(board.bw)} GB/s ${board.mem} · ${board.lname}${board.link?"":" only"} · ${board.fp4?"native FP4 + FP8":board.fp8?"native FP8, no FP4":"no FP8 or FP4 cores"}`
+  cap.innerHTML = `${d.gpus} × <b>${board.n}</b>${board.host ? ` in an HPE ${board.host.short}` : ""}${d.gpus>1 ? ` (${layoutText(d)})` : ""} · ${commas(board.bw)} GB/s ${board.mem} · ${board.lname}${board.link?"":" only"} · ${board.fp4?"native FP4 + FP8":board.fp8?"native FP8, no FP4":"no FP8 or FP4 cores"}`
     + ` <span class="pill ${bnCls}" data-tip="bneck" tabindex="0">${bnTxt}</span>`;
 
   const [stN, stU] = fmtTime(t.tStep), [paN, paU] = fmtTime(t.pause);
@@ -2206,6 +3689,7 @@ function renderThroughput(d){
   const segs = [
     {l: t.tCompute>t.tMem ? "Compute" : "Memory read", v: core,    c:"var(--accent)"},
     {l: "Interconnect",                               v: t.tComm, c:"var(--tp)"},
+    {l: "Stage hand-off",                             v: t.tPipe || 0, c:"var(--kv)"},
     {l: "Scheduler",                                  v: t.tOver, c:"var(--ov)"},
   ].filter(s=> s.v>0);
 
@@ -2247,27 +3731,51 @@ function renderThroughput(d){
 }
 
 function renderTpNote(m, tp, active){
-  const per = `${tp} GPU${tp>1?"s":""} per copy`;
+  const per = `${tp} GPU${tp>1?"s":""} per copy`, pp = active ? active.pp : 1, tpw = active ? active.tpw : tp;
   let t = S.tpo!=="auto" ? `<b>Fixed at ${per}</b> on every board, with as many copies as your users need.`
         : active ? `<b>Auto</b> — ${per}${active.reps>1 ? `, ${active.reps} copies` : ""}: the smallest layout on ${active.g.n}.`
         : `<b>Auto</b> — one copy doesn't fit, even split 8 ways.`;
-  if(tp>1){
+  if(pp>1) t += ` On ${active.g.n} that is <b>TP ${tpw} × ${pp} pipeline stages</b>, one per bridged group.`;
+  if(tpw>1){
     const minHeads = Math.min(...m.kv.filter(g=>!g.state).map(g=>g.heads));
     if(usesDpAttention(m)) t += `<br>This model's attention is served <b>data-parallel</b>, as SGLang and vLLM run it: each GPU keeps only its own users' cache, so nothing is copied.`;
     else if(minHeads===1) t += `<br>Part of this model's cache has a single head, so <b>every GPU keeps a full copy</b> of it.`;
-    else if(tp>minHeads) t += `<br><b>TP &gt; ${minHeads} KV heads</b> — part of the cache copies instead of splitting, so it stops shrinking.`;
-    else t += ` The cache splits ÷ ${tp} across KV heads.`;
+    else if(tpw>minHeads) t += `<br><b>TP &gt; ${minHeads} KV heads</b> — part of the cache copies instead of splitting, so it stops shrinking.`;
+    else t += ` The cache splits ÷ ${tpw} across KV heads${pp>1 ? ` and ÷ ${pp} across stages` : ""}.`;
   }
   $('tpnote').innerHTML = t;
+  renderPipeNote(active);
+}
+/* under the Pipeline control: which boards it can apply to, in which HPE server, and whether the
+   deployment on screen uses it */
+function renderPipeNote(active){
+  const bridged = boardsInPlay().filter(g=> g.split);
+  const where = g => `${g.n}${g.host ? ` in the ${g.host.short}` : ""}`;
+  const groups = g => `${nodeMax(g)/g.split} groups of ${g.split}${g.bridge ? ` (${g.bridge})` : ""}`;
+  let t = !bridged.length ? `No board in play has NVLink bridge groups, so this changes nothing.`
+        : !S.pipe ? `<b>Off</b> — one copy stays within one NVLink bridge: ${bridged.map(g=> `${where(g)}, ${groups(g)}`).join("; ")}, so a full server runs one copy per group.`
+        : `<b>On</b> — one copy may span every bridge group of the server as pipeline stages, tensor-parallel within each: ${bridged.map(g=> `${where(g)}, TP ${g.split} × ${nodeMax(g)/g.split} stages`).join("; ")}. It holds a model or users that one group can't; speed per user stays about one group's, since every stage still reads all of its weights for each token.`;
+  if(active && active.pp>1) t += ` The deployment shown uses it.`;
+  $('pipenote').innerHTML = t;
+}
+/* the headline's sentence on the HPE server and, on a board with NVLink bridge groups, how a copy sits in them */
+function hostSentence(d){
+  const g = d.g;
+  if(!g.host) return "";
+  const s = `In an <b>${hostLink(g.host)}</b> (${g.host.spec}). `
+    + (g.est ? `<span class="warnx">Card count to confirm: ${g.est}.</span> ` : "");
+  if(d.pp>1) return s + `One copy spans its ${d.pp} NVLink bridge groups${g.bridge ? ` (${d.pp} × ${g.bridge})` : ""}: tensor-parallel across the ${d.tpw} cards of each group and ${d.pp} pipeline stages between them. `;
+  if(g.split && d.tp>1) return s + `Each copy sits inside one NVLink bridge group${g.bridge ? ` (${g.bridge})` : ""}, tensor-parallel across its ${d.tp} cards${d.reps>1 ? `, one copy per group` : ""}. `;
+  return s;
 }
 
 
 /* the collapsed Advanced header still says what's set, and how much differs from the defaults */
 function renderAdvState(){
-  const changed = [S.kq!==2, S.tpo!=="auto", S.chunk!==S.chunkBase, S.ovpct!==7, !S.cache, S.srv].filter(Boolean).length;
+  const changed = [S.kq!==2, S.tpo!=="auto", S.pipe, S.chunk!==S.chunkBase, S.ovpct!==7, !S.cache, S.srv].filter(Boolean).length;
   const many = S.models.length > 1;   // with several models, say which settings are the shown model's and which every model's
   $('advState').innerHTML = (changed ? `<b>${changed} changed</b> · ` : "") + (many ? `${esc(specName(S.models[S.edit]))}: ` : "")
-    + `KV ${kqLabel()} · TP ${S.tpo==="auto" ? "auto" : S.tpo} · ${CHUNK_NAME[S.chunk]} · ${many ? "all models: " : ""}${S.ovpct}% overhead · prompt caching ${S.cache ? "on" : "off"}`
+    + `KV ${kqLabel()} · TP ${S.tpo==="auto" ? "auto" : S.tpo}${S.pipe ? " · pipeline across bridges" : ""} · ${CHUNK_NAME[S.chunk]} · ${many ? "all models: " : ""}${S.ovpct}% overhead · prompt caching ${S.cache ? "on" : "off"}`
     + ` · ${S.srv ? "server by NVIDIA guidance (beta)" : "GPUs only"}`;
 }
 
@@ -2361,6 +3869,7 @@ function renderFleet(){
   const d = active ? active.models[S.edit].d
           : suggestDeployment(new Map([...fleets.values()].map(f=> [f.g.n, f.models[S.edit].alone])));
   const fits = !!(d && d.fits), tp = S.tp = d ? d.tp : (S.tpo==="auto" ? 8 : S.tpo);
+  S.pp = d ? d.pp : 1;
   const r = d ? d.r : compute(tp, 1);
   showGauge(false);
   $('mathState').textContent = `${specName(S.models[S.edit])}${fits ? ` on ${d.g.n}` : ""}: speed · model architecture · memory breakdown · how it's calculated`;
@@ -2396,7 +3905,8 @@ function renderFleetVerdict(fleets, f, picked){
     main = fleetName(f);
     const hold = k===1 ? `the ${big ? "system" : "server"} holds` : `the ${big ? "systems" : "servers"} hold`;
     if(need < f.gpus) facts = `Models need <b>${plural(need, "GPU")}</b> · ${hold} <b>${f.gpus}</b>${S.srv && !big ? ", by NVIDIA's guidance" : ""}`;
-    why = `Each model runs as copies of its own, and copies of different models share ${k>1 ? "servers" : `the ${big ? "system" : "server"}`}. `
+    why = (f.g.host ? `In ${k>1 ? `${k} ×` : "an"} <b>${hostLink(f.g.host)}</b> (${f.g.host.spec}). ` : "")
+      + `Each model runs as copies of its own, and copies of different models share ${k>1 ? "servers" : `the ${big ? "system" : "server"}`}. `
       + (used > need ? (used - need===1 ? `The spare GPU runs an extra copy of the model closest to its goal. ` : `The ${used - need} spare GPUs run extra copies of the models closest to their goals. `) : "")
       + (idle ? `${plural(idle, "GPU")} ${idle===1 ? "is" : "are"} left free. ` : "");
     for(const m of ms){
@@ -2545,7 +4055,7 @@ function renderFleetCards(fleets, active, suggested, picked){
       <td class="board"><div class="gname">${b.n}${isSugg ? `<span class="pill sugg">${suggested.meets ? "Suggested" : "Closest"}</span>` : ""}</div>
         <div class="gcap">${boxMem(b)} ${b.mem}${big ? ` · ${big}-GPU systems only`
           : S.srv ? ` · ${popText(b)} per server${b.split ? `, NVLink across ${b.split}` : ""}`
-          : b.split ? ` · up to ${nodeMax(b)} per server, NVLink across ${b.split}` : b.max ? ` · up to ${b.max} per server` : ""}${b.bench ? "" : ` · <span class="tipl" data-tip="extrap">speed extrapolated</span>`}</div></td>
+          : b.split ? ` · up to ${nodeMax(b)} per server, NVLink across ${b.split}` : b.max ? ` · up to ${b.max} per server` : ""}${b.host ? ` · HPE ${b.host.short}${b.est ? ` <span class="tipl" title="${esc(b.est)}">(count to confirm)</span>` : ""}` : ""}${b.bench ? "" : ` · <span class="tipl" data-tip="extrap">speed extrapolated</span>`}</div></td>
       <td class="link col-opt tipl" data-tip="${linkTip}">${linkTxt}</td>
       <td class="num"><b>${!f.fits ? "—" : big ? k : f.gpus}</b> <small>× ${big ? `${big}-GPU system${k===1 ? "" : "s"}` : "GPU"}</small></td>
       <td class="layout">${status || (f.fits ? (big ? plural(k, "system") : k===1 ? "1 server" : `${k} servers: ${f.servers.map(s=> s.n).join(" + ")}`) : "—")}</td>
@@ -2725,6 +4235,7 @@ function wireSeg(id, key){
 wireSeg('kq','kq');
 wireSeg('chunk','chunk');
 wireSeg('tp','tpo');
+wireSeg('pipe','pipe');
 wireSeg('srv','srv');
 function kqLabel(){ return $('kq').querySelector(`[data-v="${S.kq}"]`).dataset.lbl; }
 
@@ -2954,7 +4465,7 @@ let DL = null;   // claude.ai's downloads capability, when this page runs there
 /* The address holds only what differs from the defaults: the version first, then the page's settings and
    each model's. Model 1's keys are as they have always been; model k's are the same keys with k appended
    (m2, u2…). KEY_ORDER keeps a one-model link exactly as earlier versions wrote it. */
-const KEY_ORDER = ["v","m","c","u","w","p","r","cb","x","th","tv","wq","g","kv","tp","ck","ov","pc","sv","sh","fr","b","tf","e"];   // e: the model the controls show, when not the first
+const KEY_ORDER = ["v","m","c","u","w","p","r","cb","x","th","tv","wq","g","kv","tp","pp","ck","ov","pc","sv","vw","hs","cf","sh","fr","b","tf","e"];   // e: the model the controls show, when not the first
 function stateToHash(){
   saveSpec();
   const out = [["v", VERSION]];               // the estimator the link was made with, first so it reads at a glance
@@ -2962,6 +4473,9 @@ function stateToHash(){
   if(S.ovpct!==7) out.push(["ov", S.ovpct]);
   if(!S.cache) out.push(["pc", "off"]);
   if(S.srv) out.push(["sv", "nv"]);
+  if(S.view!=="srv") out.push(["vw", S.view]);
+  if(S.scope.size < CATALOG.servers.length) out.push(["hs", [...S.scope].join(".") || "none"]);
+  if(S.cfg) out.push(["cf", S.cfg]);
   if(S.board!=="auto") out.push(["b", S.board]);
   if(S.edit) out.push(["e", S.edit + 1]);
   const rank = ([k])=> { const [, key, n] = k.match(/^([a-z]+)(\d*)$/); return (+n || 1)*100 + KEY_ORDER.indexOf(key); };
@@ -2983,6 +4497,7 @@ function specToParams(spec){
     if(S.goal!=="smooth") p.push(["g", S.goal]);
     if(S.kq!==2) p.push(["kv", kqLabel()]);
     if(S.tpo!=="auto") p.push(["tp", S.tpo]);
+    if(S.pipe) p.push(["pp", "on"]);
     if(S.chunk!==S.chunkBase) p.push(["ck", S.chunk]);
     if(S.workload==="custom") p.push(["sh", S.shared], ["fr", S.fresh==null ? "rest" : S.fresh]);
     if(trafficInUse()){ const t = S.trafficApplied; p.push(["tf", [t.people, t.req, t.hours, t.peak].join("_")]); }
@@ -3039,6 +4554,7 @@ function parseSpec(get, base){
     S.goal = GOALS[get("g")] ? get("g") : "smooth";
     S.kq = segValue('kq', get("kv") || "FP16") ?? S.kq;
     S.tpo = segValue('tp', get("tp") || "auto") ?? S.tpo;
+    S.pipe = get("pp")==="on" ? 1 : 0;
     if(w==="custom" && get("sh")!==null){ S.shared = Math.max(0, Math.round(+get("sh")) || 0); S.fresh = get("fr")==="rest" || get("fr")===null ? null : Math.max(1, Math.round(+get("fr")) || 1); }
     S.extra = (get("x") || "").split(".").map(s=>{
       const [key, u, p, r, sh, fr] = s.split("_"), n = Math.round(+u);
@@ -3065,7 +4581,7 @@ function showSpec(){
   workloadSel.value = S.workload; showSeg('chunk', S.chunk); showLengths();
   showUsers(); usersNum.value = S.users;
   $('goal').value = S.goal; updateGoalHint();
-  showSeg('kq', S.kq); showSeg('tp', S.tpo); showSeg('pcache', S.cache); showSeg('srv', S.srv);
+  showSeg('kq', S.kq); showSeg('tp', S.tpo); showSeg('pipe', S.pipe); showSeg('pcache', S.cache); showSeg('srv', S.srv);
   ovSlider.value = S.ovpct; syncOv();
   renderMix(); syncTrafficInputs();
 }
@@ -3093,6 +4609,11 @@ function applyHash(){
     S.ovpct = q.has("ov") && ov>=0 && ov<=25 ? ov : 7;
     S.cache = q.get("pc")==="off" ? 0 : 1;
     S.srv = q.get("sv")==="nv" ? 1 : 0;
+    /* the Servers view is the answer unless the link says otherwise; links made before it existed open as they were, in the GPU view */
+    S.view = q.get("vw")==="gpu" || (!q.has("vw") && olderThan(v || LINK_BEFORE, "1.7.0")) ? "gpu" : "srv";
+    const ids = CATALOG.servers.map(sv=> sv.id), hs = q.get("hs");
+    S.scope = new Set(hs===null ? ids : hs==="none" ? [] : hs.split(".").filter(id=> ids.includes(id)));
+    S.cfg = q.get("cf") || null;
     const bq = {"H200":"H200 NVL", "B200":"HGX B200", "B300":"HGX B300", "AMD MI350X":"AMD MI355X"}[q.get("b")] || q.get("b");   // rows renamed: when the HGX H200 was added, and the MI350X became the MI355X
     S.board = GPUS.some(g=> g.n===bq) ? bq : "auto";
     showSpec();
@@ -3180,7 +4701,7 @@ function buildSummary(){
   const prec = S.wqLbl==="NATIVE" ? `${m.nat.f}, as released` : S.wqLbl;
   const all = allUsers(), wl = groupNames(), gs = groups();
   const date = new Date().toLocaleDateString('en-US', {year:'numeric', month:'long', day:'numeric'});
-  const head = fits ? deployName(a) : "Too big for one 8-GPU node";
+  const head = fits ? deployName(a) + (a.g.host ? ` in an ${a.g.host.n}` : "") : "Too big for one 8-GPU node";
   const role = fits ? (L.picked ? (notRecommended(a) ? "Selected node · split over PCIe" : "Selected node") : a.partial ? "Closest single node" : "Recommended node") : "No single node fits";
   const short = fits && a.partial
     ? `One node ${a.meets ? "serves" : "holds"} up to ${commas(a.served)} of the ${commas(all)} users${hasGoal ? (a.meets ? " within the speed goal" : ", below the speed goal") : ""}.` : "";
@@ -3224,7 +4745,7 @@ function buildSummary(){
                    ["Workload", `${wl[0]}: ${lengths(S)}`]]),
     ["Speed goal", hasGoal ? goalDesc().replace(/\.$/, "") : "None: the smallest setup that fits"],
     ["Layout", layout],
-    ["Advanced", `KV cache ${kqLabel()} · GPUs per copy ${S.tpo==="auto" ? "chosen automatically" : S.tpo} · ${CHUNK_NAME[S.chunk]} · ${S.ovpct}% overhead`
+    ["Advanced", `KV cache ${kqLabel()} · GPUs per copy ${S.tpo==="auto" ? "chosen automatically" : S.tpo}${S.pipe ? " · pipeline across bridge groups on" : ""} · ${CHUNK_NAME[S.chunk]} · ${S.ovpct}% overhead`
       + ` · ${S.srv ? "server sized by NVIDIA's guidance (beta)" : "GPUs only"}`],
   ];
   /* the server, when Server is set to NVIDIA guidance: the page's tiles as a table, or the manufacturer's system */
@@ -3287,7 +4808,7 @@ ${SUMMARY_CSS}
 </style>
 <main>
   <button class="print" onclick="print()">Print or save as PDF</button>
-  <div class="eyebrow">LLM Inference Estimator · ${esc(role)}</div>
+  <div class="eyebrow">HPE Server Inference Estimator · ${esc(role)}</div>
   <h1>${esc(head)}</h1>
   <p class="sub">${esc(name)} · ${commas(all)} concurrent user${all===1 ? "" : "s"} · ${esc(what)} · ${esc(prec)}</p>
   <div class="date">Prepared ${esc(date)} · estimator ${esc(VERSION)} · model and board data as of ${esc(DATA_AS_OF)}${link}</div>
@@ -3363,7 +4884,7 @@ ${SUMMARY_CSS}
 </style>
 <main>
   <button class="print" onclick="print()">Print or save as PDF</button>
-  <div class="eyebrow">LLM Inference Estimator · ${esc(role)}</div>
+  <div class="eyebrow">HPE Server Inference Estimator · ${esc(role)}</div>
   <h1>${esc(head)}</h1>
   <p class="sub">${n} models · ${commas(all)} concurrent users</p>
   <div class="date">Prepared ${esc(date)} · estimator ${esc(VERSION)} · model and board data as of ${esc(DATA_AS_OF)}${link}</div>
@@ -3418,7 +4939,12 @@ const TIPS = {
   users:"How many requests are served at once — the batch. Each carries its own KV cache, so this scales cache memory linearly and is the main lever on serving capacity.",
   chunk:"When a new question arrives, the server reads the prompt in pieces while it keeps writing replies for everyone else. Small pieces keep other people's replies flowing smoothly and ride along with their steps almost free, but each prompt takes more steps to read, so under load prompts queue up and first replies wait longer. Big pieces read prompts sooner, but everyone else's text briefly freezes while each piece is read. The numbers on each choice show both effects on your setup.",
   pause:"While a new prompt is being read, everyone already mid-reply waits, whichever workload they belong to. This is the longest gap they would see between words. Under 0.1 s is unnoticeable; choose Smooth streaming to shorten it.",
-  tp:"How many GPUs one copy of the model is split across (tensor parallelism). Every layer's weights are divided and the GPUs all-reduce after each layer, so splitting needs NVLink to be fast. A copy is split 1, 2, 4 or 8 ways because serving engines need the split to divide the model's attention heads evenly; that is a software rule and applies to every board. Auto picks the smallest layout; a fixed number applies to every board.",
+  tp:"How many GPUs one copy of the model is split across (tensor parallelism). Every layer's weights are divided and the GPUs all-reduce after each layer, so splitting needs NVLink to be fast. A copy is split 1, 2, 4 or 8 ways because serving engines need the split to divide the model's attention heads evenly; that is a software rule and applies to every board. Auto picks the smallest layout; a fixed number applies to every board. On a bridged board with Pipeline across bridge groups on, a copy wider than one bridge is tensor-parallel within each group and pipelined across them.",
+  svScope:"The HPE servers the answer may use: every current HPE ProLiant server that takes one of these GPUs, from HPE's NVIDIA Accelerators for HPE QuickSpecs and each server's US QuickSpecs. Pick the customer's standard builds, or the servers you can sell, to size only those. Gen11 servers with a Gen12 successor that takes the same GPUs are left out.",
+  svSmaller:"The smallest server, by rack units, that also meets your goal (or comes closest), for a customer who wants a smaller footprint than the recommendation. Check its headroom: it may serve your users with little room to spare.",
+  svMoreRoom:"A bigger server with more room than the recommendation: its leanest configuration within your goal and its roomiest, for a customer who expects to grow.",
+  svModeled:"This layout pipelines one copy across stages that hand each token's activations to the next over PCIe. The memory it needs is exact; its speed is modeled from the same fitted shares as the rest, with a PCIe hand-off per stage, but no pipelined run is in the benchmark set yet. Load-test it before quoting a speed.",
+  pipe:"Pipeline parallelism between a server's NVLink bridge groups. An H200 NVL bridge joins at most 4 cards (HPE's S4A91C, in the DL380a Gen12), so a copy of a model normally spans at most 4 and 8 cards run two copies. In a DL385 Gen11 the bridge is 2-way, so there it is two groups of 2 in 4 cards. On, one copy may span both groups as two pipeline stages: each stage holds half the layers on its own bridged group, tensor-parallel within it, and hands each token's activations to the next stage over PCIe. It fits a model, or a KV cache, that one group can't hold. It does not raise speed per user: each stage still reads all of its weights for every token, and the engine runs the stages on alternating halves of the batch (vLLM --pipeline-parallel-size 2). Two copies of 4 serve more users when they fit, and the page still prefers them.",
   copies:"A copy (replica) is a full, independent instance of the model on its own GPUs within the node, serving its share of the users. More copies serve more users without slowing each other down, and unlike splitting one copy across GPUs, they need no direct GPU-to-GPU link between them.",
   fleet:"Each model runs as copies of its own on GPUs of its own, sized as it would be alone; the copies of every model are then packed into the board's servers, widest first, and spare GPUs run extra copies of the models closest to their goals. Models don't share GPUs, so each one's speed is its own. The strip shows every server's GPUs, numbered by model.",
   fleetGpus:"GPUs for every model together, in as few servers as the board's sizes allow. A server that isn't full is the smallest size the board comes in that holds its copies.",
@@ -3433,7 +4959,7 @@ const TIPS = {
   usable:"The dashed line marks how much memory the model may use: 90% of each GPU. That is vLLM's default limit (gpu_memory_utilization = 0.9); the other 10% is left for the driver and anything else on the card. A setup fits only if its memory stays to the left of the line.",
   perGPU:"What each individual board must hold. This is the number that determines fit — a model can need 300 GB total and still run fine on 4 × 80 GB.",
   fit:"What one node of each board takes to serve everyone: up to 8 GPUs, as one copy of the model or several, and how much GPU memory that adds up to. If one node can't serve everyone, its row says how many users it does serve. Assumes ~90% of board memory is usable; drivers and the CUDA context claim the rest.",
-  nvlink:"NVLink is the direct GPU-to-GPU link that splitting one copy of a model across GPUs needs to be fast. On the H200 NVL card, an NVLink bridge joins 2 or 4 cards to each other, never more: a server with 8 cards has two bridged groups of 4, so it runs two copies of the model, and one copy spans at most 4. In an 8-GPU HGX system (the HGX H200, HGX B200 and HGX B300) an NVSwitch joins all 8 GPUs' NVLink lanes, so every GPU reaches every other at full speed.",
+  nvlink:"NVLink is the direct GPU-to-GPU link that splitting one copy of a model across GPUs needs to be fast. On the H200 NVL card, an NVLink bridge joins 2 or 4 cards to each other, never more: a server with 8 cards has two bridged groups of 4, so it runs two copies of the model, and one copy spans at most 4 — unless Pipeline across bridge groups is on in Advanced settings, which lets one copy span both groups as pipeline stages. In an 8-GPU HGX system (the HGX H200, HGX B200 and HGX B300) an NVSwitch joins all 8 GPUs' NVLink lanes, so every GPU reaches every other at full speed.",
   fabricAmd:"Infinity Fabric is AMD's direct GPU-to-GPU link. On the MI355X's 8-GPU board there is no switch: each GPU has one link to each of the other 7, at 76.8 GB/s each way. A copy split across all 8 uses all 7 links, 538 GB/s each way, but a copy on 2 GPUs uses only the link between them and a copy on 4 uses 3, where an NVSwitch in an HGX system gives any group of GPUs the full link speed. So splitting across 2 or 4 MI355X GPUs costs more per layer than on an HGX.",
   pcie:"PCIe-only — no NVLink. Fine for a single GPU, but tensor parallelism must all-reduce over a far slower link after every layer, so throughput suffers badly.",
   pcieSlow:"Not recommended. This board has no NVLink, and here one copy of the model has to be split across several of them, so the GPUs exchange data over PCIe after every layer. That is slower than the same number of NVLink cards, and the speed shown already reflects it. It works and can be picked, but it is never the suggestion; prefer a board that holds a copy on one GPU, or an NVLink board.",
@@ -3443,7 +4969,7 @@ const TIPS = {
   srvSet:"GPUs only sizes the GPUs, at any count a server of the board holds. NVIDIA guidance follows the inference server recommendations in NVIDIA's Certified Systems Configuration Guide: 2, 4 or 8 GPUs in a server with two CPU sockets (HGX systems stay whole 8-GPU systems, and the AMD boards are left out), and a Server panel under the answer sizes the CPUs, memory and storage around them, with CPU cores as HPE builds the servers of HPE Private Cloud AI. Rounding GPU counts up can change which board is suggested.",
   srv:"The rest of the server around the GPUs, from the inference server recommendations in NVIDIA's Certified Systems Configuration Guide: two CPU sockets with the GPUs split evenly between them, system memory of twice the GPU memory, and local NVMe storage. CPU cores follow the worker nodes HPE builds for HPE Private Cloud AI. Network and remote management are left to the conversation with the customer. A starting point for a vendor, not a certification: a server is NVIDIA-Certified only if it is on NVIDIA's list. An HGX system comes whole from its manufacturer, so its server is not sized here. Click another board to see its server.",
   srvGpu:"How many GPUs the server holds and how they sit: split evenly across the two CPU sockets, each in an x16 slot of the PCIe generation the card needs. With 8 GPUs NVIDIA's layout puts them behind PCIe Gen5 switches; with one or two per socket the CPUs may have enough lanes of their own. Drives and network cards belong on the same switch or root complex as the GPUs.",
-  srvCpu:"Physical cores, not threads, across both sockets, as HPE builds the AI worker nodes of HPE Private Cloud AI, its inference platform with NVIDIA: two 32-core CPUs for 2 GPUs, two 64-core CPUs for 4 or 8. That is 32 cores per GPU in a 2- or 4-GPU server and 16 per GPU in an 8-GPU one, well above NVIDIA's floor of 6 per GPU for certified inference servers. The CPUs need PCIe Gen5 and a base clock of 2.0 GHz or more. The serving engine uses only a few cores per copy, for its API server, tokenization and scheduling; the rest run everything else on the host, such as Kubernetes, a vector database or embedding for RAG.",
+  srvCpu:"Physical cores, not threads, across both sockets, as HPE builds the AI worker nodes of HPE Private Cloud AI, its inference platform with NVIDIA: two 32-core CPUs for 2 GPUs, two 64-core CPUs for 4 or 8. That is 32 cores per GPU in a 2- or 4-GPU server and 16 per GPU in an 8-GPU one; the L4 and RTX PRO 4500, smaller cards for smaller servers, get 16 per GPU at any count. All are well above NVIDIA's floor of 6 per GPU for certified inference servers. The CPUs need PCIe Gen5 and a base clock of 2.0 GHz or more. The serving engine uses only a few cores per copy, for its API server, tokenization and scheduling; the rest run everything else on the host, such as Kubernetes, a vector database or embedding for RAG.",
   srvRam:"The least system memory (RAM) NVIDIA recommends for a certified inference server: twice the GPU memory. How it is made up from memory modules is the vendor's choice; NVIDIA asks for it to be spread evenly over every memory channel of both sockets. Shown in GB as sold.",
   srvDisk: srvDiskTip(),
   extrap:"No published benchmark in the validation set covers this board. Its speed and first-token figures apply the shares of memory bandwidth and compute fitted on HGX H200, HGX B200 and L40S runs (Llama 3.1 8B, Llama 3.3 70B and gpt-oss-120b) to its datasheet, so its likely range is borrowed from those boards and may be wider in practice. The H200 NVL is the same chip as the benchmarked H200 at a lower power limit, so it is the closest; the MI350P also carries the factor for AMD's software stack fitted on MI355X runs, and is half of the MI355X's chip. The validation results are linked from the Every board caption. Confirm with a load test before buying.",
@@ -3498,6 +5024,7 @@ function labelTips(){
   });
 }
 /* init */
+wireServerView();
 usersSlider.max = USER_STOPS.length-1;
 usersSlider.value = stopIndex(USER_STOPS, S.users);
 $('asof').textContent = `Estimator ${VERSION} · model and board data as of ${DATA_AS_OF}. Estimates for planning, not a guarantee.`;

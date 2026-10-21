@@ -1,6 +1,6 @@
-# LLM Inference Estimator
+# HPE Server Inference Estimator
 
-Sizing estimate: how many GPUs your models and users need, with each model on one node at most. Does not cover models spread over several nodes, or NVL rack-scale systems.
+Sizing estimate: the HPE server and GPUs your models and users need, with each model running within one server. Does not cover a model spread over several servers, or NVL rack-scale systems.
 
 A single-page tool for estimating what LLM inference needs. Pick a model, the number of concurrent users, a workload and a speed goal, and it recommends the node estimated to meet the goal with the least GPU memory in total. Add up to four models and it sizes them together on one kind of board:
 
@@ -15,7 +15,44 @@ It covers 40+ popular open models (Qwen, Gemma, Llama, DeepSeek, gpt-oss, GLM, K
 
 Every result is one server of up to 8 GPUs. If one node of a board can't serve every user, its row says how many it does serve. For production, plan at least one more node (or replica) than this, so the service keeps running if one fails or is being updated.
 
-GPU counts round up to what can be bought. H200 NVL servers take 1, 2, 4 or 8 cards, but an NVLink bridge joins at most 4 of them, so one copy of a model spans at most 4 and 8 cards run two copies. The HGX H200, HGX B200 and HGX B300 are sold only as 8-GPU systems, with all 8 GPUs joined through NVSwitch. So is the AMD MI355X, but with no switch: each GPU has one Infinity Fabric link to each of the other 7, so a copy split across 2 or 4 of them uses only the links among them and pays more per layer than on an HGX. RTX PRO 4500 servers hold up to 5 cards (the limit on HPE servers).
+GPU counts round up to what can be bought. H200 NVL servers take 1, 2, 4 or 8 cards, but an NVLink bridge joins at most 4 of them, so one copy of a model spans at most 4 and 8 cards run two copies. **Pipeline across bridge groups** in Advanced settings (off by default) lets one copy span both groups as two pipeline stages, tensor-parallel within each and handing activations between them over PCIe (vLLM's `--tensor-parallel-size 4 --pipeline-parallel-size 2`): that fits a model or a KV cache that one group can't hold, at about one group's speed per user, since each stage still reads all of its weights for every token; two copies of 4 are still preferred when they fit. Pipelined figures are modeled, not yet fitted to a benchmark. The HGX H200, HGX B200 and HGX B300 are sold only as 8-GPU systems, with all 8 GPUs joined through NVSwitch. So is the AMD MI355X, but with no switch: each GPU has one Infinity Fabric link to each of the other 7, so a copy split across 2 or 4 of them uses only the links among them and pays more per layer than on an HGX. RTX PRO 4500 servers hold up to 5 cards (the limit on HPE servers).
+
+### Servers view
+
+The answer opens by server. **Servers in scope** picks the HPE servers to consider (all by default; the customer's standard builds, say). The page sizes the model on every configuration of those servers — each server with each GPU it takes, at the count and wiring HPE supports — and shows:
+
+- **the recommendation**: the configuration the GPU view would suggest — not split over PCIe, then the least GPU memory, not pipelined, fewer GPUs per copy, faster — then the most room and the fewest rack units, with its build (chassis, GPUs, bridges, CPUs, memory, storage, power), figures and how the model is laid out on the cards;
+- **room to grow**: on the recommendation, what the same server serves with its open bays filled;
+- **every server in scope**: the configurations that hold the model, with the smallest server that also works tagged *Smaller server* and bigger ones with more room tagged *More room*; for the rest, the most GPU memory they carry against what the model needs;
+- **one configuration in detail**: how its cards are wired, every layout the wiring allows (TP within an NVLink group or NVSwitch; TP within groups × PP across them; on PCIe cards, TP over PCIe or PP over PCIe) at each number of copies, and its build.
+
+**Several models** are sized together, as the GPU view does: each model runs as copies of its own, the copies are packed into servers of one kind with one kind of GPU, and spare GPUs run extra copies of the models furthest from their goals. Each model must fit on one server. The recommendation follows the GPU view's order, plus one rule it never needs: on the same GPU, fewer servers win even with more cards. The card gives each server's build and every model's figures and layout; the configuration detail is for one model only.
+
+Pipelined layouts are modeled, not yet fitted to a benchmark, and say so. The server catalog is the JSON block `id="catalog-hpe"` in `index.html`; edit it when HPE revises its QuickSpecs. URL keys: `vw=gpu` opens the GPU view, `hs` lists the servers in scope (dot-separated ids), `cf` the configuration in detail.
+
+### HPE servers
+
+Each board is named with the HPE server it is sized in, and **HPE server** in Advanced settings narrows the comparison to one server at its own limits (URL key `hs`). The list is every current HPE ProLiant server that takes one of these GPUs:
+
+| HPE server (US QuickSpecs version) | Boards (most cards per server) | Notes |
+|---|---|---|
+| ProLiant Compute DL380a Gen12 · 4U · 2 × Xeon 6 (v20) | L4, L40S, RTX PRO 6000 (8), H200 NVL | H200 NVL in two 4-way NVLink groups (S4A91C, supported only here, and not in the 10-card layout). Holds up to 10 double-wide / 16 single-wide; a node is sized at 8 |
+| ProLiant Compute DL380 Gen12 · 2U · 2 × Xeon 6 (v20) | L4 (8), L40S (3), RTX PRO 4500 (5), RTX PRO 6000 (3), H200 NVL (2) | H200 NVL and RTX PRO 6000 power-capped at 450 W, 27 °C; NVLink bridges not supported, so a split copy runs over PCIe |
+| ProLiant DL385 Gen11 · 2U · 2 × EPYC 9004/9005 (v49) | L4 (8), L40S (4), RTX PRO 4500 (4), RTX PRO 6000 (4), H200 NVL (4), MI350P (4) | H200 NVL with the 2-way S4A90C bridge only: a copy spans 2, or 4 as TP 2 × 2 stages. MI350P needs 450 W power capping; HPE targets shipping from December 2026 |
+| ProLiant Compute DL345 Gen12 · 2U · 1 × EPYC 9005 (v13) | L4 (6), L40S (4), RTX PRO 4500 (4), RTX PRO 6000 (2) | L4: 6 in the rear of the standard chassis, 4 in the front of the GPU chassis |
+| ProLiant Compute DL340 Gen12 · 2U · 1 × Xeon 6 (v16) | L4 (4), L40S (4) | front GPU chassis; the 4x kit needs a Rich I/O 6xx1P |
+| ProLiant Compute ML350 Gen12 · 4U tower · 2 × Xeon 6 (v18) | L4 (4), L40S (2), RTX PRO 4500 (4) | external GPU fan kit for 30 °C |
+| ProLiant ML110 Gen11 · tower · 1 × Xeon (v36) | L4 (2) | CPU limited to 150 W; 25 °C |
+| ProLiant Compute DL320 Gen12 · 1U · 1 × Xeon 6 (v21) | L4 (4), L40S (2) | GPU server needs a Rich I/O 6xx1P; above 270 W, the closed-loop liquid cooling fan kit |
+| ProLiant Compute DL325 Gen12 · 1U · 1 × EPYC 9005 (v13) | L4 (4) | front of the GPU server |
+| ProLiant Compute DL360 Gen12 · 1U · 2 × Xeon 6 (v20) | L4 (3) | low-profile, rear slots |
+| ProLiant DL365 Gen11 · 1U · 2 × EPYC 9004/9005 (v46) | L4 (2), RTX PRO 4500 (2) | GPU CTO model |
+| ProLiant DL145 Gen11 · 2U edge · 1 × EPYC 8004 (v23) | L4 (3), L40S (1), RTX PRO 4500 (1) | |
+| ProLiant Compute XD685 · 5U DLC / 6U air · 2 × EPYC 9005 (v16) | HGX H200, HGX B200, HGX B300, MI355X | whole 8-GPU systems; B200, B300 and MI355X liquid-cooled only |
+
+On **Auto** each board sits in the first server above that lists it. That matches the board's own figures, except the MI350P, which is now sized at the DL385 Gen11's 4 cards. Gen11 servers with a Gen12 successor that takes the same GPUs are left out. HPE also lists the RTX PRO 4500 and 6000 for the EL2000 EL240 Gen12 and Edge Server e930t without a card count, so those are named beside the picker but not sized. Storage, Superdome, Compute Scale-up and EL8000 systems are out of scope.
+
+**Sources, all US:** HPE's *NVIDIA Accelerators for HPE* QuickSpecs (version 83, 8 September 2026) for which servers take which GPU and bridge, and each server's US QuickSpecs (version in the table; link, version and date in the catalog's `quickspecs` field) for card counts and constraints. The sizer is for the US; confirm a build against the current US QuickSpecs.
 
 Separately, one copy of a model is split across 1, 2, 4 or 8 GPUs. Serving engines need the split to divide the model's attention heads evenly, so this is a software rule that applies to every board. On a 5-card RTX PRO 4500 server, one copy uses at most 4 cards and the fifth can run another copy. When the GPUs bought are more than one copy needs, as with a small model on an 8-GPU HGX system, they run more copies rather than one copy split wider, unless only the wider split reaches the speed goal: copies leave room for far more users, and it is how small models are served in production.
 
@@ -39,8 +76,8 @@ This part is in beta: its rules and figures are still being worked on and may ch
 
 Set **Server** to **NVIDIA guidance** in Advanced settings to size the whole server, following the inference server table in NVIDIA's [Certified Systems Configuration Guide](https://docs.nvidia.com/certification-programs/latest/nvidia-certified-configuration-guide.html). GPU counts then round up to 2, 4 or 8 per server, split evenly across two CPU sockets (2 or 4 for the RTX PRO 4500). That can change which board is suggested: 56 chat users on Llama 3.1 8B move from 1 × RTX PRO 6000 to 2 × L40S. A Server panel under the answer gives what goes around those GPUs:
 
-- **CPUs:** two sockets with PCIe Gen5 and a base clock of 2.0 GHz or more. Cores follow the AI worker nodes HPE builds for [HPE Private Cloud AI](https://www.hpe.com/us/en/collaterals/collateral.a50009216enw.html): 32 physical cores per GPU in a 2- or 4-GPU server and 16 per GPU in an 8-GPU one (2 × 32-core CPUs for 2 GPUs, 2 × 64-core for 4 or 8). NVIDIA's own floor is 6 per GPU.
-- **Recommended minimum system memory:** twice the GPU memory, as NVIDIA recommends. How it's made up from memory modules is left to the vendor.
+- **CPUs:** two sockets with PCIe Gen5 and a base clock of 2.0 GHz or more. Cores follow the AI worker nodes HPE builds for [HPE Private Cloud AI](https://www.hpe.com/us/en/collaterals/collateral.a50009216enw.html): 32 physical cores per GPU in a 2- or 4-GPU server and 16 per GPU in an 8-GPU one (2 × 32-core CPUs for 2 GPUs, 2 × 64-core for 4 or 8), and 16 per GPU at any count for the L4 and RTX PRO 4500. NVIDIA's own floor is 6 per GPU. In the Servers view the build starts with **one CPU**, so the GPUs, memory and serving process share one NUMA node, and goes to two only when it must: the server takes two processors only (DL380a Gen12, XD685), a GPU sits in a slot wired to CPU 2 (from each server's riser tables in its US QuickSpecs), or the cores won't fit in the largest CPU the server takes. With two, the GPUs split evenly across the sockets. A build whose cores exceed what the server's CPUs offer is flagged.
+- **Recommended minimum system memory:** twice the GPU memory, as NVIDIA recommends. In the GPU view, how it's made up from memory modules is left to the vendor. In the Servers view the build makes it from the server's own RDIMMs. Memory is costly, so it does not fill every channel: it takes the smallest modules the server takes, as few as reach the minimum, one per channel, so that much memory lands on as many channels as it can. A larger module is used only when the smallest can't reach the minimum at one per channel, and two per channel only when one can't. Each CPU holds the same DIMMs, a count HPE's population rules allow. The row says how many channels that fills and, when not all, flags it with roughly the share of the CPU's memory bandwidth it leaves; fill more channels if the CPU offloads KV cache or does heavy work of its own. Each server's channels, DIMMs per channel and module sizes come from its US QuickSpecs (the catalog's `mem` field). The DIMM counts per CPU (`pop`) come from the server's table in HPE's memory population rules for its processor family (`rules`). Xeon 6 servers take 1, 2, 4, 8, 12 or 16 DIMMs per CPU, with no 6, so a 6-channel build there becomes 8.
 - **Slots and switches:** each GPU in an x16 slot of its own PCIe generation, behind PCIe Gen5 switches when there are 8.
 - **Workload storage: the usable NVMe capacity the model needs**, not a drive configuration (drives and RAID are the vendor's choice): two copies of its weights (the version serving and the next one downloading) and 100 GB for images, caches and logs, kept under 80% full, beside a separate boot volume. What offloading KV cache to disk (NVIDIA Dynamo) would add, at least the larger of 100 GB and the GPUs' KV cache, is in the tooltip, since few single servers do it. NVIDIA's own guidance, one NVMe drive of at least 1 TB per socket, is in the tooltip.
 
