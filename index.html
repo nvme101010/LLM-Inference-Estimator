@@ -2686,8 +2686,9 @@ function buildRows(c, d){
   else {
     const sr = serverOf(d.g, d.gpus, [[d, d.gpus]]), per = sr.cores/d.gpus, cp = cpusFor(sv, d, sr.cores);
     const why = LIGHT_GPUS.includes(d.g.n) ? `, for the ${esc(d.g.n.replace(" Blackwell", ""))}` : "";
-    const each = cp.n===2 ? `${commas(sr.cores)} physical cores, ${commas(sr.cores/2)} per CPU` : `${commas(sr.cores)} physical cores`;
-    row(cp.n===2 ? "CPUs" : "CPU", `${cp.n} × ${esc(sv.cpu)}`, `${each} · ${per} per GPU${why}</span><span>${cp.why}`, cp.short);
+    const value = cp.n===2 ? `2 × ${esc(sv.cpu)}, ${commas(sr.cores/2)} cores each` : `1 × ${esc(sv.cpu)}, ${commas(sr.cores)} cores`;
+    const tally = cp.n===2 ? `${commas(sr.cores)} physical cores in total · ${per} per GPU${why}` : `${per} physical cores per GPU${why}`;
+    row(cp.n===2 ? "CPUs" : "CPU", value, `${tally}</span><span>${cp.why}`, cp.short);
     row("Memory", `${commas(Math.ceil(sr.ram))} GB`, `2 × GPU memory, every channel ${cp.n===2 ? "of both CPUs " : ""}populated`);
     row("Storage", `${capParts(sr.diskGB).join(" ")} NVMe`, `Required usable capacity: 2 × model weights + 100 GB for images, caches and logs</span><span>Doesn't include boot storage, request logs or KV cache offload`);
   }
