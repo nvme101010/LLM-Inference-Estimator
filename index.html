@@ -991,7 +991,13 @@
     "drives": "2 × 480 GB M.2 NVMe in hardware RAID 1, hot-plug",
     "alt": "or 960 GB, P81160-B21",
     "kit": "Needs the DL380a Gen12 NS204i-u Front Cage Kit, P75284-B21"
-   }
+   },
+   "maxCores": 86,
+   "coreNote": "Xeon 6787P",
+   "cpu1": {
+    "*": 0
+   },
+   "cpu1Why": "The DL380a Gen12 takes two processors only."
   },
   {
    "id": "dl380-g12",
@@ -1057,7 +1063,15 @@
     "drives": "2 × 480 GB M.2 NVMe in hardware RAID 1, hot-plug",
     "alt": "or 960 GB, P81160-B21",
     "kit": "Needs a front (P74759-B21, SFF or EDSFF chassis), rear (P74755-B21) or internal enablement kit"
-   }
+   },
+   "maxCores": 86,
+   "coreNote": "Xeon 6787P",
+   "cpu1": {
+    "*": 1,
+    "L4": 3,
+    "RTX PRO 4500 Blackwell": 2
+   },
+   "cpu1Why": "GPUs past the primary riser (slots 1 to 3) sit on CPU 2."
   },
   {
    "id": "dl385-g11",
@@ -1070,7 +1084,7 @@
    "cpu": "AMD EPYC 9004/9005",
    "url": "https://www.hpe.com/us/en/collaterals/collateral.a50004300enw.html",
    "notes": [
-    "GPU base unit: front GPU bays, two processors, high-performance fans."
+    "GPU base unit: front GPU bays and high-performance fans; HPE spreads the GPUs evenly across CPU 1 and CPU 2."
    ],
    "gpus": [
     {
@@ -1132,7 +1146,14 @@
      "The NS204i-u v2 needs EPYC 9005 CPUs; with EPYC 9004, use the Gen11 device, P48183-B21.",
      "The NS204i-u takes the tertiary riser or secondary slots 4 and 5: check its location against the GPU risers in OCA."
     ]
-   }
+   },
+   "maxCores": 160,
+   "coreNote": "EPYC 9845; 128 on EPYC 9004",
+   "cpu1": {
+    "*": 1
+   },
+   "cpu1Why": "HPE installs GPUs evenly across CPU 1 and CPU 2.",
+   "cpu1Check": true
   },
   {
    "id": "dl345-g12",
@@ -1183,7 +1204,9 @@
     "drives": "2 × 480 GB M.2 NVMe in hardware RAID 1, hot-plug",
     "alt": "or 960 GB, P81160-B21",
     "kit": "Needs a front enablement kit (P74759-B21) or rear cable kit (P71433-B21)"
-   }
+   },
+   "maxCores": 192,
+   "coreNote": "EPYC 9965"
   },
   {
    "id": "dl340-g12",
@@ -1224,7 +1247,9 @@
     "drives": "2 × 480 GB M.2 NVMe in hardware RAID 1, hot-plug",
     "alt": "or 960 GB, P81160-B21",
     "kit": "Front install needs the Multipurpose Drive Cage Kit, P76449-B21"
-   }
+   },
+   "maxCores": 80,
+   "coreNote": "Rich I/O Xeon 6781P, for the 4x GPU kit"
   },
   {
    "id": "ml350-g12",
@@ -1273,7 +1298,14 @@
     "drives": "2 × 480 GB M.2 NVMe in hardware RAID 1, hot-plug",
     "alt": "or 960 GB, P81160-B21",
     "kit": "Needs a front (P74252-B21) or rear (P72360-B21) enablement kit"
-   }
+   },
+   "maxCores": 86,
+   "coreNote": "Xeon 6787P",
+   "cpu1": {
+    "*": 2,
+    "L40S": 1
+   },
+   "cpu1Why": "Slots 5 to 10 need CPU 2."
   },
   {
    "id": "ml110-g11",
@@ -1308,7 +1340,9 @@
     "notes": [
      "With the NS204i-u, the embedded storage port is taken and no drive bays are supported: the model's weights go on the boot device."
     ]
-   }
+   },
+   "maxCores": 28,
+   "coreNote": "5th Gen Xeon, per the QuickSpecs"
   },
   {
    "id": "dl320-g12",
@@ -1346,7 +1380,9 @@
     "drives": "2 × 480 GB M.2 NVMe in hardware RAID 1, hot-plug",
     "alt": "or 960 GB, P81160-B21",
     "kit": "On the GPU server, needs the NS204i-u GPU Internal Cable Kit, P76628-B21"
-   }
+   },
+   "maxCores": 80,
+   "coreNote": "Rich I/O Xeon 6781P"
   },
   {
    "id": "dl325-g12",
@@ -1382,7 +1418,9 @@
     "notes": [
      "A rear NS204i-u needs the low-profile primary riser, P81927-B21."
     ]
-   }
+   },
+   "maxCores": 192,
+   "coreNote": "EPYC 9965"
   },
   {
    "id": "dl360-g12",
@@ -1418,7 +1456,13 @@
     "notes": [
      "The rear NS204i-u kit uses PCIe slot 2: with 3 GPUs, check the front or internal kit in OCA."
     ]
-   }
+   },
+   "maxCores": 86,
+   "coreNote": "Xeon 6787P",
+   "cpu1": {
+    "*": 2
+   },
+   "cpu1Why": "The third GPU, in the secondary riser, needs CPU 2."
   },
   {
    "id": "dl365-g11",
@@ -1431,7 +1475,7 @@
    "cpu": "AMD EPYC 9004/9005",
    "url": "https://www.hpe.com/us/en/collaterals/collateral.a50004299enw.html",
    "notes": [
-    "GPU base unit, two front GPU slots; needs two processors."
+    "GPU base unit: two front GPU slots, slot 5 on CPU 1 and slot 4 on CPU 2."
    ],
    "gpus": [
     {
@@ -1460,7 +1504,14 @@
      "The NS204i-u v2 needs EPYC 9005 CPUs; with EPYC 9004, use the Gen11 device, P48183-B21.",
      "The NS204i-u requires the low-profile secondary riser, which leaves no full-height secondary slot: check the GPU slots in OCA."
     ]
-   }
+   },
+   "maxCores": 160,
+   "coreNote": "EPYC 9845; 128 on EPYC 9004",
+   "cpu1": {
+    "*": 1
+   },
+   "cpu1Why": "The second GPU slot (slot 4) sits on CPU 2.",
+   "cpu1Check": true
   },
   {
    "id": "dl145-g11",
@@ -1504,7 +1555,9 @@
     "drives": "2 × 480 GB M.2 NVMe in hardware RAID 1, hot-plug",
     "kit": "Needs the DL145 Gen11 NS204i-u Enablement Kit, P71992-B21",
     "alt": "or v2 960 GB, P81160-B21"
-   }
+   },
+   "maxCores": 84,
+   "coreNote": "EPYC 8635P"
   },
   {
    "id": "xd685",
@@ -1563,7 +1616,13 @@
     "sku": "S4R99A",
     "drives": "RAID 1 M.2 NVMe, hot-plug",
     "alt": "or 2 × 960 GB, S6A36A"
-   }
+   },
+   "maxCores": 96,
+   "coreNote": "EPYC 9655",
+   "cpu1": {
+    "*": 0
+   },
+   "cpu1Why": "The XD685 is a two-processor system."
   }
  ],
  "unsized": [
@@ -2702,6 +2761,23 @@ function statsHtml(d){
     + statCell("srvGpu", "GPU memory", boxTotal(d.memGB).split(" ")[0], S.unit, `${fmtMem(d.perGB)} used of ${boxMem(d.g)} per card`)
     + `</div>`;
 }
+/* One CPU or two. One keeps the GPUs, their memory and the serving process on one NUMA node, so it's the
+   default; a second CPU is added only when the build needs it: the server takes two processors only, a GPU sits
+   in a slot wired to CPU 2 (sv.cpu1: how many of each board one CPU reaches), or the cores won't fit in one CPU
+   (sv.maxCores: the most physical cores one CPU offers in the server's GPU configuration). With two, the GPUs
+   split evenly across the sockets. short: even the CPUs the server takes can't give the cores. */
+function cpusFor(sv, d, cores){
+  const max = sv.maxCores || Infinity, cap = `one CPU here has at most ${max} cores (${esc(sv.coreNote || "")})`;
+  const one = "One CPU keeps the GPUs and memory on one NUMA node";
+  if(sv.sockets < 2) return cores <= max ? {n: 1, why: one}
+                                         : {n: 1, short: true, why: `Needs ${cores} cores, but ${cap}: fewer cores per GPU, or another server`};
+  const reach = sv.cpu1 ? (sv.cpu1[d.g.n] ?? sv.cpu1["*"]) : Infinity;
+  if(reach > 0 && d.gpus <= reach && cores <= max) return {n: 1, why: `${one}. A second CPU adds nothing this build needs${sv.cpu1Check ? ". Confirm a one-CPU GPU build in OCA" : ""}`};
+  const because = reach===0 ? esc(sv.cpu1Why) : d.gpus > reach ? `${esc(sv.cpu1Why)} One CPU reaches ${reach} ${esc(d.g.n.replace(" Blackwell", ""))}${reach===1 ? "" : "s"}.`
+                : `Two CPUs for the cores: ${cap}.`;
+  if(cores > 2*max) return {n: 2, short: true, why: `Needs ${cores} cores, but two CPUs here give at most ${2*max}: fewer cores per GPU`};
+  return {n: 2, why: because + (d.gpus > 1 ? ` Split the GPUs evenly across the two; keep each copy on one CPU's GPUs where it fits.` : "")};
+}
 /* The build for a layout, as one bill of materials: chassis, GPUs and how they're joined, CPUs, memory,
    storage and power, in the order they go on a quote. CPU cores as HPE Private Cloud AI builds them, memory
    and storage by NVIDIA's certified-server guidance. Rows that need a decision are flagged. */
@@ -2719,11 +2795,11 @@ function buildRows(c, d){
     `${esc(bt.drives)}${bt.alt ? ` · ${pn(bt.alt)}` : ""}${bt.kit ? `</span><span>${pn(bt.kit)}` : ""}`);
   if(systemOf(d.g)){ row("Platform", "Comes with the system", `CPUs, memory and storage: ${esc(sv.cpu)}`); boot(); }
   else {
-    const sr = serverOf(d.g, d.gpus, [[d, d.gpus]]), per = sr.cores/d.gpus;
+    const sr = serverOf(d.g, d.gpus, [[d, d.gpus]]), per = sr.cores/d.gpus, cp = cpusFor(sv, d, sr.cores);
     const why = LIGHT_GPUS.includes(d.g.n) ? `for the ${esc(d.g.n.replace(" Blackwell", ""))}` : "as HPE Private Cloud AI builds it";
-    if(sv.sockets >= 2) row("CPUs", `2 × ${esc(sv.cpu)}`, `${commas(sr.cores)} physical cores in total, ${commas(sr.cores/2)} per socket · ${per} per GPU, ${why}`);
-    else row("CPU", `1 × ${esc(sv.cpu)}`, `${commas(sr.cores)} physical cores, ${per} per GPU, ${why} · NVIDIA's guidance asks for two sockets`, true);
-    row("Memory", `${commas(Math.ceil(sr.ram))} GB`, `2 × GPU memory, every channel populated`);
+    const each = cp.n===2 ? `${commas(sr.cores)} physical cores, ${commas(sr.cores/2)} per CPU` : `${commas(sr.cores)} physical cores`;
+    row(cp.n===2 ? "CPUs" : "CPU", `${cp.n} × ${esc(sv.cpu)}`, `${each} · ${per} per GPU, ${why}</span><span>${cp.why}`, cp.short);
+    row("Memory", `${commas(Math.ceil(sr.ram))} GB`, `2 × GPU memory, every channel ${cp.n===2 ? "of both CPUs " : ""}populated`);
     row("Storage", `${capParts(sr.diskGB).join(" ")} NVMe`, `usable, for model weights${bt ? "" : " · plus a 1 TB boot drive"}`);
     boot();
   }
