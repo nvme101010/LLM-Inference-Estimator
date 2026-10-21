@@ -1152,8 +1152,7 @@
    "cpu1": {
     "*": 1
    },
-   "cpu1Why": "HPE installs GPUs evenly across CPU 1 and CPU 2.",
-   "cpu1Check": true
+   "cpu1Why": "HPE installs GPUs evenly across CPU 1 and CPU 2."
   },
   {
    "id": "dl345-g12",
@@ -1510,8 +1509,7 @@
    "cpu1": {
     "*": 1
    },
-   "cpu1Why": "The second GPU slot (slot 4) sits on CPU 2.",
-   "cpu1Check": true
+   "cpu1Why": "The second GPU slot (slot 4) sits on CPU 2."
   },
   {
    "id": "dl145-g11",
@@ -2774,7 +2772,7 @@ function cpusFor(sv, d, cores){
   if(sv.sockets < 2) return cores <= max ? {n: 1, why: one}
                                          : {n: 1, short: true, why: `Needs ${cores} cores, but ${cap}: fewer cores per GPU, or another server`};
   const reach = sv.cpu1 ? (sv.cpu1[d.g.n] ?? sv.cpu1["*"]) : Infinity;
-  if(reach > 0 && d.gpus <= reach && cores <= max) return {n: 1, why: `${one}${sv.cpu1Check ? ". Confirm a one-CPU GPU build in OCA" : ""}`};
+  if(reach > 0 && d.gpus <= reach && cores <= max) return {n: 1, why: one};
   const because = reach===0 ? esc(sv.cpu1Why) : d.gpus > reach ? `${esc(sv.cpu1Why)} One CPU reaches ${reach} ${esc(d.g.n.replace(" Blackwell", ""))}${reach===1 ? "" : "s"}.`
                 : `Two CPUs for the cores: ${cap}.`;
   if(cores > 2*max) return {n: 2, short: true, why: `Needs ${cores} cores, but two CPUs here give at most ${2*max}: fewer cores per GPU`};
