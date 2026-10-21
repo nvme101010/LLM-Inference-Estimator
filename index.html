@@ -2781,7 +2781,7 @@ function cpusFor(sv, d, cores){
   return {n: 2, why: because + (d.gpus > 1 ? ` Split the GPUs evenly across the two; keep each copy on one CPU's GPUs where it fits.` : "")};
 }
 /* The build for a layout, as one bill of materials: chassis, GPUs and how they're joined, CPUs, memory,
-   storage and power, in the order they go on a quote. CPU cores as HPE Private Cloud AI builds them, memory
+   storage and power, in the order they go on a quote. CPU cores by the fixed per-GPU ratio (coresPerGpu), memory
    and storage by NVIDIA's certified-server guidance. Rows that need a decision are flagged. */
 function buildRows(c, d){
   const x = c.x, sv = c.sv, rows = [];
@@ -2798,9 +2798,9 @@ function buildRows(c, d){
   if(systemOf(d.g)){ row("Platform", "Comes with the system", `CPUs, memory and storage: ${esc(sv.cpu)}`); boot(); }
   else {
     const sr = serverOf(d.g, d.gpus, [[d, d.gpus]]), per = sr.cores/d.gpus, cp = cpusFor(sv, d, sr.cores);
-    const why = LIGHT_GPUS.includes(d.g.n) ? `for the ${esc(d.g.n.replace(" Blackwell", ""))}` : "as HPE Private Cloud AI builds it";
+    const why = LIGHT_GPUS.includes(d.g.n) ? `, for the ${esc(d.g.n.replace(" Blackwell", ""))}` : "";
     const each = cp.n===2 ? `${commas(sr.cores)} physical cores, ${commas(sr.cores/2)} per CPU` : `${commas(sr.cores)} physical cores`;
-    row(cp.n===2 ? "CPUs" : "CPU", `${cp.n} × ${esc(sv.cpu)}`, `${each} · ${per} per GPU, ${why}</span><span>${cp.why}`, cp.short);
+    row(cp.n===2 ? "CPUs" : "CPU", `${cp.n} × ${esc(sv.cpu)}`, `${each} · ${per} per GPU${why}</span><span>${cp.why}`, cp.short);
     row("Memory", `${commas(Math.ceil(sr.ram))} GB`, `2 × GPU memory, every channel ${cp.n===2 ? "of both CPUs " : ""}populated`);
     row("Storage", `${capParts(sr.diskGB).join(" ")} NVMe`, `usable, for model weights${bt ? "" : " · plus a 1 TB boot drive"}`);
     boot();
