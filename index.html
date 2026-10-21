@@ -474,9 +474,11 @@
   .svhead .svacts{margin-left:auto; display:flex; gap:14px}
   .svhead .linkbtn{margin:0; font-size:13px; min-height:32px}
   .svsub{display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 14px; margin-top:6px}
-  .chipgroups{display:flex; flex-wrap:wrap; gap:10px 22px}
-  .chipgroup{display:flex; flex-wrap:wrap; gap:6px; align-items:center}
-  .chipgroup .gl{width:100%; font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted)}
+  .chipgroups{display:grid; gap:8px}
+  .chipgroup{display:grid; grid-template-columns:128px 1fr; gap:12px; align-items:center}
+  .chipgroup .gl{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted)}
+  .chipgroup .chiprow{display:flex; flex-wrap:wrap; gap:6px}
+  @media (max-width:560px){ .chipgroup{grid-template-columns:1fr; gap:5px} .chipgroups{gap:12px} }
   .chip{min-height:36px; padding:0 13px; border-radius:18px; border:1px solid var(--line-2); background:var(--panel-2); color:var(--ink-2); font:inherit; font-size:13px; font-weight:500; cursor:pointer}
   .chip[aria-pressed=true]{border-color:var(--accent); background:color-mix(in srgb, var(--accent) 13%, var(--panel)); color:var(--ink)}
   .chip:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
@@ -2619,10 +2621,10 @@ function renderScope(A){
     + `<span class="cap">${n===all ? `All ${all} current GPU-capable HPE servers` : `${n} of ${all}`}. Pick the customer's standard builds to size only those.</span>`
     + `<span class="svacts"><button type="button" class="linkbtn" data-scope-all>All</button><button type="button" class="linkbtn" data-scope-none>None</button></span></div>`
     + `<div class="chipgroups">` + [...new Set(CATALOG.servers.map(sv=> sv.group))].map(grp=>
-        `<div class="chipgroup" role="group" aria-label="${esc(grp)}"><span class="gl">${esc(grp)}</span>`
+        `<div class="chipgroup" role="group" aria-label="${esc(grp)}"><span class="gl">${esc(grp)}</span><span class="chiprow">`
         + CATALOG.servers.filter(sv=> sv.group===grp).map(sv=>
             `<button type="button" class="chip" data-scope="${sv.id}" aria-pressed="${S.scope.has(sv.id)}">${esc(sv.short)}</button>`).join("")
-        + `</div>`).join("") + `</div>`;
+        + `</span></div>`).join("") + `</div>`;
 }
 /* the same server with more cards: the option with the most room that meets the goal for everyone */
 const growOf = c => c.best ? c.opts.filter(d=> d.gpus > c.best.gpus && d.meets && !d.partial && !d.nr).sort((a, b)=> b.room - a.room || a.gpus - b.gpus)[0] || null : null;
