@@ -2774,7 +2774,7 @@ function cpusFor(sv, d, cores){
   if(sv.sockets < 2) return cores <= max ? {n: 1, why: one}
                                          : {n: 1, short: true, why: `Needs ${cores} cores, but ${cap}: fewer cores per GPU, or another server`};
   const reach = sv.cpu1 ? (sv.cpu1[d.g.n] ?? sv.cpu1["*"]) : Infinity;
-  if(reach > 0 && d.gpus <= reach && cores <= max) return {n: 1, why: `${one}. A second CPU adds nothing this build needs${sv.cpu1Check ? ". Confirm a one-CPU GPU build in OCA" : ""}`};
+  if(reach > 0 && d.gpus <= reach && cores <= max) return {n: 1, why: `${one}${sv.cpu1Check ? ". Confirm a one-CPU GPU build in OCA" : ""}`};
   const because = reach===0 ? esc(sv.cpu1Why) : d.gpus > reach ? `${esc(sv.cpu1Why)} One CPU reaches ${reach} ${esc(d.g.n.replace(" Blackwell", ""))}${reach===1 ? "" : "s"}.`
                 : `Two CPUs for the cores: ${cap}.`;
   if(cores > 2*max) return {n: 2, short: true, why: `Needs ${cores} cores, but two CPUs here give at most ${2*max}: fewer cores per GPU`};
