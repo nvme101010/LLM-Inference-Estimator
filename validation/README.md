@@ -52,17 +52,17 @@ Not fitted, since no benchmark here exercises them: the PCIe all-reduce latency 
 
 | Group left out | Points | Speed per user | Output, all users | First token, lowest concurrency |
 |---|---|---|---|---|
-| All | 295 | 1.02 (0.80–1.31), 77% | 1.06 (0.82–1.38), 74% | 1.02 (0.66–1.49), 50% |
-| InferenceX gpt-oss-120b, HGX B200 | 56 | 0.80 (0.68–0.99), 46% | 0.81 (0.70–1.02), 59% | 1.58 (0.76–2.18), 25% |
-| InferenceX gpt-oss-120b, HGX H200 | 51 | 1.14 (1.02–1.30), 86% | 1.19 (1.08–1.56), 75% | 0.84 (0.62–1.31), 33% |
+| All | 295 | 1.02 (0.80–1.30), 77% | 1.06 (0.82–1.38), 74% | 1.03 (0.65–1.49), 50% |
+| InferenceX gpt-oss-120b, HGX B200 | 56 | 0.79 (0.68–0.99), 46% | 0.81 (0.70–1.02), 59% | 1.57 (0.76–2.18), 25% |
+| InferenceX gpt-oss-120b, HGX H200 | 51 | 1.14 (1.02–1.30), 86% | 1.19 (1.08–1.56), 75% | 0.83 (0.61–1.31), 33% |
 | InferenceX Llama 3.3 70B, HGX B200 | 58 | 1.04 (0.93–1.24), 93% | 1.09 (0.96–1.31), 86% | 0.71 (0.50–0.85), 25% |
-| InferenceX Llama 3.3 70B, HGX H200 | 58 | 1.05 (0.92–1.24), 91% | 1.06 (0.94–1.28), 88% | 1.05 (1.02–1.14), 100% |
-| NIM Llama 3.1 8B, HGX H200 | 44 | 1.23 (0.89–1.57), 52% | 1.30 (0.91–1.59), 41% | 1.17 (0.81–1.36), 50% |
-| NIM Llama 3.1 8B, L40S | 28 | 0.92 (0.88–0.99), 100% | 0.92 (0.89–1.05), 100% | 1.10 (0.98–1.25), 83% |
+| InferenceX Llama 3.3 70B, HGX H200 | 58 | 1.04 (0.92–1.24), 91% | 1.06 (0.94–1.27), 88% | 1.05 (1.02–1.13), 100% |
+| NIM Llama 3.1 8B, HGX H200 | 44 | 1.24 (0.89–1.58), 50% | 1.29 (0.91–1.59), 39% | 1.16 (0.81–1.35), 50% |
+| NIM Llama 3.1 8B, L40S | 28 | 0.92 (0.89–0.99), 100% | 0.92 (0.89–1.05), 100% | 1.10 (0.98–1.26), 83% |
 
-Each cell is predicted ÷ measured: the median, the middle 80% in brackets, and the share within ±25%. The fitted constants hardly move from fold to fold (bandwidth share 0.83–0.85, prompt-reading share 0.44–0.59, all-reduce latency 20–24 µs), so no one group is carrying the fit. Fitted on all six, in sample, speed per user comes to 1.00 (0.87–1.18) with 91% within ±25%.
+Each cell is predicted ÷ measured: the median, the middle 80% in brackets, and the share within ±25%. The fitted constants hardly move from fold to fold (bandwidth share 0.83–0.85, prompt-reading share 0.44–0.59, all-reduce latency 20–24 µs), so no one group is carrying the fit. Refitted for 1.7.1, when the wait for other prompts stopped counting a user's own request (a single user never waits): the rounded constants came out the same, and the held-out figures above moved by a point or so. Fitted on all six, in sample, speed per user comes to 1.00 (0.87–1.18) with 91% within ±25%.
 
-**The likely range.** For the middle 80% of held-out points, measured speed per user came to between 0.77 and 1.3 times the estimate, and the first token with nothing queued between 0.67 and 1.5 times. `fit.mjs --apply` writes these into `RANGE`. The page shows them as the likely range beside each figure, and judges the speed goal at the cautious end: speed at the low end, first token at the slow end. Held out, the central estimate promises more than 25% too much speed on 37 of 295 points; the cautious end does so on 3 (and by more than 10% on 19).
+**The likely range.** For the middle 80% of held-out points, measured speed per user came to between 0.77 and 1.3 times the estimate, and the first token with nothing queued between 0.67 and 1.5 times. `fit.mjs --apply` writes these into `RANGE`. The page shows them as the likely range beside each figure, and judges the speed goal at the cautious end: speed at the low end, first token at the slow end. Held out, the central estimate promises more than 25% too much speed on 38 of 295 points; the cautious end does so on 3 (and by more than 10% on 18).
 
 **AMD.** The MI355X's 8 GPUs are wired to each other with no switch, one Infinity Fabric link per pair (76.8 GB/s each way), so a run split across 2 or 4 of them uses only 1 or 3 links. Since 1.5.0 the model counts that (`mesh` in `GPUS`); before, every split got all 7 links' 538 GB/s. The constants fitted on NVIDIA boards promise 14% too much speed on the MI355X (1.14, 1.00–1.43). With one factor for AMD's stack, the estimate is checked by fitting that factor on one model's MI355X runs and predicting the other's: 0.99 (0.85–1.25), 81% within ±25%, as good as the NVIDIA held-out figures. The factor comes to 0.73 fitted on Llama 3.3 70B (vLLM 0.10, October 2025) and 0.78 fitted on gpt-oss (vLLM 0.22, 2026). With every split given all 7 links, those were 0.64 and 0.77, read at the time as ROCm catching up; most of that gap was the 70B runs' 2- and 4-GPU splits, which the gpt-oss runs barely use. The page ships 0.75, fitted on both, for the MI355X and MI350P.
 
