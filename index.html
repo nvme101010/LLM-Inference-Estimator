@@ -858,6 +858,15 @@
           </div>
           <div class="hint">NVIDIA guidance puts 2, 4 or 8 GPUs in a two-socket server and sizes the CPUs, memory and storage around them, from NVIDIA's recommendations for certified inference servers and the servers HPE builds for Private Cloud AI.</div>
         </div>
+        <div>
+          <p class="eyebrow">System memory <span class="i" data-tip="memSet" tabindex="0">i</span></p>
+          <div class="seg" id="memset" role="group" aria-label="System memory">
+            <button data-v="0" aria-pressed="false">Least memory</button>
+            <button data-v="1" aria-pressed="true">One per channel</button>
+            <button data-v="2" aria-pressed="false">Every channel</button>
+          </div>
+          <div class="hint">How the Servers view builds each server's memory from its own DIMMs, at least 2 × GPU memory: the fewest GB, one DIMM per channel, or every channel filled.</div>
+        </div>
       </div>
     </details>
 
@@ -1887,7 +1896,7 @@ const DATA_AS_OF = "October 2026";   // when the model and board figures were la
 /* The estimator's version, carried in every shared link and summary. A link made under an older
    version opens with the changes since then listed, so a sizing never shifts without saying so.
    Bump it with each release tag; add to CHANGES whenever a release changes what the figures come to. */
-const VERSION = "1.7.1";
+const VERSION = "1.8.0";
 const CHANGES = [
   {v:"1.7.1", what:"A prompt now waits only behind other users' prompts: each user has one request at a time, so a single user never waits, and a few users wait less than before. First token comes out up to about a fifth shorter with few users and long prompts, and by a few percent or less otherwise; some setups that missed the goal only on that wait now meet it, or serve more users within it, so a suggestion can change. Output, all users is now the replies finished each second times their length, not users × speed per user: lower by 1–2% for chat, and by a third or more for one user on long documents. It also no longer counts copies left with no users of their own, as when one user is suggested two copies of a model, which used to double it. The build and wiring name each board's own PCIe generation (Gen4 for the L4 and L40S), and pipeline stages on cards with no GPU link hand off at that speed. The fitted constants are unchanged. Each recommendation now says when it assumes a warm prompt cache, and how much of each prompt that leaves to read; the GPU view says its HPE server is one of those that take the board."},
   {v:"1.7.0", what:"The answer now opens by server: the Servers view sizes the model on every current GPU-capable HPE ProLiant server, recommends one configuration, tags the smaller and bigger servers that also work, and shows every layout its wiring allows, including pipelining across NVLink groups and over PCIe. The GPU view is one click away, and links made before 1.7.0 open in it. Pipeline across bridge groups, off by default, in Advanced settings: on H200 NVL servers one copy of a model may span both bridged groups of 4 as two pipeline stages, tensor-parallel within each, so a model or a KV cache too big for one group fits on 8 cards. With it off nothing changes. With it on, a board that could only run two copies of 4 can also be suggested as one copy of 8 when that is the only layout that holds everyone; speed per user is sized as one group's, since each stage still reads all of its weights per token, and the figures for pipelined copies are modeled, not yet fitted to a benchmark. In the GPU view each board is now sized as in one HPE server that takes it, at that server's limits (on the DL385 Gen11, 4 double-wide cards and 2-way H200 NVL bridges; on the DL380 Gen12, H200 NVL with no bridge); the Servers view compares all 13 current GPU-capable HPE ProLiant servers. Server sizing gives the L4 and RTX PRO 4500 16 CPU cores per GPU at any count (other boards keep 32 per GPU, 16 at 8 GPUs). On Auto the figures are unchanged, except the AMD MI350P: its only HPE server, the DL385 Gen11, holds 4, so it is now sized at 4 cards. In the Servers view, system memory is built from the server's own modules: the smallest it takes, as few as reach 2 × GPU memory, one per channel, rather than filling every channel."},
@@ -1927,6 +1936,7 @@ function loadUnit(){ try { return localStorage.getItem(UNIT_KEY)==="GiB" ? "GiB"
 const S = { wq:2, wqLbl:"NATIVE", kq:2, tp:1, pp:1, tpo:"auto", pipe:0, chunk:512, ovpct:7, users:16, board:"auto",
             goal:"smooth",
             srv:0,             // Server: 0 = GPUs only, 1 = NVIDIA's guidance for the whole server (see serverFor)
+            mem:1,             // System memory in the Servers view: 0 = least memory, 1 = one DIMM per channel, 2 = every channel (see memFor)
             view:"srv",        // which answer shows: "srv" = the Servers view (configurations of HPE servers), "gpu" = boards
             scope:null,        // the Servers view's servers in scope: a Set of catalog ids (every server, set at start)
             cfg:null,          // the configuration its detail shows: "<server id>|<board>", or null for the recommendation
@@ -2693,24 +2703,44 @@ function cpusFor(sv, d, cores){
   if(cores > 2*max) return {n: 2, short: true, why: `Needs ${cores} cores, but two CPUs here give at most ${2*max}: fewer cores per GPU`};
   return {n: 2, why: because + (d.gpus > 1 ? ` Split the GPUs evenly across the two; keep each copy on one CPU's GPUs where it fits.` : "")};
 }
-/* System memory from the server's own modules (sv.mem): NVIDIA's minimum, 2 × GPU memory, rounded up only as far
-   as the modules make it, since memory is the costly part, not every channel filled. The smallest modules the server takes, as
-   few as reach the minimum, so they land on as many channels as that much memory can: one per channel, a larger
-   module only when the smallest can't reach it that way, and two per channel only when one can't. Each CPU holds
-   the same DIMMs, a count its population rules allow (pop). null: the server can't hold that much. */
-function memFor(sv, cpus, minGB){
+/* System memory from the server's own modules (sv.mem), at least NVIDIA's minimum of 2 × GPU memory. Each CPU holds
+   the same DIMMs, a count its population rules allow (pop), one per channel before any channel takes a second. The
+   rest is the System memory setting (S.mem), a trade between memory's cost and its speed:
+     0  Least memory: the fewest GB that reach the minimum, two per channel allowed; ties go to more channels, then
+        fewer DIMMs.
+     1  One per channel (the default): the smallest modules, as few as reach it, so that much memory lands on as
+        many channels as it can; a larger module only when the smallest can't reach it one per channel, and two
+        per channel only when one can't.
+     2  Every channel: every channel filled, as NVIDIA's guide asks, with the smallest modules that reach the
+        minimum; two per channel only when one can't.
+   two: channels holding a second DIMM, which slows the memory. null: the server can't hold that much. */
+const MEM_NAME = ["least memory", "one DIMM per channel", "every channel"];
+function memFor(sv, cpus, minGB, mode = S.mem){
   const m = sv.mem;
   if(!m) return null;
+  const pick = (k, gb)=> ({k, gb, total: cpus*k*gb, ch: Math.min(k, m.ch), two: Math.max(0, k - m.ch), of: m.ch, dimms: cpus*k});
+  if(mode===0){
+    let best = null;
+    for(const k of m.pop) if(k <= m.ch*m.dpc) for(const gb of m.gb){
+      const x = pick(k, gb);
+      if(x.total < minGB) continue;
+      if(!best || x.total < best.total || x.total===best.total && (x.ch > best.ch || x.ch===best.ch && k < best.k)) best = x;
+    }
+    return best;
+  }
   for(const most of [m.ch, m.ch*m.dpc]) for(const gb of m.gb){
-    const k = m.pop.find(k=> k <= most && cpus*k*gb >= minGB);
-    if(k) return {k, gb, total: cpus*k*gb, ch: Math.min(k, m.ch), of: m.ch, dimms: cpus*k};
+    const k = mode===2 ? (m.pop.includes(most) && cpus*most*gb >= minGB ? most : 0)
+                       : m.pop.find(k=> k <= most && cpus*k*gb >= minGB);
+    if(k) return pick(k, gb);
   }
   return null;
 }
-/* the Memory row's lines for memFor's pick: the modules, then how many channels they fill, called out when not all */
+/* the Memory row's lines for memFor's pick: the modules, how many channels they fill, and the setting it was sized
+   for; flagged when channels are left empty or hold two DIMMs */
 function memLines(mm, cpus, minGB){
   const each = cpus===2 ? " on each CPU" : "", mods = `${mm.dimms} × ${mm.gb} GB` + (cpus===2 ? `, ${mm.k} per CPU` : "");
-  const floor = `NVIDIA's minimum is 2 × GPU memory, ${commas(Math.ceil(minGB))} GB`;
+  const floor = `NVIDIA's minimum is 2 × GPU memory, ${commas(Math.ceil(minGB))} GB · sized for ${MEM_NAME[S.mem]} (System memory, in Advanced settings)`;
+  if(mm.two) return {sub: `${mods} · every channel${each} populated, ${mm.two} with two DIMMs, so memory runs at the slower two-per-channel speed`, extra: floor, flag: true};
   if(mm.ch === mm.of) return {sub: `${mods} · every channel${each} populated`, extra: floor, flag: false};
   return {sub: `${mods} · ${mm.ch} of ${mm.of} memory channels${each} populated, so about ${Math.round(100*mm.ch/mm.of)}% of the CPU's memory bandwidth`,
           extra: `${floor}. Fill more channels if the CPU offloads KV cache or does heavy work of its own`, flag: true};
@@ -3801,11 +3831,11 @@ function hostSentence(d){
 
 /* the collapsed Advanced header still says what's set, and how much differs from the defaults */
 function renderAdvState(){
-  const changed = [S.kq!==2, S.tpo!=="auto", S.pipe, S.chunk!==S.chunkBase, S.ovpct!==7, !S.cache, S.srv].filter(Boolean).length;
+  const changed = [S.kq!==2, S.tpo!=="auto", S.pipe, S.chunk!==S.chunkBase, S.ovpct!==7, !S.cache, S.srv, S.mem!==1].filter(Boolean).length;
   const many = S.models.length > 1;   // with several models, say which settings are the shown model's and which every model's
   $('advState').innerHTML = (changed ? `<b>${changed} changed</b> · ` : "") + (many ? `${esc(specName(S.models[S.edit]))}: ` : "")
     + `KV ${kqLabel()} · TP ${S.tpo==="auto" ? "auto" : S.tpo}${S.pipe ? " · pipeline across bridges" : ""} · ${CHUNK_NAME[S.chunk]} · ${many ? "all models: " : ""}${S.ovpct}% overhead · prompt caching ${S.cache ? "on" : "off"}`
-    + ` · ${S.srv ? "server by NVIDIA guidance (beta)" : "GPUs only"}`;
+    + ` · ${S.srv ? "server by NVIDIA guidance (beta)" : "GPUs only"} · memory: ${MEM_NAME[S.mem]}`;
 }
 
 /* ---------------- several models on the page ----------------
@@ -4266,6 +4296,7 @@ wireSeg('chunk','chunk');
 wireSeg('tp','tpo');
 wireSeg('pipe','pipe');
 wireSeg('srv','srv');
+wireSeg('memset','mem');
 function kqLabel(){ return $('kq').querySelector(`[data-v="${S.kq}"]`).dataset.lbl; }
 
 /* weight precision select: "As released" follows the model; the rest are fixed bytes/param (WQ_BYTES) */
@@ -4494,7 +4525,7 @@ let DL = null;   // claude.ai's downloads capability, when this page runs there
 /* The address holds only what differs from the defaults: the version first, then the page's settings and
    each model's. Model 1's keys are as they have always been; model k's are the same keys with k appended
    (m2, u2…). KEY_ORDER keeps a one-model link exactly as earlier versions wrote it. */
-const KEY_ORDER = ["v","m","c","u","w","p","r","cb","x","th","tv","wq","g","kv","tp","pp","ck","ov","pc","sv","vw","hs","cf","sh","fr","b","tf","e"];   // e: the model the controls show, when not the first
+const KEY_ORDER = ["v","m","c","u","w","p","r","cb","x","th","tv","wq","g","kv","tp","pp","ck","ov","pc","sv","mm","vw","hs","cf","sh","fr","b","tf","e"];   // e: the model the controls show, when not the first
 function stateToHash(){
   saveSpec();
   const out = [["v", VERSION]];               // the estimator the link was made with, first so it reads at a glance
@@ -4502,6 +4533,7 @@ function stateToHash(){
   if(S.ovpct!==7) out.push(["ov", S.ovpct]);
   if(!S.cache) out.push(["pc", "off"]);
   if(S.srv) out.push(["sv", "nv"]);
+  if(S.mem!==1) out.push(["mm", S.mem ? "all" : "least"]);
   if(S.view!=="srv") out.push(["vw", S.view]);
   if(S.scope.size < CATALOG.servers.length) out.push(["hs", [...S.scope].join(".") || "none"]);
   if(S.cfg) out.push(["cf", S.cfg]);
@@ -4610,7 +4642,7 @@ function showSpec(){
   workloadSel.value = S.workload; showSeg('chunk', S.chunk); showLengths();
   showUsers(); usersNum.value = S.users;
   $('goal').value = S.goal; updateGoalHint();
-  showSeg('kq', S.kq); showSeg('tp', S.tpo); showSeg('pipe', S.pipe); showSeg('pcache', S.cache); showSeg('srv', S.srv);
+  showSeg('kq', S.kq); showSeg('tp', S.tpo); showSeg('pipe', S.pipe); showSeg('pcache', S.cache); showSeg('srv', S.srv); showSeg('memset', S.mem);
   ovSlider.value = S.ovpct; syncOv();
   renderMix(); syncTrafficInputs();
 }
@@ -4638,6 +4670,7 @@ function applyHash(){
     S.ovpct = q.has("ov") && ov>=0 && ov<=25 ? ov : 7;
     S.cache = q.get("pc")==="off" ? 0 : 1;
     S.srv = q.get("sv")==="nv" ? 1 : 0;
+    S.mem = q.get("mm")==="least" ? 0 : q.get("mm")==="all" ? 2 : 1;
     /* the Servers view is the answer unless the link says otherwise; links made before it existed open as they were, in the GPU view */
     S.view = q.get("vw")==="gpu" || (!q.has("vw") && olderThan(v || LINK_BEFORE, "1.7.0")) ? "gpu" : "srv";
     const ids = CATALOG.servers.map(sv=> sv.id), hs = q.get("hs");
@@ -4980,6 +5013,7 @@ const TIPS = {
   fleetMem:"GPU memory bought in all: every GPU of every server, spare ones included, at the size on the box. The suggestion is the board where every model meets its goal with the least of it.",
   fleetGoal:"How many models are estimated to serve all their users within their own speed goal, judged at the cautious end of the estimate as for one model.",
   prefill:"How fast a new prompt is read, in tokens per second. Reading is limited by compute rather than memory speed, so faster chips and FP8 or FP4 help most. Optimize for, in Advanced settings, sets the piece size.",
+  memSet:"System memory in the Servers view: at least NVIDIA's minimum of 2 × GPU memory, built from the DIMMs each HPE server takes, in counts its population rules allow, the same on each CPU. Least memory: the fewest GB, even if some channels hold two DIMMs, which slows the memory, or stay empty, which cuts its bandwidth. One per channel (the default): the smallest DIMMs, one per channel, on as many channels as that much memory fills, so nothing is slowed, for at most a module size more. Every channel: every channel filled, as NVIDIA's guide asks, for the full bandwidth, with the most memory. With the model on the GPUs, memory bandwidth matters most for loading models, KV cache offloaded to CPU memory, and work the CPUs do of their own. Only the Memory row changes; GPU sizing and speed don't.",
   pcache:"Chat and agent prompts mostly repeat: the same system prompt for everyone, and each user's earlier turns. vLLM and SGLang keep that part cached by default, so only the new text is read before the first reply, and the shared system prompt is stored once per GPU rather than once per user. Each workload preset sets how much of its prompt is new and how much is shared; the workload hint says. Turn it off to size for prompts that never repeat.",
   ovpct:"Headroom for allocator fragmentation and framework buffers, as a percentage of weights + cache + activations. 5–10% is typical; raise it if you have hit OOM under load.",
   goal:"How fast each user should see answers: at least this many tokens per second, and a first reply within the time limit. When users don't see a thinking model's thinking, the limit is on when the answer starts instead: 15 s for Fast, 30 s for Smooth chat, 60 s for Readable. The suggestion is the setup that reaches it with the least GPU memory in total, judged at the cautious end of the estimate: speed at the low end of its likely range, first token at the slow end. Any speed just finds the smallest setup that fits.",
