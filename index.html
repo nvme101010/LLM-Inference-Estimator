@@ -519,6 +519,8 @@
   .bom dd{margin:0; display:flex; flex-direction:column; gap:2px; min-width:0}
   .bom dd b{font-size:14px; font-weight:600; color:var(--ink)}
   .bom dd span{font-size:12.5px; color:var(--ink-2)}
+  .bom .pn{font-style:normal; white-space:nowrap}
+  .bom dd b .sku{font-family:"IBM Plex Mono",monospace; font-size:12px; font-weight:500; color:var(--muted); margin-left:6px; white-space:nowrap}
   .bom-r.flag dt{color:var(--warn)} .bom-r.flag dt::before{content:"! "; font-weight:700}
   .bom-notes{display:flex; flex-direction:column; gap:5px}
   @media (max-width:860px){ .rec-body{grid-template-columns:1fr} }
@@ -982,6 +984,13 @@
     "url": "https://www.hpe.com/us/en/collaterals/collateral.a00047453enw.html",
     "version": "20",
     "date": "2026-09-08"
+   },
+   "boot": {
+    "device": "HPE NS204i-u v2 480GB",
+    "sku": "P78279-B21",
+    "drives": "2 × 480 GB M.2 NVMe in hardware RAID 1, hot-plug",
+    "alt": "or 960 GB, P81160-B21",
+    "kit": "Needs the DL380a Gen12 NS204i-u Front Cage Kit, P75284-B21"
    }
   },
   {
@@ -1041,6 +1050,13 @@
     "url": "https://www.hpe.com/us/en/collaterals/collateral.a00073551enw.html",
     "version": "20",
     "date": "2026-10-05"
+   },
+   "boot": {
+    "device": "HPE NS204i-u v2 480GB",
+    "sku": "P78279-B21",
+    "drives": "2 × 480 GB M.2 NVMe in hardware RAID 1, hot-plug",
+    "alt": "or 960 GB, P81160-B21",
+    "kit": "Needs a front (P74759-B21, SFF or EDSFF chassis), rear (P74755-B21) or internal enablement kit"
    }
   },
   {
@@ -1105,6 +1121,17 @@
     "url": "https://www.hpe.com/us/en/collaterals/collateral.a50004300enw.html",
     "version": "49",
     "date": "2026-10-05"
+   },
+   "boot": {
+    "device": "HPE NS204i-u v2 480GB",
+    "sku": "P78279-B21",
+    "drives": "2 × 480 GB M.2 NVMe in hardware RAID 1, hot-plug",
+    "alt": "or 960 GB, P81160-B21",
+    "kit": "Needs a tertiary (P57850-B21) or secondary (P57885-B21) enablement kit",
+    "notes": [
+     "The NS204i-u v2 needs EPYC 9005 CPUs; with EPYC 9004, use the Gen11 device, P48183-B21.",
+     "The NS204i-u takes the tertiary riser or secondary slots 4 and 5: check its location against the GPU risers in OCA."
+    ]
    }
   },
   {
@@ -1149,6 +1176,13 @@
     "url": "https://www.hpe.com/us/en/collaterals/collateral.a50009233enw.html",
     "version": "13",
     "date": "2026-10-05"
+   },
+   "boot": {
+    "device": "HPE NS204i-u v2 480GB",
+    "sku": "P78279-B21",
+    "drives": "2 × 480 GB M.2 NVMe in hardware RAID 1, hot-plug",
+    "alt": "or 960 GB, P81160-B21",
+    "kit": "Needs a front enablement kit (P74759-B21) or rear cable kit (P71433-B21)"
    }
   },
   {
@@ -1183,6 +1217,13 @@
     "url": "https://www.hpe.com/us/en/collaterals/collateral.a50004261enw.html",
     "version": "16",
     "date": "2026-10-05"
+   },
+   "boot": {
+    "device": "HPE NS204i-u v2 480GB",
+    "sku": "P78279-B21",
+    "drives": "2 × 480 GB M.2 NVMe in hardware RAID 1, hot-plug",
+    "alt": "or 960 GB, P81160-B21",
+    "kit": "Front install needs the Multipurpose Drive Cage Kit, P76449-B21"
    }
   },
   {
@@ -1225,6 +1266,13 @@
     "url": "https://www.hpe.com/us/en/collaterals/collateral.a50006995enw.html",
     "version": "18",
     "date": "2026-10-05"
+   },
+   "boot": {
+    "device": "HPE NS204i-u v2 480GB",
+    "sku": "P78279-B21",
+    "drives": "2 × 480 GB M.2 NVMe in hardware RAID 1, hot-plug",
+    "alt": "or 960 GB, P81160-B21",
+    "kit": "Needs a front (P74252-B21) or rear (P72360-B21) enablement kit"
    }
   },
   {
@@ -1251,6 +1299,15 @@
     "url": "https://www.hpe.com/us/en/collaterals/collateral.a00054055enw.html",
     "version": "36",
     "date": "2026-07-13"
+   },
+   "boot": {
+    "device": "HPE NS204i-u Gen11",
+    "sku": "P48183-B21",
+    "drives": "2 × 480 GB M.2 NVMe in hardware RAID 1, hot-plug",
+    "kit": "Needs the ML110 Gen11 NS204i-u Enablement Kit, P61742-B21",
+    "notes": [
+     "With the NS204i-u, the embedded storage port is taken and no drive bays are supported: the model's weights go on the boot device."
+    ]
    }
   },
   {
@@ -1282,6 +1339,13 @@
     "url": "https://www.hpe.com/us/en/collaterals/collateral.a50004283enw.html",
     "version": "21",
     "date": "2026-10-05"
+   },
+   "boot": {
+    "device": "HPE NS204i-u v2 480GB",
+    "sku": "P78279-B21",
+    "drives": "2 × 480 GB M.2 NVMe in hardware RAID 1, hot-plug",
+    "alt": "or 960 GB, P81160-B21",
+    "kit": "On the GPU server, needs the NS204i-u GPU Internal Cable Kit, P76628-B21"
    }
   },
   {
@@ -1308,6 +1372,16 @@
     "url": "https://www.hpe.com/us/en/collaterals/collateral.a50009232enw.html",
     "version": "13",
     "date": "2026-10-05"
+   },
+   "boot": {
+    "device": "HPE NS204i-u v2 480GB",
+    "sku": "P78279-B21",
+    "drives": "2 × 480 GB M.2 NVMe in hardware RAID 1, hot-plug",
+    "alt": "or 960 GB, P81160-B21",
+    "kit": "Needs a front (P77186-B21) or rear (P71433-B21) cable kit",
+    "notes": [
+     "A rear NS204i-u needs the low-profile primary riser, P81927-B21."
+    ]
    }
   },
   {
@@ -1334,6 +1408,16 @@
     "url": "https://www.hpe.com/us/en/collaterals/collateral.a50006984enw.html",
     "version": "20",
     "date": "2026-10-05"
+   },
+   "boot": {
+    "device": "HPE NS204i-u v2 480GB",
+    "sku": "P78279-B21",
+    "drives": "2 × 480 GB M.2 NVMe in hardware RAID 1, hot-plug",
+    "alt": "or 960 GB, P81160-B21",
+    "kit": "Needs a front (P77198-B21), rear (P72197-B21) or internal (P72595-B21) enablement kit",
+    "notes": [
+     "The rear NS204i-u kit uses PCIe slot 2: with 3 GPUs, check the front or internal kit in OCA."
+    ]
    }
   },
   {
@@ -1365,6 +1449,17 @@
     "url": "https://www.hpe.com/us/en/collaterals/collateral.a50004299enw.html",
     "version": "46",
     "date": "2026-10-05"
+   },
+   "boot": {
+    "device": "HPE NS204i-u v2 480GB",
+    "sku": "P78279-B21",
+    "drives": "2 × 480 GB M.2 NVMe in hardware RAID 1, hot-plug",
+    "alt": "or 960 GB, P81160-B21",
+    "kit": "Needs the low-profile secondary riser, P55029-B21",
+    "notes": [
+     "The NS204i-u v2 needs EPYC 9005 CPUs; with EPYC 9004, use the Gen11 device, P48183-B21.",
+     "The NS204i-u requires the low-profile secondary riser, which leaves no full-height secondary slot: check the GPU slots in OCA."
+    ]
    }
   },
   {
@@ -1402,6 +1497,13 @@
     "url": "https://www.hpe.com/us/en/collaterals/collateral.a50009217enw.html",
     "version": "23",
     "date": "2026-10-05"
+   },
+   "boot": {
+    "device": "HPE NS204i-u Gen11",
+    "sku": "P48183-B21",
+    "drives": "2 × 480 GB M.2 NVMe in hardware RAID 1, hot-plug",
+    "kit": "Needs the DL145 Gen11 NS204i-u Enablement Kit, P71992-B21",
+    "alt": "or v2 960 GB, P81160-B21"
    }
   },
   {
@@ -1455,6 +1557,12 @@
     "url": "https://www.hpe.com/us/en/collaterals/collateral.a00073553enw.html",
     "version": "16",
     "date": "2026-08-03"
+   },
+   "boot": {
+    "device": "HPE ProLiant Compute XD NS204i-u 960GB",
+    "sku": "S4R99A",
+    "drives": "RAID 1 M.2 NVMe, hot-plug",
+    "alt": "or 2 × 960 GB, S6A36A"
    }
   }
  ],
@@ -2606,14 +2714,18 @@ function buildRows(c, d){
   if(k==="bridge" && d.gpus>1){ const n = groupsUsed(c, d);
     row("NVLink", `${n} × ${esc(x.link.kit)}`, `${x.link.bridge}-way NVLink bridge${n===1 ? "" : "s"}`); }
   if(x.unconfirmed) row("Card count", "To confirm", esc(x.unconfirmed), true);
-  if(systemOf(d.g)){ row("Platform", "Comes with the system", `CPUs, memory and storage: ${esc(sv.cpu)}`); }
+  const pn = t => esc(t).replace(/\b(P\d{5}-B21)\b/g, '<i class="pn">$1</i>');   /* part numbers don't break */
+  const bt = sv.boot, boot = () => bt && row("Boot", `${esc(bt.device)} <span class="sku">${esc(bt.sku)}</span>`,
+    `${esc(bt.drives)}${bt.alt ? ` · ${pn(bt.alt)}` : ""}${bt.kit ? `</span><span>${pn(bt.kit)}` : ""}`);
+  if(systemOf(d.g)){ row("Platform", "Comes with the system", `CPUs, memory and storage: ${esc(sv.cpu)}`); boot(); }
   else {
     const sr = serverOf(d.g, d.gpus, [[d, d.gpus]]), per = sr.cores/d.gpus;
     const why = LIGHT_GPUS.includes(d.g.n) ? `for the ${esc(d.g.n.replace(" Blackwell", ""))}` : "as HPE Private Cloud AI builds it";
     if(sv.sockets >= 2) row("CPUs", `2 × ${esc(sv.cpu)}`, `${commas(sr.cores)} physical cores in total, ${commas(sr.cores/2)} per socket · ${per} per GPU, ${why}`);
     else row("CPU", `1 × ${esc(sv.cpu)}`, `${commas(sr.cores)} physical cores, ${per} per GPU, ${why} · NVIDIA's guidance asks for two sockets`, true);
     row("Memory", `${commas(Math.ceil(sr.ram))} GB`, `2 × GPU memory, every channel populated`);
-    row("Storage", `${capParts(sr.diskGB).join(" ")} NVMe`, `usable, for model weights · plus a 1 TB boot drive`);
+    row("Storage", `${capParts(sr.diskGB).join(" ")} NVMe`, `usable, for model weights${bt ? "" : " · plus a 1 TB boot drive"}`);
+    boot();
   }
   row("Power", "Size in HPE Power Advisor", "PSUs and redundancy for this load", true);
   return `<dl class="bom">${rows.join("")}</dl>`;
@@ -2698,7 +2810,7 @@ function configCard(c, eyebrow, cmp, back = ""){
     + `<div class="rec-body">`
     + `<section class="rec-col"><h3 class="colh">Build</h3>${buildRows(c, d)}`
     + bridgeBays(c, d)
-    + ((c.x.constraints || []).length || (sv.notes || []).length ? `<div class="bom-notes"><span class="sublbl">Before you quote</span><ul class="svnotes">${[...(c.x.constraints || []), ...(sv.notes || [])].map(t=> `<li>${esc(t)}</li>`).join("")}</ul></div>` : "")
+    + ((c.x.constraints || []).length || (sv.notes || []).length || ((sv.boot || {}).notes || []).length ? `<div class="bom-notes"><span class="sublbl">Before you quote</span><ul class="svnotes">${[...(c.x.constraints || []), ...(sv.notes || []), ...((sv.boot || {}).notes || [])].map(t=> `<li>${esc(t)}</li>`).join("")}</ul></div>` : "")
     + `</section>`
     + `<section class="rec-col"><h3 class="colh">Performance</h3>${statsHtml(d)}`
     + (extrap ? `<p class="cap">Speeds are extrapolated: the ${esc(d.g.n.replace(" Blackwell", ""))} has no published benchmark here <span class="i" data-tip="extrap" tabindex="0">i</span>. Load-test before quoting them.</p>` : "")
