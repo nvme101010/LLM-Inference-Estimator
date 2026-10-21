@@ -2620,7 +2620,7 @@ function evalLayout(b, L, reps, upr = Math.ceil(allUsers()/reps)){
   const r = compute(L.tp, upr, L.pp), perGB = r.perGPU/GB, fits = fitsOn(b, perGB);
   const t = fits ? throughput(b, L.tp, S.chunk, upr, L.pp) : null, gpus = L.n*reps;
   return {g: b, L, tp: L.n, tpw: L.tp, pp: L.pp, reps, upr, gpus, r, perGB, fits, t, meets: !!t && meetsGoal(t),
-          memGB: gpus*b.cap, nr: L.tp>1 && !b.link, modeled: L.pp>1};
+          memGB: gpus*b.cap, nr: L.n>1 && !b.link, modeled: L.pp>1};
 }
 /* the most users one copy of layout L holds (memOnly) or serves within the goal, up to upTo */
 function layoutCapacity(b, L, upTo, memOnly){
@@ -2683,13 +2683,15 @@ function allConfigs(){
             within the goal and its roomiest */
 const rackU = c => c.sv.u ?? 99;
 /* the recommendation's order: least GPU memory, then not over PCIe, not pipelined, most room, fewest rack units */
-const leanOrder = (a, c)=> a.best.memGB - c.best.memGB || (+a.best.nr - +c.best.nr) || (+a.best.modeled - +c.best.modeled)
-                       || c.best.room - a.best.room || rackU(a) - rackU(c);
+/* The same order as the GPU view's suggestion: a copy split over PCIe last (the GPU view never suggests one),
+   then the least GPU memory, then not pipelined, fewer GPUs per copy and faster; then most room, fewest rack units. */
+const leanOrder = (a, c)=> (+a.best.nr - +c.best.nr) || a.best.memGB - c.best.memGB || (+a.best.modeled - +c.best.modeled)
+                       || a.best.L.n - c.best.L.n || c.best.t.perUser - a.best.t.perUser || c.best.room - a.best.room || rackU(a) - rackU(c);
 function serverAnswer(cfgs){
   const inScope = cfgs.filter(c=> S.scope.has(c.sv.id)), fits = inScope.filter(c=> c.fits);
   const ok = fits.filter(c=> c.ok);
   const lean = leanOrder;
-  const rec = ok.slice().sort(lean)[0] || fits.slice().sort((a, c)=> c.best.served - a.best.served || lean(a, c))[0] || null;
+  const rec = ok.slice().sort(lean)[0] || fits.slice().sort((a, c)=> (+a.best.nr - +c.best.nr) || c.best.served - a.best.served || lean(a, c))[0] || null;
   if(!rec) return {inScope, fits, rec: null};
   const others = fits.filter(c=> c.sv.id!==rec.sv.id);
   const down = rec.sv.u ? (others.filter(c=> c.ok && rackU(c) < rec.sv.u).sort((a, c)=> rackU(a) - rackU(c) || lean(a, c))[0]
@@ -2812,7 +2814,8 @@ function layoutWhy(c, d){
   const how = d.pp>1 ? `One copy across ${d.pp} ${bridged ? "NVLink groups" : "cards"} as pipeline stages${d.tpw>1 ? `, tensor-parallel across the ${d.tpw} cards of each` : ""}.`
             : d.reps>1 ? `${d.reps} copies of the model${d.tpw>1 ? `, each tensor-parallel across ${d.tpw} ${bridged ? "bridged " : ""}cards` : ", one per card"}, sharing the users.`
             : d.tpw>1 ? `One copy, tensor-parallel across ${d.tpw} ${bridged ? "bridged " : ""}cards.` : `One copy on one card.`;
-  const pcie = d.nr ? ` The cards have no direct link, so an all-reduce crosses PCIe after every layer; the speed shown reflects that.` : "";
+  const pcie = !d.nr ? "" : d.tpw>1 ? ` The cards have no direct link, so an all-reduce crosses PCIe after every layer; the speed shown reflects that.`
+             : ` The cards have no direct link, so each hand-off between stages crosses PCIe.`;
   return how + pcie;
 }
 /* a layout with more cards, in words: "8 cards as 2 copies of TP 4" */
