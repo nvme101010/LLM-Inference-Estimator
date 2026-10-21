@@ -936,6 +936,7 @@
  "vendor": "HPE",
  "checked": "2026-10-20",
  "about": "Every current HPE ProLiant server that takes one of the estimator's boards, for the US. Which GPU and NVLink bridge each server takes: the matrix. How many cards, and each constraint: the server's US QuickSpecs (quickspecs: URL, version, date). max is per server; a node here is at most 8, so larger counts are capped at 8. Gen11 servers with a Gen12 successor that takes the same GPUs are left out.",
+ "memAbout": "mem: memory channels per CPU (ch), DIMMs per channel (dpc), the RDIMM sizes HPE sells for the server in GB (gb), from its US QuickSpecs; pop: how many DIMMs one CPU may hold, from the population table for the server in HPE's memory population rules for its processor family (rules; checked 2026-10-21). Xeon 6 servers take no 6-DIMM population; AMD servers with 2 DIMMs per channel go 12, 16, 20, 24.",
  "matrix": {
   "title": "NVIDIA Accelerators for HPE QuickSpecs",
   "version": "83",
@@ -990,6 +991,7 @@
     "version": "20",
     "date": "2026-09-08"
    },
+   "mem": {"ch": 8, "dpc": 2, "gb": [16, 32, 64, 96, 128, 256], "pop": [1, 2, 4, 8, 12, 16], "rules": "https://www.hpe.com/psnow/doc/a50012949enw"},
    "maxCores": 86,
    "coreNote": "Xeon 6787P",
    "cpu1": {
@@ -1055,6 +1057,7 @@
     "version": "20",
     "date": "2026-10-05"
    },
+   "mem": {"ch": 8, "dpc": 2, "gb": [16, 32, 64, 96, 128, 256], "pop": [1, 2, 4, 8, 12, 16], "rules": "https://www.hpe.com/psnow/doc/a50012949enw"},
    "maxCores": 86,
    "coreNote": "Xeon 6787P",
    "cpu1": {
@@ -1127,6 +1130,7 @@
     "version": "49",
     "date": "2026-10-05"
    },
+   "mem": {"ch": 12, "dpc": 1, "gb": [16, 32, 64, 96, 128, 256], "pop": [1, 2, 4, 6, 8, 10, 12], "rules": "https://www.hpe.com/psnow/doc/a50007481enw"},
    "maxCores": 160,
    "coreNote": "EPYC 9845; 128 on EPYC 9004",
    "cpu1": {
@@ -1177,6 +1181,7 @@
     "version": "13",
     "date": "2026-10-05"
    },
+   "mem": {"ch": 12, "dpc": 2, "gb": [32, 64, 96, 128, 256], "pop": [1, 2, 4, 6, 8, 10, 12, 16, 20, 24], "rules": "https://www.hpe.com/psnow/doc/a50012817enw"},
    "maxCores": 192,
    "coreNote": "EPYC 9965"
   },
@@ -1213,6 +1218,7 @@
     "version": "16",
     "date": "2026-10-05"
    },
+   "mem": {"ch": 8, "dpc": 2, "gb": [16, 32, 64, 96, 128, 256], "pop": [1, 2, 4, 8, 12, 16], "rules": "https://www.hpe.com/psnow/doc/a50012949enw"},
    "maxCores": 80,
    "coreNote": "Rich I/O Xeon 6781P, for the 4x GPU kit"
   },
@@ -1257,6 +1263,7 @@
     "version": "18",
     "date": "2026-10-05"
    },
+   "mem": {"ch": 8, "dpc": 2, "gb": [32, 64, 96, 128, 256], "pop": [1, 2, 4, 8, 12, 16], "rules": "https://www.hpe.com/psnow/doc/a50012949enw"},
    "maxCores": 86,
    "coreNote": "Xeon 6787P",
    "cpu1": {
@@ -1290,6 +1297,7 @@
     "version": "36",
     "date": "2026-07-13"
    },
+   "mem": {"ch": 8, "dpc": 2, "gb": [16, 32, 64, 96], "pop": [1, 2, 4, 6, 8, 12, 16], "rules": "https://www.hpe.com/psnow/doc/a50010242enw"},
    "maxCores": 28,
    "coreNote": "5th Gen Xeon, per the QuickSpecs"
   },
@@ -1323,6 +1331,7 @@
     "version": "21",
     "date": "2026-10-05"
    },
+   "mem": {"ch": 8, "dpc": 2, "gb": [16, 32, 64, 96, 128, 256], "pop": [1, 2, 4, 8, 12, 16], "rules": "https://www.hpe.com/psnow/doc/a50012949enw"},
    "maxCores": 80,
    "coreNote": "Rich I/O Xeon 6781P"
   },
@@ -1351,6 +1360,7 @@
     "version": "13",
     "date": "2026-10-05"
    },
+   "mem": {"ch": 12, "dpc": 2, "gb": [32, 64, 96, 128, 256], "pop": [1, 2, 4, 6, 8, 10, 12, 16, 20, 24], "rules": "https://www.hpe.com/psnow/doc/a50012817enw"},
    "maxCores": 192,
    "coreNote": "EPYC 9965"
   },
@@ -1379,6 +1389,7 @@
     "version": "20",
     "date": "2026-10-05"
    },
+   "mem": {"ch": 8, "dpc": 2, "gb": [16, 32, 64, 96, 128, 256], "pop": [1, 2, 4, 8, 12, 16], "rules": "https://www.hpe.com/psnow/doc/a50012949enw"},
    "maxCores": 86,
    "coreNote": "Xeon 6787P",
    "cpu1": {
@@ -1416,6 +1427,7 @@
     "version": "46",
     "date": "2026-10-05"
    },
+   "mem": {"ch": 12, "dpc": 1, "gb": [16, 32, 64, 96, 128, 256], "pop": [1, 2, 4, 6, 8, 10, 12], "rules": "https://www.hpe.com/psnow/doc/a50007481enw"},
    "maxCores": 160,
    "coreNote": "EPYC 9845; 128 on EPYC 9004",
    "cpu1": {
@@ -1459,6 +1471,7 @@
     "version": "23",
     "date": "2026-10-05"
    },
+   "mem": {"ch": 6, "dpc": 1, "gb": [16, 32, 64, 96, 128], "pop": [1, 2, 4, 6], "rules": "https://www.hpe.com/psnow/doc/a50007481enw"},
    "maxCores": 84,
    "coreNote": "EPYC 8635P"
   },
@@ -1514,6 +1527,7 @@
     "version": "16",
     "date": "2026-08-03"
    },
+   "mem": {"ch": 12, "dpc": 1, "gb": [64, 96, 128], "pop": [1, 2, 4, 6, 8, 10, 12], "rules": "https://www.hpe.com/psnow/doc/a50012817enw"},
    "maxCores": 96,
    "coreNote": "EPYC 9655",
    "cpu1": {
@@ -1877,7 +1891,7 @@ const DATA_AS_OF = "October 2026";   // when the model and board figures were la
    Bump it with each release tag; add to CHANGES whenever a release changes what the figures come to. */
 const VERSION = "1.7.0";
 const CHANGES = [
-  {v:"1.7.0", what:"The answer now opens by server: the Servers view sizes the model on every current GPU-capable HPE ProLiant server, recommends one configuration, tags the smaller and bigger servers that also work, and shows every layout its wiring allows, including pipelining across NVLink groups and over PCIe. The GPU view is one click away, and links made before 1.7.0 open in it. Pipeline across bridge groups, off by default, in Advanced settings: on H200 NVL servers one copy of a model may span both bridged groups of 4 as two pipeline stages, tensor-parallel within each, so a model or a KV cache too big for one group fits on 8 cards. With it off nothing changes. With it on, a board that could only run two copies of 4 can also be suggested as one copy of 8 when that is the only layout that holds everyone; speed per user is sized as one group's, since each stage still reads all of its weights per token, and the figures for pipelined copies are modeled, not yet fitted to a benchmark. Each board is now named with the HPE server it is sized in, and any of 13 current GPU-capable HPE ProLiant servers can be picked in Advanced settings to compare only the boards it takes, at its limits (on the DL385 Gen11, 4 double-wide cards and 2-way H200 NVL bridges; on the DL380 Gen12, H200 NVL with no bridge). Server sizing gives the L4 and RTX PRO 4500 16 CPU cores per GPU at any count (other boards keep 32 per GPU, 16 at 8 GPUs). On Auto the figures are unchanged, except the AMD MI350P: its only HPE server, the DL385 Gen11, holds 4, so it is now sized at 4 cards."},
+  {v:"1.7.0", what:"The answer now opens by server: the Servers view sizes the model on every current GPU-capable HPE ProLiant server, recommends one configuration, tags the smaller and bigger servers that also work, and shows every layout its wiring allows, including pipelining across NVLink groups and over PCIe. The GPU view is one click away, and links made before 1.7.0 open in it. Pipeline across bridge groups, off by default, in Advanced settings: on H200 NVL servers one copy of a model may span both bridged groups of 4 as two pipeline stages, tensor-parallel within each, so a model or a KV cache too big for one group fits on 8 cards. With it off nothing changes. With it on, a board that could only run two copies of 4 can also be suggested as one copy of 8 when that is the only layout that holds everyone; speed per user is sized as one group's, since each stage still reads all of its weights per token, and the figures for pipelined copies are modeled, not yet fitted to a benchmark. Each board is now named with the HPE server it is sized in, and any of 13 current GPU-capable HPE ProLiant servers can be picked in Advanced settings to compare only the boards it takes, at its limits (on the DL385 Gen11, 4 double-wide cards and 2-way H200 NVL bridges; on the DL380 Gen12, H200 NVL with no bridge). Server sizing gives the L4 and RTX PRO 4500 16 CPU cores per GPU at any count (other boards keep 32 per GPU, 16 at 8 GPUs). On Auto the figures are unchanged, except the AMD MI350P: its only HPE server, the DL385 Gen11, holds 4, so it is now sized at 4 cards. In the Servers view, system memory is built from the server's own modules: the smallest it takes, as few as reach 2 × GPU memory, one per channel, rather than filling every channel."},
   {v:"1.5.0", what:"The AMD MI355X joins the boards: 288 GB per GPU, sold only as 8-GPU systems, with published benchmarks of its own. Its GPUs are wired to each other with no switch, one Infinity Fabric link per pair, so a copy split across 2 or 4 of them uses only the links among them. Counting AMD's MI355X benchmark runs the same way, AMD's software reaches 0.75 of the hardware shares rather than 0.68, so the MI350P's figures come out up to 10% faster."},
   {v:"1.4.0", what:"When two layouts use the same GPUs, the suggestion runs more copies of the model rather than splitting one copy wider, on NVLink boards too, since both reach the goal and copies leave room for more users. A small model on an 8-GPU HGX system now runs as 8 copies, not one copy across all 8: speed per user comes out lower but still within the goal. The number of GPUs is unchanged."},
   {v:"1.2.0", what:"Speed and first-token estimates are calibrated against 295 published benchmark points: board compute is now each datasheet's dense figure, and the shares of it serving reaches are fitted, as are vLLM's fixed costs per step and per request, with a further factor for AMD's software stack fitted to MI355X runs. Speed per user, which ran about 20% slow, now lands near the measured figures, prompts read about twice as fast, and a likely range sits beside both. The speed goal is judged at the cautious end of that range. The RTX PRO 6000's memory bandwidth is corrected to the Server Edition's 1,597 GB/s."},
@@ -2677,6 +2691,28 @@ function cpusFor(sv, d, cores){
   if(cores > 2*max) return {n: 2, short: true, why: `Needs ${cores} cores, but two CPUs here give at most ${2*max}: fewer cores per GPU`};
   return {n: 2, why: because + (d.gpus > 1 ? ` Split the GPUs evenly across the two; keep each copy on one CPU's GPUs where it fits.` : "")};
 }
+/* System memory from the server's own modules (sv.mem): NVIDIA's minimum, 2 × GPU memory, rounded up only as far
+   as the modules make it, since memory is the costly part, not every channel filled. The smallest modules the server takes, as
+   few as reach the minimum, so they land on as many channels as that much memory can: one per channel, a larger
+   module only when the smallest can't reach it that way, and two per channel only when one can't. Each CPU holds
+   the same DIMMs, a count its population rules allow (pop). null: the server can't hold that much. */
+function memFor(sv, cpus, minGB){
+  const m = sv.mem;
+  if(!m) return null;
+  for(const most of [m.ch, m.ch*m.dpc]) for(const gb of m.gb){
+    const k = m.pop.find(k=> k <= most && cpus*k*gb >= minGB);
+    if(k) return {k, gb, total: cpus*k*gb, ch: Math.min(k, m.ch), of: m.ch, dimms: cpus*k};
+  }
+  return null;
+}
+/* the Memory row's lines for memFor's pick: the modules, then how many channels they fill, called out when not all */
+function memLines(mm, cpus, minGB){
+  const each = cpus===2 ? " on each CPU" : "", mods = `${mm.dimms} × ${mm.gb} GB` + (cpus===2 ? `, ${mm.k} per CPU` : "");
+  const floor = `NVIDIA's minimum is 2 × GPU memory, ${commas(Math.ceil(minGB))} GB`;
+  if(mm.ch === mm.of) return {sub: `${mods} · every channel${each} populated`, extra: floor, flag: false};
+  return {sub: `${mods} · ${mm.ch} of ${mm.of} memory channels${each} populated, so about ${Math.round(100*mm.ch/mm.of)}% of the CPU's memory bandwidth`,
+          extra: `${floor}. Fill more channels if the CPU offloads KV cache or does heavy work of its own`, flag: true};
+}
 /* The build for a layout, as one bill of materials: chassis, GPUs and how they're joined, CPUs, memory,
    storage and power, in the order they go on a quote. CPU cores by the fixed per-GPU ratio (coresPerGpu), memory
    and storage by NVIDIA's certified-server guidance. Rows that need a decision are flagged. */
@@ -2700,7 +2736,10 @@ function bomRows(c, g, n, parts, pills = "", extra = []){
     const value = cp.n===2 ? `2 × ${esc(sv.cpu)}, ${commas(sr.cores/2)} physical cores each` : `1 × ${esc(sv.cpu)}, ${commas(sr.cores)} physical cores`;
     const tally = cp.n===2 ? `${commas(sr.cores)} physical cores in total · ${per} per GPU${why}` : `${per} physical cores per GPU${why}`;
     row(cp.n===2 ? "CPUs" : "CPU", value, `${tally}</span><span>${cp.why}`, cp.short);
-    row("Memory", `${commas(Math.ceil(sr.ram))} GB`, `2 × GPU memory, every channel ${cp.n===2 ? "of both CPUs " : ""}populated`);
+    const mm = memFor(sv, cp.n, sr.ram);
+    if(!sv.mem) row("Memory", `${commas(Math.ceil(sr.ram))} GB`, `2 × GPU memory`);
+    else if(!mm) row("Memory", `${commas(Math.ceil(sr.ram))} GB`, `2 × GPU memory, more than ${cp.n===2 ? "two CPUs" : "one CPU"} here can hold`, true);
+    else { const ml = memLines(mm, cp.n, sr.ram); row("Memory", `${commas(mm.total)} GB`, `${ml.sub}</span><span>${ml.extra}`, ml.flag); }
     row("Storage", `${capParts(sr.diskGB).join(" ")} NVMe`, `Required usable capacity: 2 × ${parts.length>1 ? "each model's" : "model"} weights + 100 GB for images, caches and logs</span><span>Doesn't include boot storage, request logs or KV cache offload`);
   }
   row("Power", "Size in HPE Power Advisor", "PSUs and redundancy for this load", true);
@@ -3107,7 +3146,8 @@ $('serverView').addEventListener('click', e=>{
    logs, kept under DISK_FILL full, beside a separate boot volume. KV cache offloaded to disk
    (NVIDIA Dynamo's KV block manager: a CPU tier of 100 GB or more and larger than the GPUs' KV cache,
    and a disk tier at least as large) is a tooltip note (srvDiskTip), since few single servers do it.
-   System memory is NVIDIA's recommended minimum alone: how it is made up from modules is the vendor's.
+   System memory is NVIDIA's recommended minimum alone; in the Servers view it is made up from the server's own
+   modules (memFor), filling as many channels as that minimum allows rather than every channel.
    An 8-GPU system (HGX, or AMD's MI355X platform) comes whole from its manufacturer, so its server is
    left to its spec sheet.
    Amounts are in GB as sold (10⁹ bytes), whatever unit is picked at the top. */
