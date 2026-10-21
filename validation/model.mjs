@@ -1,6 +1,7 @@
 // The page's own speed and memory model, loaded from index.html, and one benchmark point run through it.
 // Its script, from the start up to the display helpers, runs here against a stand-in for the page, so
-// what is checked is exactly what the page shows. CAL (the efficiency constants) is returned live:
+// what is checked is exactly what the page shows. The stand-in serves the page's JSON data blocks
+// (<script type="application/json" id=…>, such as the server catalog) by id, as the page reads them. CAL (the efficiency constants) is returned live:
 // change its fields and the next prediction uses them.
 
 import { readFileSync } from "node:fs";
@@ -18,11 +19,13 @@ const LAYOUT = ["MODELS", "WORKLOADS", "thinksOf", "boardsInPlay", "deploymentFo
   "evaluate", "copyCapacity", "popOf", "nodeMax", "splitMax", "packServers", "fleetFor", "fleetServers", "suggestFleet", "serverOf"];
 
 export function load(path = INDEX){
-  const html = readFileSync(path, "utf8").split(/\r?\n/);
+  const text = readFileSync(path, "utf8"), html = text.split(/\r?\n/);
   const from = html.findIndex(l => l.startsWith("<script>")) + 1, to = html.findIndex(l => l.startsWith("const fmtTps"));
   if(from < 1 || to < from) throw new Error("index.html layout changed: script or fmtTps line not found");
+  const data = new Map([...text.matchAll(/<script type="application\/json" id="([^"]+)">([\s\S]*?)<\/script>/g)].map(m=> [m[1], m[2]]));
   const el = () => new Proxy(function(){}, { get: (t, k)=> k==="value" ? "" : k==="style" || k==="dataset" ? {} : el(), apply: ()=> el(), set: ()=> true });
-  globalThis.document = { getElementById: el, querySelector: el, querySelectorAll: ()=> [], createElement: el, documentElement: el() };
+  globalThis.document = { getElementById: id=> data.has(id) ? { textContent: data.get(id) } : el(),
+                          querySelector: el, querySelectorAll: ()=> [], createElement: el, documentElement: el() };
   globalThis.localStorage = { getItem: ()=> null, setItem: ()=> {} };
   const P = new Function(html.slice(from, to).join("\n")
     + ";return {S, GPUS, GB, USABLE, compute, throughput, findModel, setModel: m=>{ M = m; },"
