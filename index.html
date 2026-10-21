@@ -2689,7 +2689,7 @@ function buildRows(c, d){
     const each = cp.n===2 ? `${commas(sr.cores)} physical cores, ${commas(sr.cores/2)} per CPU` : `${commas(sr.cores)} physical cores`;
     row(cp.n===2 ? "CPUs" : "CPU", `${cp.n} × ${esc(sv.cpu)}`, `${each} · ${per} per GPU${why}</span><span>${cp.why}`, cp.short);
     row("Memory", `${commas(Math.ceil(sr.ram))} GB`, `2 × GPU memory, every channel ${cp.n===2 ? "of both CPUs " : ""}populated`);
-    row("Storage", `${capParts(sr.diskGB).join(" ")} NVMe`, `usable, for model weights · doesn't include boot storage`);
+    row("Storage", `${capParts(sr.diskGB).join(" ")} NVMe`, `usable: 2 × model weights + 100 GB for images, caches and logs</span><span>Doesn't include boot storage, request logs or KV cache offload`);
   }
   row("Power", "Size in HPE Power Advisor", "PSUs and redundancy for this load", true);
   return `<dl class="bom">${rows.join("")}</dl>`;
