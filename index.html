@@ -506,6 +506,23 @@
   .bay{display:block; width:18px; height:30px; border-radius:3px; border:1px dashed var(--muted)}
   .bay.on{background:var(--accent); border:1px solid var(--accent)}
   .rec .statstrip{margin-top:0}
+  .rec-head{display:flex; flex-direction:column; gap:4px}
+  .rec-body{display:grid; grid-template-columns:minmax(0, 1.05fr) minmax(0, 1fr); gap:20px 32px; align-items:start}
+  .rec-col{display:flex; flex-direction:column; gap:10px; min-width:0}
+  .sv .colh{margin:4px 0 0; font-size:11px; font-family:"IBM Plex Mono",monospace; letter-spacing:.08em; text-transform:uppercase; font-weight:600; color:var(--muted)}
+  .rec-col .statstrip{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:0}
+  .rec-col .statstrip .cell{min-width:0}
+  .bom{margin:0; border:1px solid var(--line); border-radius:9px; overflow:hidden}
+  .bom-r{display:grid; grid-template-columns:96px minmax(0, 1fr); gap:12px; padding:9px 13px; border-top:1px solid var(--line)}
+  .bom-r:first-child{border-top:0}
+  .bom dt{font-size:12px; color:var(--muted); padding-top:1px}
+  .bom dd{margin:0; display:flex; flex-direction:column; gap:2px; min-width:0}
+  .bom dd b{font-size:14px; font-weight:600; color:var(--ink)}
+  .bom dd span{font-size:12.5px; color:var(--ink-2)}
+  .bom-r.flag dt{color:var(--warn)} .bom-r.flag dt::before{content:"! "; font-weight:700}
+  .bom-notes{display:flex; flex-direction:column; gap:5px}
+  @media (max-width:860px){ .rec-body{grid-template-columns:1fr} }
+  @media (max-width:560px){ .bom-r{grid-template-columns:70px minmax(0, 1fr); gap:10px; padding:9px 11px} }
   .launch{display:block; font-family:"IBM Plex Mono",monospace; font-size:12.5px; background:#14181d; color:#e6eaee; padding:11px 13px; border-radius:7px; overflow-x:auto; white-space:pre}
   .rec-foot{display:flex; flex-wrap:wrap; gap:16px 32px}
   .rec-foot > div{flex:1 1 420px; min-width:0; display:flex; flex-direction:column; gap:7px}
@@ -2577,20 +2594,29 @@ function statsHtml(d){
     + statCell("srvGpu", "GPU memory", boxTotal(d.memGB).split(" ")[0], S.unit, `${fmtMem(d.perGB)} used of ${boxMem(d.g)} per card`)
     + `</div>`;
 }
-/* the build around a layout, as checks: by NVIDIA's guidance, CPU cores as HPE Private Cloud AI builds them */
-function buildChecks(c, d){
-  const ok = t => `<li><span class="ok" aria-hidden="true">✓</span><span>${t}</span></li>`, no = t => `<li><span class="no" aria-hidden="true">!</span><span>${t}</span></li>`;
-  const x = c.x, sv = c.sv, out = [];
-  if(x.unconfirmed) out.push(no(`Card count to confirm: ${esc(x.unconfirmed)}.`));
-  if(systemOf(d.g)){ out.push(ok(`CPUs, memory and storage come with the ${d.g.n} system (${esc(sv.cpu)})`)); return out.join(""); }
-  const s = serverOf(d.g, d.gpus, [[d, d.gpus]]);
-  if(linkKind(x)==="bridge"){ const n = groupsUsed(c, d); out.push(ok(`${n} × ${x.link.kit} ${x.link.bridge}-way NVLink bridge${n===1 ? "" : "s"}`)); }
-  out.push(sv.sockets >= 2 ? ok(`2 sockets, ${commas(s.cores)} physical cores (${s.cores/d.gpus} per GPU${LIGHT_GPUS.includes(d.g.n) ? `, for the ${esc(d.g.n.replace(" Blackwell", ""))}` : ", as HPE Private Cloud AI builds it"})`)
-                           : no(`One socket (${esc(sv.cpu)}): NVIDIA's guidance asks for two, with at least 6 cores per GPU`));
-  out.push(ok(`${commas(Math.ceil(s.ram))} GB system memory: 2 × GPU memory, over every channel`));
-  out.push(ok(`${capParts(s.diskGB).join(" ")} usable NVMe for weights, plus a 1 TB boot drive`));
-  out.push(no(`Power and PSU redundancy: check in HPE Power Advisor`));
-  return out.join("");
+/* The build for a layout, as one bill of materials: chassis, GPUs and how they're joined, CPUs, memory,
+   storage and power, in the order they go on a quote. CPU cores as HPE Private Cloud AI builds them, memory
+   and storage by NVIDIA's certified-server guidance. Rows that need a decision are flagged. */
+function buildRows(c, d){
+  const x = c.x, sv = c.sv, rows = [];
+  const row = (k, v, sub = "", flag = false) => rows.push(`<div class="bom-r${flag ? " flag" : ""}"><dt>${k}</dt><dd><b>${v}</b>${sub ? `<span>${sub}</span>` : ""}</dd></div>`);
+  const k = linkKind(x), more = d.gpus < c.max ? `the server takes up to ${c.max}` : `the most this server takes`;
+  row("Chassis", esc(sv.short), esc(sv.form));
+  row("GPUs", `${d.gpus} × ${esc(d.g.n)}${flagPills(d)}`, d.gpus>1 ? `${esc(wiringText(c, d))} · ${more}` : `${k==="pcie" ? "PCIe Gen5 x16 · " : ""}${more}`);
+  if(k==="bridge" && d.gpus>1){ const n = groupsUsed(c, d);
+    row("NVLink", `${n} × ${esc(x.link.kit)}`, `${x.link.bridge}-way NVLink bridge${n===1 ? "" : "s"}`); }
+  if(x.unconfirmed) row("Card count", "To confirm", esc(x.unconfirmed), true);
+  if(systemOf(d.g)){ row("Platform", "Comes with the system", `CPUs, memory and storage: ${esc(sv.cpu)}`); }
+  else {
+    const sr = serverOf(d.g, d.gpus, [[d, d.gpus]]), per = sr.cores/d.gpus;
+    const why = LIGHT_GPUS.includes(d.g.n) ? `for the ${esc(d.g.n.replace(" Blackwell", ""))}` : "as HPE Private Cloud AI builds it";
+    if(sv.sockets >= 2) row("CPUs", `2 × ${esc(sv.cpu)}`, `${commas(sr.cores)} physical cores in total, ${commas(sr.cores/2)} per socket · ${per} per GPU, ${why}`);
+    else row("CPU", `1 × ${esc(sv.cpu)}`, `${commas(sr.cores)} physical cores, ${per} per GPU, ${why} · NVIDIA's guidance asks for two sockets`, true);
+    row("Memory", `${commas(Math.ceil(sr.ram))} GB`, `2 × GPU memory, every channel populated`);
+    row("Storage", `${capParts(sr.diskGB).join(" ")} NVMe`, `usable, for model weights · plus a 1 TB boot drive`);
+  }
+  row("Power", "Size in HPE Power Advisor", "PSUs and redundancy for this load", true);
+  return `<dl class="bom">${rows.join("")}</dl>`;
 }
 /* the sentence under a configuration: how its copy is laid out, and what's left in the server */
 function layoutWhy(c, d){
@@ -2665,20 +2691,20 @@ function configCard(c, eyebrow, cmp, back = ""){
     + `<p class="rec-why">One copy needs about ${fmtMem(needGB())} of GPU memory; this server carries ${fmtMem(c.usable)} at most with this GPU.</p></div>`
     + bridgeBays(c, null) + `</div>`
     + `<div class="rec-acts">${back}</div>`;
-  return `<div class="rec-top"><div class="rec-main">${eyebrow}`
-    + `<h2 class="rec-name">${hostLink(HPE_HOSTS.find(h=> h.id===sv.id))}</h2>`
-    + `<span class="rec-spec">${esc(sv.form)} · ${sv.sockets} × ${esc(sv.cpu)}</span>`
-    + `<p class="rec-cfg">${d.gpus} × ${esc(d.g.n)}${d.gpus>1 ? `, ${wiringText(c, d)}` : ""}${flagPills(d)}</p>`
-    + `<p class="rec-why">${layoutWhy(c, d)}</p>`
-    + (grow ? `<p class="rec-grow">Room to grow in the same server: ${growText(grow)} serve up to ${commas(grow.room)} users.</p>` : "")
-    + (cmp ? `<p class="rec-cmp">${cmp}</p>` : "")
+  const extrap = !d.g.bench;
+  return `<div class="rec-head">${eyebrow}<h2 class="rec-name">${hostLink(HPE_HOSTS.find(h=> h.id===sv.id))}</h2>`
     + `</div>`
-    + bridgeBays(c, d) + `</div>`
-    + statsHtml(d)
-    + (speedBasis(d).includes("extrapolated") ? `<p class="note-warn">Speed is extrapolated: the ${esc(d.g.n)} has no published benchmark here, so its figures apply the shares fitted on other boards' runs to its datasheet. Memory fit is not affected. Load-test before quoting speeds.</p>` : "")
-    + `<div class="rec-foot"><div><span class="sublbl">Launch</span><code class="launch">${esc(launchText(d))}</code></div>`
-    + `<div><span class="sublbl">Build checks</span><ul class="checks">${buildChecks(c, d)}</ul>`
-    + ((c.x.constraints || []).length ? `<ul class="svnotes">${c.x.constraints.map(t=> `<li>${esc(t)}</li>`).join("")}</ul>` : "") + `</div></div>`
+    + (cmp ? `<p class="rec-cmp">${cmp}</p>` : "")
+    + `<div class="rec-body">`
+    + `<section class="rec-col"><h3 class="colh">Build</h3>${buildRows(c, d)}`
+    + bridgeBays(c, d)
+    + ((c.x.constraints || []).length || (sv.notes || []).length ? `<div class="bom-notes"><span class="sublbl">Before you quote</span><ul class="svnotes">${[...(c.x.constraints || []), ...(sv.notes || [])].map(t=> `<li>${esc(t)}</li>`).join("")}</ul></div>` : "")
+    + `</section>`
+    + `<section class="rec-col"><h3 class="colh">Performance</h3>${statsHtml(d)}`
+    + (extrap ? `<p class="cap">Speeds are extrapolated: the ${esc(d.g.n.replace(" Blackwell", ""))} has no published benchmark here <span class="i" data-tip="extrap" tabindex="0">i</span>. Load-test before quoting them.</p>` : "")
+    + (grow ? `<p class="rec-grow">Room to grow: ${growText(grow)} in this server serve up to ${commas(grow.room)} users.</p>` : "")
+    + `<h3 class="colh">Run it</h3><p class="rec-why">${layoutWhy(c, d)}</p><code class="launch">${esc(launchText(d))}</code>`
+    + `</section></div>`
     + `<div class="rec-acts">${back}<button type="button" class="tool-btn" data-copylink>Copy link</button></div>`;
 }
 /* Every server in scope, one line each: the servers that meet the goal, in the recommendation's order, each at
@@ -2746,8 +2772,6 @@ function renderCfg(A, cfgs){
           + `<td class="num">${o.partial ? `<span class="warnx">${commas(o.served)} of ${commas(all)}</span>` : commas(o.room)}</td><td class="num">${commas(o.memRoom)}</td>`
           + `<td class="num">${fmtMem(o.perGB)}</td><td><code class="flags">--tensor-parallel-size ${o.tpw}${o.pp>1 ? ` --pipeline-parallel-size ${o.pp}` : ""}${o.reps>1 ? ` ×${o.reps}` : ""}</code></td></tr>`).join("")
       + `</tbody></table></div>` : `<p class="note-warn">No layout on this server holds one copy: it needs about ${fmtMem(needGB())} of GPU memory, and the server carries ${fmtMem(c.usable)} at most.</p>`;
-  const notes = [...(sv.notes || []), ...(c.x.constraints || [])].map(esc);
-  if(c.x.unconfirmed) notes.unshift(`<span class="warnx">Card count to confirm: ${esc(c.x.unconfirmed)}.</span>`);
   el.innerHTML = `<div class="svhead"><span class="eyebrow-s">Configuration</span></div>`
     + `<h2 class="rec-name">${esc(sv.name)} · ${esc(c.x.board)}</h2>`
     + `<span class="rec-spec">${esc(sv.form)} · ${sv.sockets} × ${esc(sv.cpu)} · up to ${c.max} × ${esc(c.x.board)}, ${wiringShort(c)}</span>`
@@ -2756,8 +2780,6 @@ function renderCfg(A, cfgs){
         + ` <span class="chipnote">${o.ok ? "meets goal" : o.fits ? "below goal" : "won't hold it"}</span></button>`).join("") + `</div>` : "")
     + `<div class="svsub"><h3>How the cards are wired</h3></div>${wire}`
     + `<div class="svsub"><h3>Layouts on this server</h3><span class="cap">Every layout the wiring allows, at each number of copies the server holds. You pick by what the customer is buying for.</span></div>${table}`
-    + (d && !systemOf(d.g) ? `<div class="svsub"><h3>Build for ${d.gpus} card${d.gpus===1 ? "" : "s"}</h3></div><ul class="checks">${buildChecks(c, d)}</ul>` : d ? `<ul class="checks">${buildChecks(c, d)}</ul>` : "")
-    + (notes.length ? `<ul class="svnotes">${notes.map(n=> `<li>${n}</li>`).join("")}</ul>` : "")
     + `<p class="cap">Sources: <a href="${CATALOG.matrix.url}" target="_blank" rel="noopener">${esc(CATALOG.matrix.title)}, version ${esc(CATALOG.matrix.version)}</a> for which GPUs and bridges the server takes; <a href="${esc(sv.quickspecs.url)}" target="_blank" rel="noopener">this server's US QuickSpecs, version ${esc(sv.quickspecs.version)} (${esc(sv.quickspecs.date)})</a> for the card count and constraints. Confirm a build against the current QuickSpecs.</p>`;
   return d || null;
 }
