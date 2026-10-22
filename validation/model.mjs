@@ -16,7 +16,8 @@ export const onRocm = (P, p) => P.GPUS.find(b=> b.n===p.board)?.stack==="rocm";
    rest). A page from before one of them existed gives null for it. */
 const LAYOUT = ["MODELS", "WORKLOADS", "thinksOf", "boardsInPlay", "deploymentFor", "suggestDeployment", "serverFor",
   "PER_MODEL", "specOf", "useSpec", "withSpec",
-  "evaluate", "copyCapacity", "popOf", "nodeMax", "splitMax", "packServers", "fleetFor", "fleetServers", "suggestFleet", "serverOf"];
+  "evaluate", "copyCapacity", "popOf", "nodeMax", "splitMax", "packServers", "fleetFor", "fleetServers", "suggestFleet", "serverOf",
+  "CATALOG", "hostOf", "configFor", "allConfigs", "serverAnswer", "layoutsOn", "evalLayout", "needGB"];   // the Servers view (servers.mjs)
 
 export function load(path = INDEX){
   const text = readFileSync(path, "utf8"), html = text.split(/\r?\n/);
