@@ -465,7 +465,7 @@
   .viewbar button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
   .viewhint{font-size:12.5px; color:var(--muted); margin-left:6px}
   .sview{display:flex; flex-direction:column; gap:18px}
-  .sview[hidden]{display:none}
+  .sview[hidden], .sv[hidden]{display:none}
   .sv{padding:20px 22px; display:flex; flex-direction:column; gap:14px}
   .sv h2{margin:0; font-size:15px; font-weight:600}
   .sv h3{margin:0; font-size:13px; font-weight:600; color:var(--ink-2)}
@@ -2576,8 +2576,10 @@ function configFor(sv, x){
     const capGoal = S.goal==="any" ? capMem : layoutCapacity(b, L, ROOM_MAX, false);
     for(let k = 1; L.n*k <= max; k++){
       if(popOf(b) && !popOf(b).includes(L.n*k)) continue;
-      const d = evalLayout(b, L, k);
-      if(!d.fits) continue;
+      /* everyone on k copies; when their caches don't fit, each copy loaded with what it holds (capMem), as the
+         GPU view's fullNode does, so the server is listed as serving some of them, not as not holding the model */
+      let d = evalLayout(b, L, k);
+      if(!d.fits){ d = evalLayout(b, L, k, capMem); if(!d.fits) continue; }
       Object.assign(d, {room: capGoal*k, memRoom: capMem*k, served: Math.min(all, capGoal*k)});
       d.partial = d.room < all;
       opts.push(d);
@@ -2681,7 +2683,12 @@ function statsHtml(d){
   const t = d.t, all = allUsers(), g = GOALS[S.goal], basis = speedBasis(d);
   return `<div class="statstrip">`
     + statCell("tpsUser", "Speed per user", fmtTps(t.perUser), "tok/s", `${likelyTps(t.perUser)}${S.goal!=="any" ? ` · goal ${g.tps}+` : ""}${basis.length ? ` · ${basis.join(" · ")}` : ""}`, basis.length ? "warn" : "")
-    + statCell("ttft", "First token", fmtTime(t.ttft)[0], fmtTime(t.ttft)[1], `${likelyTime(t.ttft)}${S.goal!=="any" ? ` · goal under ${g.ttft} s` : ""}`)
+    + (hideThink()
+       // users don't see the thinking: the wait they feel, and the goal, run to the start of the answer (as the GPU view's tile)
+       ? statCell("answer", "Answer starts", ...waitParts(answerStart(t)),
+           `after ${fmtWait(S.thinking/t.perUser)} of thinking users don't see · ${likelyAnswer(t)}${S.goal!=="any" ? ` · goal within ${g.ans} s` : ""}`,
+           S.goal!=="any" && answerHigh(t) > g.ans ? "warn" : "")
+       : statCell("ttft", "First token", fmtTime(t.ttft)[0], fmtTime(t.ttft)[1], `${likelyTime(t.ttft)}${S.goal!=="any" ? ` · goal under ${g.ttft} s` : ""}`))
     + statCell("capacity", "Room for", commas(d.room), d.room===1 ? "user" : "users", d.room < all ? `of your ${commas(all)}: below the goal past that` : `you have ${commas(all)}${d.memRoom > d.room ? ` · cache holds ${commas(d.memRoom)}` : ""}`, d.room < all ? "warn" : "")
     + statCell("srvGpu", "GPU memory", boxTotal(d.memGB).split(" ")[0], S.unit, `${fmtMem(d.perGB)} used of ${boxMem(d.g)} per card`)
     + `</div>`;
@@ -2901,7 +2908,7 @@ function renderAll(A, cfgs){
             + `<td>${d.gpus} × ${esc(d.g.n)} · ${wiringShort(c)}<br>${others(x)}</td><td>${layoutLine(d)}${flagPills(d)}</td>`
             + `<td class="num">${fmtTps(d.t.perUser)} tok/s${star(d)}</td><td class="num">${commas(d.room)}</td><td class="num">${boxTotal(d.memGB)}</td></tr>`; }).join("")
       + `</tbody></table></div><p class="cap">* Speed extrapolated: no published benchmark for this board; it applies the shares fitted on other boards' runs.</p>` : "")
-    + (below.length ? `<div class="svsub"><h3>Below your goal</h3><span class="cap">They hold the model, but can't serve all ${commas(all)} users within your speed goal.</span></div>`
+    + (below.length ? `<div class="svsub"><h3>Below your goal</h3><span class="cap">They hold the model, but can't serve all ${plural(all, "user")}: not enough cache room, or not within your speed goal.</span></div>`
       + `<div class="holds">` + below.map(x=> line(x, `<span class="cap">${x.top.best.gpus} × ${esc(x.top.best.g.n)} · ${layoutLine(x.top.best)}</span>`
           + `<span class="cap"><span class="warnx">${x.top.best.served ? `serves ${commas(x.top.best.served)} of ${commas(all)}` : "too slow for your goal, even for one user"}</span>${x.top.best.nr ? " · split over PCIe" : ""}</span>`)).join("") + `</div>` : "")
     + (cant.length ? `<div class="svsub"><h3>Won't hold it</h3><span class="cap">One copy needs about ${fmtMem(need)} of GPU memory for one user. Bars show the most each server carries.</span></div>`
@@ -2963,7 +2970,8 @@ function fleetConfigs(){
   }
   return FLEET_SRV_MEMO.get(key);
 }
-const fleetRack = c => (c.sv.u ?? 99)*c.k;
+const fleetRack = c => (c.sv.u ?? 99)*c.k;      // 99 stands in for a tower, for ordering only
+const fleetRackText = c => c.sv.u ? `${c.sv.u*c.k}U` : c.k > 1 ? `${c.k} towers` : "tower";
 const fleetWithin = c => c.f.models.filter(withinGoal).length;
 /* The GPU view's order (suggestFleet): not split over PCIe, least GPU memory, fewer servers, fewer GPUs per copy,
    faster; then the fewest rack units. bestFleet adds one rule the GPU view never needs, since it puts each board
@@ -3018,7 +3026,7 @@ function fleetCard(c, eyebrow, cmp, back = ""){
   const extrap = f.g.bench ? "" : `<p class="cap">Speeds are extrapolated: the ${esc(f.g.n.replace(" Blackwell", ""))} has no published benchmark here <span class="i" data-tip="extrap" tabindex="0">i</span>. Load-test before quoting them.</p>`;
   const warm = f.models.flatMap(m=> withSpec(m.spec, warmParts).map(([n, ...p])=> [`${specName(m.spec)} ${n}`, ...p]));
   return `<div class="rec-head">${eyebrow}<h2 class="rec-name">${many ? `${k} × ` : ""}${hostLink(HPE_HOSTS.find(h=> h.id===sv.id))}</h2>`
-    + `<p class="rec-spec">${all} models, ${plural(S.models.reduce((n, x)=> n + specUsers(x), 0), "user")} in all · ${f.gpus} × ${esc(f.g.n)}, ${boxTotal(f.memGB)} of GPU memory${many ? ` · ${fleetRack(c)}U` : ""}</p></div>`
+    + `<p class="rec-spec">${all} models, ${plural(S.models.reduce((n, x)=> n + specUsers(x), 0), "user")} in all · ${f.gpus} × ${esc(f.g.n)}, ${boxTotal(f.memGB)} of GPU memory${many ? ` · ${fleetRackText(c)}` : ""}</p></div>`
     + (cmp ? `<p class="rec-cmp">${cmp}</p>` : "")
     + `<div class="rec-body">`
     + `<section class="rec-col"><h3 class="colh">Build</h3>${builds}`
@@ -3038,7 +3046,7 @@ function renderRecFleet(A, cfgs){
     if(!pick.fits){ el.innerHTML = `<span class="eyebrow-s warn">Your pick · won't hold every model</span><h2 class="rec-name">${hostLink(HPE_HOSTS.find(h=> h.id===pick.sv.id))}</h2>`
       + `<p class="rec-why">With ${esc(pick.x.board)}, at least one of the models needs more than one ${pick.sv.short} holds. Each model must fit on one server.</p><div class="rec-acts">${back}</div>`; return; }
     const eyebrow = pick.ok ? `<span class="eyebrow-s">Your pick · meets every model's goal</span>` : `<span class="eyebrow-s warn">Your pick · ${fleetWithin(pick)} of ${n} models within their goals</span>`;
-    const cmp = !r ? "" : `Against the recommended ${r.k > 1 ? `${r.k} × ` : ""}${esc(r.sv.short)} (${r.f.gpus} × ${esc(r.f.g.n)}): ${boxTotal(pick.memGB)} vs ${boxTotal(r.memGB)} of GPU memory, ${fleetRack(pick)}U vs ${fleetRack(r)}U, ${fleetWithin(pick)} vs ${fleetWithin(r)} models within their goals.`;
+    const cmp = !r ? "" : `Against the recommended ${r.k > 1 ? `${r.k} × ` : ""}${esc(r.sv.short)} (${r.f.gpus} × ${esc(r.f.g.n)}): ${boxTotal(pick.memGB)} vs ${boxTotal(r.memGB)} of GPU memory, ${fleetRackText(pick)} vs ${fleetRackText(r)}, ${fleetWithin(pick)} vs ${fleetWithin(r)} models within their goals.`;
     el.innerHTML = fleetCard(pick, eyebrow, cmp, back); return;
   }
   if(!A.rec){
@@ -3068,7 +3076,7 @@ function renderAllFleet(A, cfgs){
           const tag = A.rec && c.id===A.rec.id ? ` <span class="pill sugg">Recommended</span>` : "";
           return `<tr class="${x.sv.id===selSv ? "sel" : ""}${c.ok ? "" : " dim"}"><th scope="row"><button type="button" class="rowbtn" data-cfg="${esc(c.id)}">${esc(x.sv.short)}</button>${tag}<br><span class="cap">${esc(x.sv.form)}</span></th>`
             + `<td>${c.k > 1 ? `${c.k} servers · ` : ""}${c.f.gpus} × ${esc(c.f.g.n)}${c.nr ? ` <span class="pill bad">split over PCIe</span>` : ""}${star(c.f.models[0].d)}</td>`
-            + `<td class="num">${c.ok ? "" : `<span class="warnx">`}${fleetWithin(c)} of ${n}${c.ok ? "" : "</span>"}</td><td class="num">${fleetRack(c)}U</td><td class="num">${boxTotal(c.memGB)}</td></tr>`; }).join("")
+            + `<td class="num">${c.ok ? "" : `<span class="warnx">`}${fleetWithin(c)} of ${n}${c.ok ? "" : "</span>"}</td><td class="num">${fleetRackText(c)}</td><td class="num">${boxTotal(c.memGB)}</td></tr>`; }).join("")
       + `</tbody></table></div><p class="cap">* Speed extrapolated: no published benchmark for this board; it applies the shares fitted on other boards' runs.</p>` : "")
     + (cant.length ? `<div class="svsub"><h3>Won't hold them</h3><span class="cap">With every GPU it takes, at least one model needs more than one of these servers holds. Each model must fit on one server.</span></div>`
       + `<p class="cap">${cant.map(x=> esc(x.sv.short)).join(" · ")}</p>` : "");
