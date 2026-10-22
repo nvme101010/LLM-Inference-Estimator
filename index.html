@@ -488,6 +488,16 @@
   .rec-main{flex:1 1 480px; min-width:0; display:flex; flex-direction:column; gap:5px}
   .sv .rec-name{margin:2px 0 0; font-size:30px; font-weight:700; line-height:1.15; letter-spacing:-.01em}   /* the card's focal point; .sv h2 would otherwise win */
   .sv#svCfg .rec-name{font-size:22px}
+  /* the Configuration panel folds away behind its heading: closed to start, an arrow like Advanced settings' */
+  .cfgbox > summary{list-style:none; cursor:pointer; display:flex; flex-direction:column; gap:3px; position:relative; padding-left:20px}
+  .cfgbox > summary::-webkit-details-marker{display:none}
+  .cfgbox > summary::before{content:""; position:absolute; left:1px; top:4px; width:7px; height:7px; border-right:2px solid var(--ink-2); border-bottom:2px solid var(--ink-2); transform:rotate(-45deg); transition:transform .15s}
+  .cfgbox[open] > summary::before{transform:rotate(45deg)}
+  .cfgbox > summary:hover .rec-name{color:var(--accent-ink)}
+  .cfgbox > summary:focus-visible{outline:2px solid var(--accent); outline-offset:4px; border-radius:4px}
+  .cfgbox[open] .cfg-hint{display:none}
+  .cfgbody{display:flex; flex-direction:column; gap:14px; margin-top:14px}
+  @media (prefers-reduced-motion:reduce){ .cfgbox > summary::before{transition:none} }
   .rec-name a{color:inherit; text-decoration:none} .rec-name a:hover{text-decoration:underline}
   .rec-spec{font-size:14px; color:var(--muted)}
   .rec-cfg{margin:6px 0 0; font-size:16.5px; font-weight:500}
@@ -1969,6 +1979,7 @@ const S = { wq:2, wqLbl:"NATIVE", kq:2, tp:1, pp:1, tpo:"auto", pipe:0, chunk:51
             view:"srv",        // which answer shows: "srv" = the Servers view (configurations of HPE servers), "gpu" = boards
             scope:null,        // the Servers view's servers in scope: a Set of catalog ids (every server, set at start)
             cfg:null,          // the configuration its detail shows: "<server id>|<board>", or null for the recommendation
+            cfgOpen:false,     // whether the Configuration panel is open: closed to start, kept across redraws
             workload:"chat", prompt:2048, reply:512, wantPrompt:2048, wantReply:512,
             think:false, thinkTok:4096, thinking:0,
             seeThink:true,     // Users see the thinking: the speed goal's wait is to the first token; off, to the answer
@@ -2985,15 +2996,16 @@ function renderCfg(A, cfgs){
           + `<td class="num">${o.partial ? `<span class="warnx">${commas(o.served)} of ${commas(all)}</span>` : commas(o.room)}</td><td class="num">${commas(o.memRoom)}</td>`
           + `<td class="num">${fmtMem(o.perGB)}</td></tr>`).join("")
       + `</tbody></table></div>` : `<p class="note-warn">No layout on this server holds one copy: it needs about ${fmtMem(needGB())} of GPU memory, and the server carries ${fmtMem(c.usable)} at most.</p>`;
-  el.innerHTML = `<div class="svhead"><span class="eyebrow-s">Configuration</span></div>`
+  el.innerHTML = `<details class="cfgbox"${S.cfgOpen ? " open" : ""}><summary><span class="eyebrow-s">Configuration</span>`
     + `<h2 class="rec-name">${esc(sv.name)} · ${esc(c.x.board)}</h2>`
+    + `<span class="cap cfg-hint">How the cards are wired and every layout on this server</span></summary><div class="cfgbody">`
     + `<span class="rec-spec">${esc(formOf(c))} · ${sv.sockets} × ${esc(sv.cpu)} · up to ${c.max} × ${esc(c.x.board)}, ${wiringShort(c)}</span>`
     + (siblings.length > 1 ? `<div class="gpuswitch" role="group" aria-label="GPUs in this server"><span class="sublbl">GPUs in this server</span>`
       + siblings.map(o=> `<button type="button" class="chip" data-cfg="${esc(o.id)}" aria-pressed="${o.id===c.id}">${esc(o.x.board.replace(" Blackwell", ""))}`
         + ` <span class="chipnote">${o.ok ? "meets goal" : o.fits ? "below goal" : "won't hold it"}</span></button>`).join("") + `</div>` : "")
     + `<div class="svsub"><h3>How the cards are wired</h3></div>${wire}`
     + `<div class="svsub"><h3>Layouts on this server</h3><span class="cap">Every layout the wiring allows, at each number of copies the server holds. You pick by what the customer is buying for.</span></div>${table}`
-    + `<p class="cap">Sources: <a href="${CATALOG.matrix.url}" target="_blank" rel="noopener">${esc(CATALOG.matrix.title)}, version ${esc(CATALOG.matrix.version)}</a> for which GPUs and bridges the server takes; <a href="${esc(sv.quickspecs.url)}" target="_blank" rel="noopener">this server's US QuickSpecs, version ${esc(sv.quickspecs.version)} (${esc(sv.quickspecs.date)})</a> for the card count and constraints. Confirm a build against the current QuickSpecs.</p>`;
+    + `<p class="cap">Sources: <a href="${CATALOG.matrix.url}" target="_blank" rel="noopener">${esc(CATALOG.matrix.title)}, version ${esc(CATALOG.matrix.version)}</a> for which GPUs and bridges the server takes; <a href="${esc(sv.quickspecs.url)}" target="_blank" rel="noopener">this server's US QuickSpecs, version ${esc(sv.quickspecs.version)} (${esc(sv.quickspecs.date)})</a> for the card count and constraints. Confirm a build against the current QuickSpecs.</p></div></details>`;
   return d || null;
 }
 /* ---------------- the Servers view with several models ----------------
@@ -3178,6 +3190,8 @@ $('viewbar').addEventListener('click', e=>{
   const b = e.target.closest('[data-view]'); if(!b || b.dataset.view===S.view) return;
   S.view = b.dataset.view; render();
 });
+/* the Configuration panel is drawn afresh on every change, so whether it's open lives in S */
+$('svCfg').addEventListener('toggle', e=>{ if(e.target.classList.contains('cfgbox')) S.cfgOpen = e.target.open; }, true);
 $('serverView').addEventListener('click', e=>{
   const t = e.target.closest('[data-scope],[data-scope-all],[data-scope-none],[data-cfg],[data-copylink]');
   if(!t) return;
