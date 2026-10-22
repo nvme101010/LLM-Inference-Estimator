@@ -32,7 +32,7 @@ Pipelined layouts are modeled, not yet fitted to a benchmark, and say so. The se
 
 ### HPE servers
 
-In the GPU view each board is sized as in one HPE server that takes it, at that server's limits, and says so; the Servers view compares every server, and **Servers in scope** narrows it (URL key `hs`). The list is every current HPE ProLiant server that takes one of these GPUs:
+In the GPU view each board is sized as in one HPE server that takes it, at that server's limits, and says so; the Servers view compares every server, and **Servers in scope** narrows it (URL key `hs`). The list is every current HPE ProLiant and HPE Compute XD server that takes one of these GPUs:
 
 | HPE server (US QuickSpecs version) | Boards (most cards per server) | Notes |
 |---|---|---|
@@ -48,11 +48,14 @@ In the GPU view each board is sized as in one HPE server that takes it, at that 
 | ProLiant Compute DL360 Gen12 · 1U · 2 × Xeon 6 (v20) | L4 (3) | low-profile, rear slots |
 | ProLiant DL365 Gen11 · 1U · 2 × EPYC 9004/9005 (v46) | L4 (2), RTX PRO 4500 (2) | GPU CTO model |
 | ProLiant DL145 Gen11 · 2U edge · 1 × EPYC 8004 (v23) | L4 (3), L40S (1), RTX PRO 4500 (1) | |
-| ProLiant Compute XD685 · 5U DLC / 6U air · 2 × EPYC 9005 (v16) | HGX H200, HGX B200, HGX B300, MI355X | whole 8-GPU systems; B200, B300 and MI355X liquid-cooled only |
+| ProLiant Compute XD685 · 5U DLC / 6U air · 2 × EPYC 9005 (v16) | HGX H200, HGX B200, HGX B300, MI355X | whole 8-GPU systems; H200 air-cooled in 6U or liquid in 5U; B200, B300 and MI355X liquid-cooled only, in 5U |
+| Compute XD690 · 10U air · 2 × Xeon 6 (v6) | HGX B300 | whole 8-GPU system, air-cooled: the B300 without facility water; about 500 lb |
 
 On **Auto** each board sits in the first server above that lists it. That matches the board's own figures, except the MI350P, which is now sized at the DL385 Gen11's 4 cards. Gen11 servers with a Gen12 successor that takes the same GPUs are left out. HPE also lists the RTX PRO 4500 and 6000 for the EL2000 EL240 Gen12 and Edge Server e930t without a card count, so those are named beside the picker but not sized. Storage, Superdome, Compute Scale-up and EL8000 systems are out of scope.
 
-**Sources, all US:** HPE's *NVIDIA Accelerators for HPE* QuickSpecs (version 83, 8 September 2026) for which servers take which GPU and bridge, and each server's US QuickSpecs (version in the table; link, version and date in the catalog's `quickspecs` field) for card counts and constraints. The sizer is for the US; confirm a build against the current US QuickSpecs.
+**Cooling** is set per configuration, since the GPU decides it on some servers. Every PCIe server here is air-cooled. The XD685 runs the HGX H200 air-cooled in 6U or with direct liquid cooling in 5U, and the HGX B200, B300 and MI355X only with direct liquid cooling, in 5U; the XD690 runs the HGX B300 air-cooled in 10U. Where both exist, the page sizes and counts the air-cooled build, which needs no facility water. Each build has a **Cooling** row, flagged when the configuration is liquid-cooled only (it needs facility water and a coolant distribution unit), naming any server that runs the same GPUs air-cooled; the server tables show each configuration's chassis and cooling, and rack units, and so the tie-break on the fewest, follow the configuration (`cooling` in the catalog).
+
+**Sources, all US:** HPE's *NVIDIA Accelerators for HPE* QuickSpecs (version 83, 8 September 2026) for which servers take which GPU and bridge (the XD690, which postdates it, from its own QuickSpecs), and each server's US QuickSpecs (version in the table; link, version and date in the catalog's `quickspecs` field) for card counts and constraints. The sizer is for the US; confirm a build against the current US QuickSpecs.
 
 Separately, one copy of a model is split across 1, 2, 4 or 8 GPUs. Serving engines need the split to divide the model's attention heads evenly, so this is a software rule that applies to every board. On a 5-card RTX PRO 4500 server, one copy uses at most 4 cards and the fifth can run another copy. When the GPUs bought are more than one copy needs, as with a small model on an 8-GPU HGX system, they run more copies rather than one copy split wider, unless only the wider split reaches the speed goal: copies leave room for far more users, and it is how small models are served in production.
 
