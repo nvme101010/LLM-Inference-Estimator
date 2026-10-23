@@ -8,6 +8,8 @@ node validation/fit.mjs --apply        # fit, cross-validate, and write CAL and 
 node validation/compare.mjs --write    # compare the page as it stands and rewrite results.md
 node validation/sweep.mjs              # size 9,850 scenarios on every board, against the last release (about 30 seconds)
 node validation/fleet.mjs              # check the sizing of several models together (about 30 seconds; --quick, 5)
+node validation/fetch-trtllm.mjs       # rebuild trtllm-rtx.json from NVIDIA's TensorRT-LLM tables for the RTX PRO 6000 (optional)
+node validation/trtllm.mjs --write     # check the page against them, and rewrite trtllm-results.md (seconds; nothing is fitted)
 node validation/servers.mjs            # size the same scenarios on every HPE server with the Servers view's search, against the last release (about 2 minutes; --quick, 20 seconds)
 ```
 
@@ -26,6 +28,7 @@ Node 18 or later, no dependencies. `compare.mjs --index <file>` checks another c
 | [NVIDIA NIM benchmarks](https://docs.nvidia.com/nim/benchmarking/llm/1.0.0/performance.html), version 1.8.0 tables | Llama 3.1 8B, FP8 and BF16 | H200 (DGX H200, sized as HGX H200), L40S | NIM (TensorRT-LLM) | 88 |
 | [SemiAnalysis InferenceX](https://inferencex.semianalysis.com) (formerly InferenceMAX), [public API](https://inferencex.semianalysis.com/api), latest runs | Llama 3.3 70B FP8; gpt-oss-120b as released (MXFP4) | HGX H200, HGX B200, 1 to 8 GPUs per copy | vLLM 0.10.2 (Llama), 0.15–0.22 (gpt-oss) | 227 |
 | InferenceX, as above: kept out of the fit on NVIDIA boards, and the ROCm factor fitted on them | the same two | AMD MI355X (the page's MI350P is half of its chip) | vLLM on ROCm | 91 |
+| [NVIDIA TensorRT-LLM performance overview](https://nvidia.github.io/TensorRT-LLM/1.4.0rc1/developer-guide/perf-overview.html), RTX 6000 Pro Blackwell Server Edition tables, versions 1.4.0rc1 and [1.2.0rc6](https://nvidia.github.io/TensorRT-LLM/1.2.0rc6/developer-guide/perf-overview.html): **checked only, never fitted** (`trtllm-rtx.json`, below) | Llama 3.3 70B, Llama 3.1 405B, Qwen3 30B-A3B, Llama 4 Scout, all NVFP4 with an FP8 KV cache (and Qwen3 235B, Llama 4 Maverick, which the page doesn't list) | RTX PRO 6000 Blackwell, 1 to 8 cards, TP and PP over PCIe | TensorRT-LLM | 132 (101 checked) |
 
 Every source holds a fixed number of requests in flight, each sending the next as soon as the last is answered, with synthetic prompts that never repeat. That is the page's own load model with prompt caching off, so each point maps onto it directly: same model, board, weight and KV-cache precision, GPUs per copy, prompt and reply lengths, prefill piece size and requests in flight, all taken from the source's own settings. Each point in `benchmarks.json` names the table or the run it came from.
 
@@ -76,12 +79,32 @@ Each cell is predicted ÷ measured: the median, the middle 80% in brackets, and 
 - Llama 3.3 70B chat, 128 users: an HGX H200 system instead of 4 H200 NVL.
 - gpt-oss-120b long-document summary, 8 users: an HGX H200 system instead of 4 H200 NVL, from the first token's slow end on 64K-token prompts.
 
+## RTX PRO 6000: NVIDIA's own throughput tables (check only)
+
+No benchmark the fit uses covers the RTX PRO 6000, so the page's figures for it are extrapolated from its datasheet. NVIDIA's TensorRT-LLM performance overview has tables for the Server Edition. They are not curves: each figure is the total output of an offline run (`trtllm-bench throughput`) with every request queued at once, so the engine keeps as many in flight as its KV cache holds (95% of the memory left after weights, CUDA-graph batches up to 8,192) and replaces each finished request at once, with fixed prompt and reply lengths of random tokens. That is the page's own load model at that many users, so `trtllm.mjs` finds how many requests the page's memory model fits in such a cache and takes the page's output at that many, with NVIDIA's settings (NVFP4 weights, FP8 KV cache, no prompt caching, 8,192-token prompt pieces). There is no first token or speed per user to check, and nothing is fitted.
+
+With the page as it stands (1.9.0), over the 101 figures on models and layouts it sizes, output comes to **0.81 × NVIDIA's (10th–90th percentile 0.39–1.17), 48% within ±25%**; with the page's own vLLM fixed costs instead of TensorRT-LLM's, 0.81 as well, as fixed costs matter little at full batches. By how the cards are used:
+
+| | Figures | Predicted ÷ NVIDIA |
+|---|---|---|
+| 1 card | 26 | 0.89 (0.55–1.20), 54% |
+| Pipeline stages over PCIe | 36 | 0.76 (0.44–1.14), 36% |
+| Tensor-parallel over PCIe | 26 | 0.71 (0.30–1.03), 46% |
+| Both | 13 | 1.07 (0.35–1.23), 69% |
+
+What it shows (every figure is in `trtllm-results.md`):
+
+- **FP4 compute is too slow in the page.** Qwen3 30B-A3B, which reads only 3B active parameters a token and so stays memory-bound, lands at 1.04 (1.2.0rc6) and 1.14 (1.4.0rc1) on one card. Llama 3.3 70B, which the page has compute- or prompt-bound, lands at 0.56–0.66. The page runs FP4 at 2 × BF16 (`PREC.FP4.p`, not fitted); Blackwell's tensor cores run NVFP4 at 4 × dense BF16 on the datasheets, as FP8 runs at 2 × (fitted at 2). At 4 ×, one card lands at 0.98 (0.88–1.21), 88% within ±25%, Llama 3.3 70B at 0.91 with every figure within, and all 101 at 0.99. Not changed here: it would move every FP4 figure on every board that runs FP4 natively.
+- **Tensor-parallel over PCIe comes out more pessimistic the wider it splits:** Qwen3 30B-A3B at 0.94 on 2 cards, 0.81 on 4 and 0.53 on 8, whatever FP4 does. The page's PCIe all-reduce latency (150 µs) is a guess, and these suggest it is too high, or that the engine overlaps the all-reduce with compute; it is the first data on it, but one engine and one model, so it is not refitted here.
+- **1.4.0rc1's two-card figures look like per-card ones.** Its Llama 3.3 70B on 2 cards (TP1 × PP2) is about half of 1.2.0rc6's for the same lengths (1,901 against 3,707 tok/s at 1000/1000) and half of the page's with FP4 at 4 × (1.96), while its one-card figures match 1.2.0rc6's. Treat that column with care.
+- **Caveats.** One engine (TensorRT-LLM, not the vLLM the page models); offline maximum throughput only; Llama 4 Scout's quantization config is gated, so its FP8 KV cache is assumed; the DEP layouts (attention data-parallel with expert parallel) and two models are not checked.
+
 ## What still doesn't fit
 
 - **gpt-oss on B200 comes out slow** (0.80 held out, 0.88 in sample), and its first tokens long. Its runs use vLLM 0.22 with all-reduce fusion, against the 0.10 behind the Llama runs: newer engines have lower fixed costs than one set of constants can carry.
 - **Short first tokens on NIM come out long** in `results.md`, which compares the page as it stands: the page charges vLLM's 37 ms to take a request in, and TensorRT-LLM takes about 3.
 - **First token with many requests in flight is not used.** These benchmarks start every request at once, so the first wave queues behind the others' prompts. In InferenceX runs above about 32 in flight, that burst makes the mean first token 2–3 × the median, and the 99th percentile about 10 ×. The comparison uses InferenceX's medians, which reflect the steady state; NIM publishes only means, which include the burst. The page's wait assumes requests arrive at random, so neither tests it. A benchmark at a random request rate (`vllm bench serve --request-rate`) would.
-- **Boards with no benchmark** (L4, RTX PRO 4500 and 6000, H200 NVL, B300, MI350P) rest on the fitted shares applied to their datasheets, and the MI350P additionally on the ROCm factor.
+- **Boards with no benchmark** (L4, RTX PRO 4500 and 6000, H200 NVL, B300, MI350P) rest on the fitted shares applied to their datasheets, and the MI350P additionally on the ROCm factor. The RTX PRO 6000 is now checked against NVIDIA's own throughput tables (above), which point at FP4 compute and PCIe all-reduce.
 - **Coverage.** Three models (dense and one mixture-of-experts); nothing on hybrid or latent-attention models, or with prompt caching on.
 
 **Memory, for completeness:** of the 20 points the page would not size onto that many GPUs, 18 show first tokens of 2.8 s to 18 minutes, most of them 10–300 × the estimate: the engine holding requests back for want of cache space. The other two, Llama 3.3 70B on one H200 or one B200 with 64 requests of 1K in and 8K out, ran normally, so the page was cautious there.
