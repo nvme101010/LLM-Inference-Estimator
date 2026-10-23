@@ -47,7 +47,7 @@ Every source holds a fixed number of requests in flight, each sending the next a
 | `request` | 37 ms | vLLM's time to take a request in (HTTP, tokenization, scheduling), part of every first token |
 | `rocm` | 0.75 | share of the bandwidth and compute shares reached on AMD's stack, fitted on MI355X runs (since 1.5.0; 0.68 before, see AMD below) |
 
-Not fitted, since no benchmark here exercises them: the PCIe all-reduce latency (150 µs) and the precisions other than FP8 and the gpt-oss checkpoint's own.
+Not fitted, since no benchmark here exercises them: the PCIe all-reduce latency (150 µs) and the precisions other than FP8 and the gpt-oss checkpoint's own. FP4's compute is set to 4 × BF16 on boards with native FP4, the datasheet ratio (since 1.9.1; 2 × before), and checked against NVIDIA's own RTX PRO 6000 throughput tables (`trtllm.mjs`, where it took the page from 0.81 × NVIDIA's output to 0.99 ×). A refit with it moves the constants by a hair (bandwidth share 0.85 → 0.84, request time 37 → 38 ms) and held-out speed within ±25% from 77% to 75%, so they are kept.
 
 **How.** The loss, per group of points (one source, model and board), is the mean pseudo-Huber log error of speed per user over every point that fits in memory, plus that of the first token at each curve's lowest concurrency. Errors beyond ±50% count linearly, so no single benchmark's quirks set the constants, and every group counts equally. The engines' fixed costs differ several-fold (TensorRT-LLM takes 3 ms to take a request in, against vLLM's 37), so each engine gets its own step and request time. The page ships vLLM's, as it models vLLM. The search runs Nelder–Mead from three starting points and keeps the best.
 
