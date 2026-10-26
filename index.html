@@ -952,8 +952,8 @@
 {
  "vendor": "HPE",
  "checked": "2026-10-20",
- "about": "Every current HPE ProLiant and HPE Compute XD server that takes one of the estimator's boards, for the US. Which GPU and NVLink bridge each server takes: the matrix. How many cards, and each constraint: the server's US QuickSpecs (quickspecs: URL, version, date). max is per server; a node here is at most 8, so larger counts are capped at 8. cooling: per board, the ways HPE builds that configuration as [{by: air or liquid, u: rack units}], the first sized and counted (air first where there is a choice); none listed means air-cooled in the server's own chassis. Gen11 servers with a Gen12 successor that takes the same GPUs are left out.",
- "memAbout": "mem: memory channels per CPU (ch), DIMMs per channel (dpc), the RDIMM sizes HPE sells for the server in GB (gb), from its US QuickSpecs; pop: how many DIMMs one CPU may hold, from the population table for the server in HPE's memory population rules for its processor family (rules; checked 2026-10-21). Xeon 6 servers take no 6-DIMM population; AMD servers with 2 DIMMs per channel go 12, 16, 20, 24.",
+ "about": "Every current HPE ProLiant and HPE Compute XD server that takes one of the estimator's boards, for the US. Which GPU and NVLink bridge each server takes: the matrix; for the XD690 and the Gen13 servers, which it doesn't list, their own QuickSpecs. How many cards, and each constraint: the server's US QuickSpecs (quickspecs: URL, version, date). max is per server; a node here is at most 8, so larger counts are capped at 8. pop, per board: the counts HPE builds, where the QuickSpecs restrict them. cooling: per board, the ways HPE builds that configuration as [{by: air or liquid, u: rack units}], the first sized and counted (air first where there is a choice); none listed means air-cooled in the server's own chassis. Gen11 servers with a Gen12 successor that takes the same GPUs are left out.",
+ "memAbout": "mem: memory channels per CPU (ch), DIMMs per channel (dpc), the RDIMM sizes HPE sells for the server in GB (gb), from its US QuickSpecs; pop: how many DIMMs one CPU may hold, from the population table for the server in HPE's memory population rules for its processor family (rules; checked 2026-10-21), or for Gen13 servers the populations their QuickSpecs list. Xeon 6 servers take no 6-DIMM population; AMD servers with 2 DIMMs per channel go 12, 16, 20, 24.",
  "matrix": {
   "title": "NVIDIA Accelerators for HPE QuickSpecs",
   "version": "83",
@@ -1577,6 +1577,84 @@
     "*": 0
    },
    "cpu1Why": "The XD690 is a two-processor system."
+  },
+  {
+   "id": "dl585a-g13",
+   "name": "HPE ProLiant DL585a Gen13",
+   "short": "DL585a Gen13",
+   "group": "GPU-dense",
+   "u": 10,
+   "form": "10U rack",
+   "sockets": 2,
+   "cpu": "AMD EPYC 9006",
+   "url": "https://www.hpe.com/us/en/collaterals/collateral.a50014668enw.html",
+   "notes": [
+    "8 double-wide GPU CTO model: the GPUs sit on a PCIe Gen6 switchboard shared by both CPUs, and HPE builds 1, 2, 4 or 8.",
+    "Also takes the RTX PRO 6000D (84 GB), which the estimator doesn't size.",
+    "Up to about 260 lb in 10U; HPE recommends four people to install it."
+   ],
+   "gpus": [
+    {
+     "board": "RTX PRO 6000 Blackwell",
+     "max": 8,
+     "pop": [1, 2, 4, 8],
+     "link": "pcie"
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a50014668enw.html",
+    "version": "1",
+    "date": "2026-10-07"
+   },
+   "mem": {"ch": 16, "dpc": 1, "gb": [32, 64, 96, 128, 256], "pop": [2, 4, 8, 12, 16], "rules": "https://www.hpe.com/psnow/doc/a50012817enw"},
+   "maxCores": 256,
+   "coreNote": "EPYC 9996",
+   "cpu1": {
+    "*": 0
+   },
+   "cpu1Why": "The DL585a Gen13 takes two processors only."
+  },
+  {
+   "id": "dl525-g13",
+   "name": "HPE ProLiant DL525 Gen13",
+   "short": "DL525 Gen13",
+   "group": "1U",
+   "u": 1,
+   "form": "1U rack",
+   "sockets": 1,
+   "cpu": "AMD EPYC 9006",
+   "url": "https://www.hpe.com/us/en/collaterals/collateral.a50014669enw.html",
+   "notes": [
+    "RTX PRO 6000 and 4500 cards go in the front slots of the Front FHFL PCIe CTO server; L4 cards in the rear."
+   ],
+   "gpus": [
+    {
+     "board": "L4",
+     "max": 3,
+     "link": "pcie",
+     "constraints": [
+      "Rear low-profile slots; two of the three are x8."
+     ]
+    },
+    {
+     "board": "RTX PRO 4500 Blackwell",
+     "max": 4,
+     "link": "pcie"
+    },
+    {
+     "board": "RTX PRO 6000 Blackwell",
+     "max": 2,
+     "link": "pcie"
+    }
+   ],
+   "quickspecs": {
+    "url": "https://www.hpe.com/us/en/collaterals/collateral.a50014669enw.html",
+    "version": "1",
+    "date": "2026-10-07"
+   },
+   "mem": {"ch": 16, "dpc": 1, "gb": [32, 64, 96], "pop": [1, 2, 4, 8, 12, 16], "rules": "https://www.hpe.com/psnow/doc/a50012817enw"},
+   "maxCores": 256,
+   "coreNote": "EPYC 9996"
   }
  ],
  "unsized": [
@@ -1857,7 +1935,7 @@ function boardWith(g, h){
     o.split ? {split: o.split, linkLbl: `NVLink bridge · up to ${o.split}`} : {},
     // no bridge for it in this server: the cards reach each other over PCIe Gen5 only
     o.nolink ? {link: false, lbw: 64, lname: "PCIe Gen5 (no NVLink bridge in this server)", linkLbl: undefined, split: undefined} : {},
-    max ? {max, pop: o.pop || (g.pop ? g.pop.filter(n=> n <= max) : undefined)} : {});
+    max ? {max, pop: o.pop || (g.pop ? g.pop.filter(n=> n <= max) : undefined)} : o.pop ? {pop: o.pop} : {});
 }
 /* the boards compared: all of them, or by NVIDIA's guidance only those it covers, each in its HPE server */
 const boardsInPlay = () => (S.srv ? GPUS.filter(g=> g.guide!==false) : GPUS).map(inHost);
@@ -1934,8 +2012,9 @@ const DATA_AS_OF = "October 2026";   // when the model and board figures were la
 /* The estimator's version, carried in every shared link and summary. A link made under an older
    version opens with the changes since then listed, so a sizing never shifts without saying so.
    Bump it with each release tag; add to CHANGES whenever a release changes what the figures come to. */
-const VERSION = "1.9.0";
+const VERSION = "1.10.0";
 const CHANGES = [
+  {v:"1.10.0", what:"Two HPE ProLiant Gen13 servers join the catalog, from their first US QuickSpecs (7 October 2026). The DL585a Gen13: 10U, 2 × AMD EPYC 9006, and 1, 2, 4 or 8 × RTX PRO 6000 Blackwell on a PCIe Gen6 switchboard. The DL525 Gen13: 1U, one EPYC 9006, and 2 × RTX PRO 6000, 4 × RTX PRO 4500 or 3 × L4. Each board keeps its default server, so the GPU view and every other server's figures are unchanged; the Servers view can now recommend either."},
   {v:"1.9.0", what:"The HPE Compute XD690 joins the servers: 8 × HGX B300, air-cooled, in 10U. Cooling is now set per configuration: on the XD685 the HGX H200 is air-cooled in 6U (or liquid-cooled in 5U), and the HGX B200, B300 and MI355X are liquid-cooled only, in 5U, where all of them used to count as 6U. Rack units follow the configuration; across the 9,850 scenarios the validation sweeps, no recommendation changes. Each build has a Cooling row, flagged when it is liquid-cooled only."},
   {v:"1.7.1", what:"A prompt now waits only behind other users' prompts: each user has one request at a time, so a single user never waits, and a few users wait less than before. First token comes out up to about a fifth shorter with few users and long prompts, and by a few percent or less otherwise; some setups that missed the goal only on that wait now meet it, or serve more users within it, so a suggestion can change. Output, all users is now the replies finished each second times their length, not users × speed per user: lower by 1–2% for chat, and by a third or more for one user on long documents. It also no longer counts copies left with no users of their own, as when one user is suggested two copies of a model, which used to double it. The build and wiring name each board's own PCIe generation (Gen4 for the L4 and L40S), and pipeline stages on cards with no GPU link hand off at that speed. The fitted constants are unchanged. Each recommendation now says when it assumes a warm prompt cache, and how much of each prompt that leaves to read; the GPU view says its HPE server is one of those that take the board."},
   {v:"1.7.0", what:"The answer now opens by server: the Servers view sizes the model on every current GPU-capable HPE ProLiant server, recommends one configuration, tags the smaller and bigger servers that also work, and shows every layout its wiring allows, including pipelining across NVLink groups and over PCIe. The GPU view is one click away, and links made before 1.7.0 open in it. Pipeline across bridge groups, off by default, in Advanced settings: on H200 NVL servers one copy of a model may span both bridged groups of 4 as two pipeline stages, tensor-parallel within each, so a model or a KV cache too big for one group fits on 8 cards. With it off nothing changes. With it on, a board that could only run two copies of 4 can also be suggested as one copy of 8 when that is the only layout that holds everyone; speed per user is sized as one group's, since each stage still reads all of its weights per token, and the figures for pipelined copies are modeled, not yet fitted to a benchmark. In the GPU view each board is now sized as in one HPE server that takes it, at that server's limits (on the DL385 Gen11, 4 double-wide cards and 2-way H200 NVL bridges; on the DL380 Gen12, H200 NVL with no bridge); the Servers view compares all 13 current GPU-capable HPE ProLiant servers. Server sizing gives the L4 and RTX PRO 4500 16 CPU cores per GPU at any count (other boards keep 32 per GPU, 16 at 8 GPUs). On Auto the figures are unchanged, except the AMD MI350P: its only HPE server, the DL385 Gen11, holds 4, so it is now sized at 4 cards. In the Servers view, system memory is built from the server's own modules: the smallest it takes, as few as reach 2 × GPU memory, one per channel, rather than filling every channel."},
