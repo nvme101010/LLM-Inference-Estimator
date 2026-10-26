@@ -50,7 +50,7 @@ In the GPU view each board is sized as in one HPE server that takes it, at that 
 | ProLiant DL145 Gen11 · 2U edge · 1 × EPYC 8004 (v23) | L4 (3), L40S (1), RTX PRO 4500 (1) | |
 | ProLiant Compute XD685 · 5U DLC / 6U air · 2 × EPYC 9005 (v16) | HGX H200, HGX B200, HGX B300, MI355X | whole 8-GPU systems; H200 air-cooled in 6U or liquid in 5U; B200, B300 and MI355X liquid-cooled only, in 5U |
 | Compute XD690 · 10U air · 2 × Xeon 6 (v6) | HGX B300 | whole 8-GPU system, air-cooled: the B300 without facility water; about 500 lb |
-| ProLiant DL585a Gen13 · 10U · 2 × EPYC 9006 (v1) | RTX PRO 6000 (8) | 1, 2, 4 or 8 cards, on a PCIe Gen6 switchboard shared by both CPUs; two processors only. Also takes the RTX PRO 6000D (84 GB), which isn't sized |
+| ProLiant DL585a Gen13 · 10U · 2 × EPYC 9006 (v1) | RTX PRO 6000 (8) | 1, 2, 4 or 8 cards, on a PCIe Gen6 switchboard shared by both CPUs; two processors only |
 | ProLiant DL525 Gen13 · 1U · 1 × EPYC 9006 (v1) | L4 (3), RTX PRO 4500 (4), RTX PRO 6000 (2) | RTX PRO cards in the front slots of the Front FHFL PCIe CTO server; L4 in the rear, two of the three slots x8 |
 
 On **Auto** each board sits in the first server above that lists it. That matches the board's own figures, except the MI350P, which is now sized at the DL385 Gen11's 4 cards. Gen11 servers with a Gen12 successor that takes the same GPUs are left out. HPE also lists the RTX PRO 4500 and 6000 for the EL2000 EL240 Gen12 and Edge Server e930t without a card count, so those are named beside the picker but not sized. Storage, Superdome, Compute Scale-up and EL8000 systems are out of scope.
