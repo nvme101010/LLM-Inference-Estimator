@@ -32,7 +32,7 @@ Pipelined layouts are modeled, not yet fitted to a benchmark, and say so. The se
 
 ### HPE servers
 
-In the GPU view each board is sized as in one HPE server that takes it, at that server's limits, and says so; the Servers view compares every server, and **Servers in scope** narrows it (URL key `hs`). The list is every current HPE ProLiant and HPE Compute XD server that takes one of these GPUs:
+In the GPU view each board is sized as in one HPE server that takes it, at that server's limits, and says so: the server the Servers view recommends for that board whenever the figures are the same there, else the first server that sells it; the Servers view compares every server, and **Servers in scope** narrows it (URL key `hs`). The list is every current HPE ProLiant and HPE Compute XD server that takes one of these GPUs:
 
 | HPE server (US QuickSpecs version) | Boards (most cards per server) | Notes |
 |---|---|---|
@@ -120,7 +120,7 @@ docker run --rm -p 8080:8080 --read-only --tmpfs /tmp ghcr.io/nvme101010/llm-inf
 [`deploy/k8s`](deploy/k8s) holds a Deployment (2 replicas, non-root, read-only root filesystem, no capabilities, readiness and liveness probes on `/healthz`, 10m CPU and 16 Mi memory requested), a Service on port 80, a PodDisruptionBudget, and an optional Ingress. Apply it from the repository or straight from GitHub:
 
 ```bash
-kubectl apply -k "https://github.com/nvme101010/LLM-Inference-Estimator//deploy/k8s?ref=v1.10.0"
+kubectl apply -k "https://github.com/nvme101010/LLM-Inference-Estimator//deploy/k8s?ref=v1.10.1"
 ```
 
 Then port-forward to try it (`kubectl port-forward svc/llm-inference-estimator 8080:80`) or set the host in `ingress.yaml` and add it to the kustomization. The image runs two nginx workers regardless of node size, so the 32 Mi limit holds everywhere.
