@@ -456,6 +456,17 @@
   .math-body h3{font-size:13px; font-weight:600; margin:0; padding:18px 18px 8px}
   .math-body .cfgnote{margin:0 18px; padding-top:0; border-top:none}
   .h3sub{font-weight:400; color:var(--muted); font-size:12px; margin-left:4px}
+  /* the headline's figures, each from its inputs: a heading with the result, then one line per step */
+  .worked{display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 430px), 1fr)); gap:10px; padding:0 18px}
+  .worked .empty{grid-column:1 / -1}
+  .wk{border:1px solid var(--line); border-radius:8px; padding:10px 12px 8px; min-width:0}
+  .wk-h{display:flex; justify-content:space-between; align-items:baseline; gap:10px; font-size:13px; font-weight:600; padding-bottom:6px}
+  .wk-h b{font-variant-numeric:tabular-nums; color:var(--accent-ink)}
+  .wk-r{display:grid; grid-template-columns:minmax(0, 11em) minmax(0, 1fr); gap:2px 12px; padding:5px 0; border-top:1px dashed var(--line-2); font-size:12.5px; line-height:1.5}
+  .wk-r > span{color:var(--muted)}
+  .wk-r code{font-variant-numeric:tabular-nums; overflow-wrap:anywhere}
+  .wk-r .ok{color:var(--accent-ink)} .wk-r .no{color:var(--bad, #c0392b)}
+  @media (max-width:560px){ .wk-r{grid-template-columns:1fr} }
   @media (prefers-reduced-motion:reduce){ details.more > summary::before{transition:none} }
 
   /* ---- Servers view ---- */
@@ -881,8 +892,10 @@
     </details>
 
     <details class="panel more" id="math">
-      <summary><span class="sum-title">Show the math</span><span class="sum-state" id="mathState">Speed on this setup · model architecture · memory breakdown · how it's calculated</span></summary>
+      <summary><span class="sum-title">Show the math</span><span class="sum-state" id="mathState">Every figure worked out · speed on this setup · model architecture · memory breakdown · how it's calculated</span></summary>
       <div class="math-body">
+        <h3>How the figures above are worked out <span class="h3sub" id="workedScope"></span></h3>
+        <div class="worked" id="worked"></div>
         <div class="tput">
           <h3>Speed on this setup <span class="i" data-tip="tput" tabindex="0">i</span></h3>
           <div class="cap" id="tputcap"></div>
@@ -2432,7 +2445,7 @@ function throughput(g, tp, chunk = S.chunk, users = allUsers(), pp = 1){
     const secTok = (2*paramsActive + attnPerTok) / (g.flops*1e12 * CAL.mfuPrefill * eff * p * tp);
     const read  = (chunks-1)*stepWith(chunk, secTok) + stepWith(P - (chunks-1)*chunk, secTok);
     const pause = stepWith(piece, secTok);                   // longest gap between tokens for running replies
-    return {i, w:x.w, users:x.users, gen: S.thinking + x.w.reply, prompt:P, chunks, read, pause, prefillTps: P/read};
+    return {i, w:x.w, users:x.users, gen: S.thinking + x.w.reply, prompt:P, chunks, read, pause, prefillTps: P/read, secTok, attnPerTok};
   });
 
   /* Under load. Each of a workload's users sends a new request as soon as the last one is answered, so
@@ -2492,7 +2505,11 @@ function throughput(g, tp, chunk = S.chunk, users = allUsers(), pp = 1){
                    : tCompute > tMem ? "compute" : "memory";
   return { perUser, total, ttft: slow.ttft, pause: stall.pause, prefillTps: slow.prefillTps, prompt: slow.prompt,
            between: 1/tStep, wait, busy, rate: per.reduce((s, x)=> s + x.rate, 0),
-           per, slow, stall, tMem, tCompute, tComm, tPipe, tOver, tStep, bottleneck, pp };
+           per, slow, stall, tMem, tCompute, tComm, tPipe, tOver, tStep, bottleneck, pp,
+           /* the step's inputs, for Show the math: bytes each GPU reads in a step (weights, cache), the
+              bandwidth and compute it reaches, bytes/s and FLOP/s, and the step's FLOPs */
+           work: {paramsRead, paramsActive, wBytes: pp*paramsRead*S.wq/n, cBytes: cacheRead/pp, flops,
+                  bwEff: g.bw*GB * CAL.mbu * eff * d, compEff: g.flops*1e12 * CAL.mfuDecode * eff * p * n, d, p, eff} };
 }
 
 const fitsOn = (g, perGB) => perGB <= g.cap*USABLE;
@@ -3261,10 +3278,11 @@ function renderServerView(){
   $('viewhint').textContent = "";
   if(d){
     S.tp = d.tp; S.pp = d.pp;
-    $('mathState').textContent = `${(cfgById(cfgs, S.cfg) || A.rec).sv.short} · ${d.gpus} × ${d.g.n}: speed · model architecture · memory breakdown · how it's calculated`;
+    $('mathState').textContent = `${(cfgById(cfgs, S.cfg) || A.rec).sv.short} · ${d.gpus} × ${d.g.n}: every figure worked out · speed · model architecture · memory breakdown · how it's calculated`;
     renderBreakdown(d.r, d.tp, d.reps, d);
     renderChunkOptions(d);
     renderThroughput(d);
+    renderWorked(d);
   }
 }
 function renderServerFleet(){
@@ -3277,10 +3295,11 @@ function renderServerFleet(){
   const c = cfgById(cfgs, S.cfg) || A.rec, d = c && c.fits ? c.f.models[S.edit].d : null;
   if(d && d.fits){
     S.tp = d.tp; S.pp = d.pp;
-    $('mathState').textContent = `${specName(S.models[S.edit])} on ${c.sv.short} · ${d.gpus} × ${d.g.n}: speed · model architecture · memory breakdown · how it's calculated`;
+    $('mathState').textContent = `${specName(S.models[S.edit])} on ${c.sv.short} · ${d.gpus} × ${d.g.n}: every figure worked out · speed · model architecture · memory breakdown · how it's calculated`;
     renderBreakdown(d.r, d.tp, d.reps, d);
     renderChunkOptions(d);
     renderThroughput(d);
+    renderWorked(d);
   }
 }
 /* render() for the Servers view: the view, then the parts of the page both views share */
@@ -3581,6 +3600,7 @@ function render(){
   renderCards(deps, active, suggested, picked);
   renderChunkOptions(fits ? active : null);
   renderThroughput(fits ? active : null);
+  renderWorked(fits ? active : null);
   renderTpNote(m, tp, active);
   renderAdvState();
   updateGoalHint();   // the goal's wait follows whether the model thinks and users see it
@@ -3969,6 +3989,124 @@ function renderThroughput(d){
     </div>`;
 }
 
+/* Show the math, first: each figure the answer shows, from its inputs, with this setup's numbers in the
+   formulas "How these numbers are built" gives in words. Every value is the one the page computed
+   (compute, throughput, capacity), shown again, so the lines add up to the figures above. */
+function renderWorked(d){
+  const el = $('worked');
+  if(!d || !d.t){
+    $('workedScope').textContent = "";
+    el.innerHTML = `<div class="empty">Worked out once the model fits on a board.</div>`;
+    return;
+  }
+  const t = d.t, g = d.g, r = d.r, w = t.work, m = r.m, n = d.tpw*d.pp, u = d.upr;
+  const goal = GOALS[S.goal], hasGoal = S.goal!=="any";
+  const ms = s => fmtTime(s).join(" "), num = x => x>=100 ? commas(Math.round(x)) : x>=10 ? x.toFixed(1) : x>=1 ? x.toFixed(2) : x.toPrecision(2);
+  const mem = b => fmtMemN(b/GB), memU = b => `${mem(b)} ${S.unit}`, bw = b => `${commas(Math.round(b/GB))} GB/s`;
+  const flop = x => x>=1e12 ? `${num(x/1e12)} TFLOP` : `${num(x/1e9)} GFLOP`;
+  const check = (ok, txt) => `<span class="${ok ? "ok" : "no"}">${txt}</span>`;
+  const row = (label, expr) => `<div class="wk-r"><span>${label}</span><code>${expr}</code></div>`;
+  const card = (title, result, rows) => `<div class="wk"><div class="wk-h"><span>${title}</span><b>${result}</b></div>${rows.join("")}</div>`;
+  $('workedScope').textContent = `${S.models.length>1 ? `${specName(S.models[S.edit])}, its share of the fleet · ` : ""}one copy: ${n} × ${g.n}, ${commas(u)} user${u===1 ? "" : "s"}${d.reps>1 ? ` (of ${d.reps} copies)` : ""}`;
+
+  // Per GPU: the memory breakdown's parts, on one GPU
+  const over = S.ovpct/100*(r.w_pg + r.kv_pg + r.act_pg), links = r.tpcomm_pg + r.ppcomm_pg;
+  const perGB = r.perGPU/GB, usable = g.cap*USABLE;
+  const memCard = card("Per GPU", `${fmtMemN(perGB)} ${S.unit}`, [
+    row("weights", `${num(m.p)}B params × ${+S.wq.toPrecision(3)} B/param${n>1 ? ` ÷ ${n} GPUs` : ""} = ${memU(r.w_pg)}`),
+    row("KV cache", `${commas(u)} user${u===1 ? "" : "s"}' caches${n>1 ? `, this GPU's share` : ""} = ${memU(r.kv_pg)}`),
+    row("activations", `${commas(r.T)} tokens per step, plus logits${n>1 ? ` ÷ ${d.tpw} GPUs` : ""} = ${memU(r.act_pg)}`),
+    row("overhead", `${memU(GB)} CUDA context + ${S.ovpct}% of the above = ${memU(GB + over)}`),
+    ...(links ? [row("link buffers", memU(links))] : []),
+    row("total", `${[r.w_pg, r.kv_pg, r.act_pg, GB + over, ...(links ? [links] : [])].map(mem).join(" + ")} = ${fmtMemN(perGB)} ${S.unit}`),
+    row("fits?", `${fmtMemN(perGB)} ${S.unit} ≤ ${boxMem(g)} × ${USABLE} usable = ${fmtMemN(usable)} ${S.unit} `
+      + check(perGB <= usable, `✓ ${Math.round(perGB/g.cap*100)}% full`)),
+  ]);
+
+  // Speed per user: one decode step, then the load from prompts arriving
+  const moe = m.E ? ` (of ${num(m.p)}B, the experts ${commas(u)} user${u===1 ? "" : "s"} route to, ${m.K} of ${m.E} each)` : "";
+  const bwParts = [`${commas(g.bw)} GB/s`, `${CAL.mbu} reached`, ...(w.d!==1 ? [`${w.d} for the precision`] : []), ...(w.eff!==1 ? [`${w.eff} ROCm`] : [])];
+  const fl = g.flops*w.p, flParts = [`${commas(Math.round(fl))} TFLOPS${w.p!==1 ? ` (${commas(g.flops)} × ${w.p} for ${precClass(m)})` : ""}`, `${CAL.mfuDecode} reached`, ...(w.eff!==1 ? [`${w.eff} ROCm`] : []), ...(n>1 ? [`${n} GPUs`] : [])];
+  const core = Math.max(t.tMem, t.tCompute);
+  const stepParts = [`max(${ms(t.tMem)}, ${ms(t.tCompute)})`, ...(t.tComm ? [`${ms(t.tComm)} links`] : []), ...(t.tPipe ? [`${ms(t.tPipe)} stage hand-off`] : []), `${ms(t.tOver)} scheduler`];
+  const arrivals = t.per.reduce((s, x)=> s + x.rate*x.chunks, 0);
+  const lowTps = tpsLow(t);
+  const speedCard = card("Speed per user", `${fmtTps(t.perUser)} tok/s`, [
+    row("weights read", `${num(w.paramsRead/1e9)}B params × ${+S.wq.toPrecision(3)} B/param${d.tpw>1 ? ` ÷ ${d.tpw} GPUs` : ""} = ${memU(w.wBytes)}${moe}`),
+    row("cache read", `${commas(u)} user${u===1 ? "'s cache" : "s' caches"}, each halfway through its reply = ${memU(w.cBytes)}`),
+    row("memory time", `(${mem(w.wBytes)} + ${memU(w.cBytes)}) ÷ (${bwParts.join(" × ")} = ${bw(w.bwEff)}) = ${ms(t.tMem)}`),
+    row("compute time", `${flop(w.flops)} ÷ (${flParts.join(" × ")}) = ${ms(t.tCompute)}`),
+    row("one step", `${stepParts.join(" + ")} = ${ms(t.tStep)}${core===t.tMem ? " (memory-bound)" : " (compute-bound)"}`),
+    row("between prompts", `1 ÷ ${ms(t.tStep)} = ${fmtTps(t.between)} tok/s`),
+    row("under load", `${fmtRate(arrivals)} prompt pieces/s + (1 − ${(t.busy*100).toFixed(1)}% reading prompts) ÷ ${ms(t.tStep)} = ${fmtTps(t.perUser)} tok/s`),
+    row("likely", `× ${RANGE.speed[0]} to × ${RANGE.speed[1]} = ${fmtTps(lowTps)}–${fmtTps(t.perUser*RANGE.speed[1])} tok/s`
+      + (hasGoal ? `; goal at the low end: ${fmtTpsShort(lowTps)} ≥ ${goal.tps} ` + check(lowTps >= goal.tps, lowTps >= goal.tps ? "✓" : "✗") : "")),
+  ]);
+
+  // First token: taking the request in, the wait for prompts ahead, reading this one (the slowest workload)
+  const x = t.slow, names = groupNames(), pp = promptParts(x.w), many = t.per.length>1;
+  const piece = Math.min(S.chunk, x.prompt);
+  const links1 = x.read - Math.max(t.tMem, t.tCompute + x.prompt*x.secTok) - CAL.step;   // the piece's all-reduces, when it is read in one step
+  const readExpr = x.chunks===1 && d.pp===1
+    ? `max(${ms(t.tMem)}, ${ms(t.tCompute)} + ${commas(x.prompt)} × ${num(x.secTok*1e6)} µs)${links1 > 1e-7 ? ` + ${ms(links1)} links` : ""} + ${ms(CAL.step)} = ${ms(x.read)}`
+    : `${x.chunks} pieces of up to ${commas(S.chunk)}, each in one step with everyone's next token = ${ms(x.read)}`;
+  const N = t.per.reduce((s, y)=> s + y.users, 0), others = Math.max(0, 1 - 1/N);
+  const lam = t.per.reduce((s, y)=> s + others*y.rate, 0), busyO = t.per.reduce((s, y)=> s + others*y.rate*y.read, 0);
+  const waitExpr = N<=1 ? `one user never waits behind another's prompt = 0 ms`
+    : many ? `Σ arrivals × read² ÷ (2 × (1 − ${(busyO*100).toFixed(1)}% busy)) = ${ms(t.wait)}`
+    : `${fmtRate(lam)}/s × (${ms(x.read)})² ÷ (2 × (1 − ${(busyO*100).toFixed(1)}%)) = ${ms(t.wait)}`;
+  const hiT = ttftHigh(t);
+  const ttftRows = [
+    row("new prompt", `${commas(x.prompt)} of ${commas(pp.P)} tokens${pp.P > x.prompt ? " (the rest cached)" : ""}, in ${x.chunks} piece${x.chunks===1 ? "" : "s"} of up to ${commas(S.chunk)}${many ? ` · ${names[x.i]}, the slowest` : ""}`),
+    row("per prompt token", `(2 × ${num(w.paramsActive/1e9)}B active + ${num(x.attnPerTok/1e9)}G attention) FLOPs ÷ (${commas(Math.round(g.flops*w.p))} TFLOPS × ${CAL.mfuPrefill} reached${w.eff!==1 ? ` × ${w.eff} ROCm` : ""}${d.tpw>1 ? ` × ${d.tpw} GPUs` : ""}) = ${num(x.secTok*1e6)} µs`),
+    row("reading it", readExpr),
+    row("waiting for others", waitExpr),
+    row("first token", `${ms(CAL.request)} taking it in + ${ms(t.wait)} + ${ms(x.read)} = ${ms(t.ttft)}`),
+    row("likely", `× ${RANGE.ttft[0]} to × ${RANGE.ttft[1]} = ${ms(t.ttft*RANGE.ttft[0])}–${ms(hiT)}`
+      + (hasGoal && !hideThink() ? `; goal at the slow end: ${ms(hiT)} ≤ ${goal.ttft} s ` + check(hiT <= goal.ttft, hiT <= goal.ttft ? "✓" : "✗") : "")),
+  ];
+  if(S.thinking){
+    ttftRows.push(row(hideThink() ? "answer starts" : "answer after thinking",
+      `${ms(t.ttft)} + ${commas(S.thinking)} thinking ÷ ${fmtTps(t.perUser)} tok/s = ${fmtWait(answerStart(t))}`
+      + (hasGoal && hideThink() ? `; at the cautious end ${fmtWait(answerHigh(t))} ≤ ${goal.ans} s ` + check(answerHigh(t) <= goal.ans, answerHigh(t) <= goal.ans ? "✓" : "✗") : "")));
+  }
+  const ttftCard = hideThink() ? card("Answer starts", fmtWait(answerStart(t)), ttftRows) : card("First token", ms(t.ttft), ttftRows);
+
+  // Output: requests last their wait, read and reply; Little's law gives arrivals, and replies give tokens
+  const busyCopies = copiesBusy(d), lasts = x.ttft + x.gen/t.perUser;
+  const outCard = card("Output, all users", `${fmtTps(t.total*busyCopies)} tok/s`, [
+    row("a request lasts", `${ms(x.ttft)} to first token + ${commas(x.gen)} tokens ÷ ${fmtTps(t.perUser)} tok/s = ${fmtWait(lasts)}${many ? ` · ${names[x.i]}` : ""}`),
+    row("requests a second", many ? `Σ users ÷ how long each request lasts = ${fmtRate(t.rate)}/s` : `${commas(x.users)} users ÷ ${fmtWait(lasts)} = ${fmtRate(t.rate)}/s`),
+    row("output", (many ? `Σ requests/s × (thinking + reply)` : `${fmtRate(t.rate)}/s × ${commas(x.gen)} tokens`)
+      + `${busyCopies!==1 ? ` × ${+busyCopies.toPrecision(3)} copies` : ""} = ${fmtTps(t.total*busyCopies)} tok/s, ${perMin(t.rate*busyCopies)} replies a minute`),
+  ]);
+
+  // Room: the most users a copy holds within the goal, shown by the next user it can't take
+  const cap = d.room!==undefined ? {perCopy: d.room/d.reps, memory: d.memRoom} : capacityFor(d);
+  const roomRows = [];
+  if(cap.perCopy && cap.perCopy < 1e5){
+    const nx = cap.perCopy + 1, rx = compute(d.tpw, nx, d.pp), gx = rx.perGPU/GB, fitsX = gx <= usable;
+    const tx = fitsX ? throughput(g, d.tpw, S.chunk, nx, d.pp) : null;
+    roomRows.push(row(`at ${commas(cap.perCopy)} users`, `fits and ${hasGoal ? "meets the goal" : "holds"} ` + check(true, "✓")));
+    roomRows.push(row(`at ${commas(nx)} users`, !fitsX
+      ? `${fmtMemN(gx)} per GPU > ${fmtMemN(usable)} usable ` + check(false, "✗ memory")
+      : tpsLow(tx) < goal.tps ? `${fmtTpsShort(tpsLow(tx))} tok/s at the low end < ${goal.tps} ` + check(false, "✗ speed")
+      : `${hideThink() ? fmtWait(answerHigh(tx)) : ms(ttftHigh(tx))} at the slow end > ${hideThink() ? goal.ans : goal.ttft} s ` + check(false, hideThink() ? "✗ answer" : "✗ first token")));
+    roomRows.push(row("room", `${commas(cap.perCopy)} per copy × ${d.reps} cop${d.reps===1 ? "y" : "ies"} = ${commas(cap.perCopy*d.reps)} users`));
+  }
+  const roomCard = roomRows.length ? card("Room for", `${commas(cap.perCopy*d.reps)} users`, roomRows) : "";
+
+  // GPUs: copies for everyone at that room, each on its GPUs
+  const all = d.need!==undefined || d.room!==undefined ? allUsers() : u*d.reps;
+  const copies = cap.perCopy ? Math.ceil(all/cap.perCopy) : d.reps;
+  const gpuCard = d.partial ? "" : card("GPUs", `${d.gpus} × ${g.n}`, [
+    row("copies", cap.perCopy ? `⌈${commas(all)} users ÷ ${commas(cap.perCopy)} per copy⌉ = ${copies}${d.reps > copies ? `, rounded up to ${d.reps} to make a GPU count its servers take` : ""}` : `${d.reps}`),
+    row("GPUs", `${d.reps} cop${d.reps===1 ? "y" : "ies"} × ${n} GPU${n===1 ? "" : "s"} each = ${d.gpus}`),
+  ]);
+
+  el.innerHTML = memCard + speedCard + ttftCard + outCard + roomCard + gpuCard;
+}
+
 function renderTpNote(m, tp, active){
   const per = `${tp} GPU${tp>1?"s":""} per copy`, pp = active ? active.pp : 1, tpw = active ? active.tpw : tp;
   let t = S.tpo!=="auto" ? `<b>Fixed at ${per}</b> on every board, with as many copies as your users need.`
@@ -4111,7 +4249,7 @@ function renderFleet(){
   S.pp = d ? d.pp : 1;
   const r = d ? d.r : compute(tp, 1);
   showGauge(false);
-  $('mathState').textContent = `${specName(S.models[S.edit])}${fits ? ` on ${d.g.n}` : ""}: speed · model architecture · memory breakdown · how it's calculated`;
+  $('mathState').textContent = `${specName(S.models[S.edit])}${fits ? ` on ${d.g.n}` : ""}: every figure worked out · speed · model architecture · memory breakdown · how it's calculated`;
   renderBreakdown(r, tp, d ? d.reps : 1, d);
   renderFleetVerdict(fleets, active, picked);
   renderFleetModels(active);
@@ -4119,6 +4257,7 @@ function renderFleet(){
   renderFleetCards(fleets, active, suggested, picked);
   renderChunkOptions(fits ? d : null);
   renderThroughput(fits ? d : null);
+  renderWorked(fits ? d : null);
   renderTpNote(r.m, tp, fits ? d : null);
   renderAdvState();
   updateGoalHint();
