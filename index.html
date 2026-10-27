@@ -3050,7 +3050,7 @@ function renderAll(A, cfgs){
   const servers = CATALOG.servers.filter(sv=> S.scope.has(sv.id)).map(sv=>{
     const mine = A.inScope.filter(c=> c.sv.id===sv.id), fits = mine.filter(c=> c.fits), ok = fits.filter(c=> c.ok);
     const top = ok.slice().sort(leanOrder)[0] || fits.slice().sort((x, y)=> y.best.served - x.best.served || leanOrder(x, y))[0] || null;
-    return {sv, mine, fits, ok, top, n: mine.length};
+    return {sv, mine, fits, ok, top};
   });
   const meet = servers.filter(x=> x.ok.length).sort((x, y)=> leanOrder(x.top, y.top));
   const below = servers.filter(x=> !x.ok.length && x.fits.length).sort((x, y)=> y.top.best.served - x.top.best.served);
@@ -3062,7 +3062,6 @@ function renderAll(A, cfgs){
   const tagOf = c => A.rec && c.sv.id===A.rec.sv.id ? ` <span class="pill sugg">Recommended</span>`
     : A.down && c.sv.id===A.down.sv.id ? ` <span class="pill neutral" data-tip="svSmaller" tabindex="0">Smaller server</span>`
     : A.upBig && c.sv.id===A.upBig.sv.id ? ` <span class="pill neutral" data-tip="svMoreRoom" tabindex="0">More room</span>` : "";
-  const others = x => x.n > 1 ? `<span class="cap">${x.ok.length > 1 ? `${x.ok.length - 1} other GPU${x.ok.length===2 ? "" : "s"} also meet the goal` : `${x.n - 1} other GPU${x.n===2 ? "" : "s"} in this server`}</span>` : "";
   const closestOf = mine => mine.slice().sort((a, b)=> b.usable - a.usable)[0];
   const line = (x, body) => `<span class="hname${hl(x.sv.id)}"><button type="button" class="rowbtn" data-cfg="${esc(x.top ? x.top.id : closestOf(x.mine).id)}">${esc(x.sv.short)}</button></span>${body}`;
   const hl = id => id===selSv ? " sel" : "";
@@ -3072,7 +3071,7 @@ function renderAll(A, cfgs){
       + `<th scope="col" class="num">Per user</th><th scope="col" class="num">Room for</th><th scope="col" class="num">GPU memory</th></tr></thead><tbody>`
       + meet.map(x=>{ const c = x.top, d = c.best;
           return `<tr class="${x.sv.id===selSv ? "sel" : ""}"><th scope="row"><button type="button" class="rowbtn" data-cfg="${esc(c.id)}">${esc(x.sv.short)}</button>${tagOf(c)}<br><span class="cap">${esc(formOf(x.top))}</span></th>`
-            + `<td>${d.gpus} × ${esc(d.g.n)} · ${wiringShort(c)}<br>${others(x)}</td><td>${layoutLine(d)}${flagPills(d)}</td>`
+            + `<td>${d.gpus} × ${esc(d.g.n)} · ${wiringShort(c)}</td><td>${layoutLine(d)}${flagPills(d)}</td>`
             + `<td class="num">${fmtTps(d.t.perUser)} tok/s${star(d)}</td><td class="num">${commas(d.room)}</td><td class="num">${boxTotal(d.memGB)}</td></tr>`; }).join("")
       + `</tbody></table></div><p class="cap">* Speed extrapolated: no published benchmark for this board; it applies the shares fitted on other boards' runs.</p>` : "")
     + (below.length ? `<div class="svsub"><h3>Below your goal</h3><span class="cap">They hold the model, but can't serve all ${plural(all, "user")}: not enough cache room, or not within your speed goal.</span></div>`
