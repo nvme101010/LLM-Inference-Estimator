@@ -1902,7 +1902,8 @@ const popText  = g => { const p = popOf(g); return p.length>1 ? `${p.slice(0, -1
    CATALOG is that block, read once. HPE_HOSTS is the shape the GPU view uses: per board, only what the
    server changes from the board's own figures (max, pop, split, bridge, nolink, est), so with each board
    in its default server (the first that sells it) the GPU view's figures are the board's own, except the
-   MI350P, whose only HPE server holds 4. The Servers view reads CATALOG directly. */
+   MI350P, whose only HPE server holds 4. The GPU view names the server the Servers view recommends when it
+   gives those same figures (hostFor). The Servers view reads CATALOG directly. */
 const CATALOG = JSON.parse(document.getElementById('catalog-hpe').textContent);
 const boardMax = g => g.pop ? Math.max(...g.pop) : g.max || 8;   // the most cards a node of this board holds, before any server
 const coolForm = k => `${k.u}U rack · ${k.by==="liquid" ? "liquid-cooled" : "air-cooled"}`;   // a cooling option's chassis, in words
@@ -1923,10 +1924,38 @@ const HPE_HOSTS = CATALOG.servers.map(sv=> ({
 }));
 const HPE_UNSIZED = CATALOG.unsized;
 const findHost = id => HPE_HOSTS.find(h=> h.id===id);
-/* the HPE server a board is sized in, in the GPU view: its default, the first that sells it; null if none */
+/* a board's default HPE server, the first that sells it; null if none */
 const hostOf = g => HPE_HOSTS.find(h=> h.boards[g.n]) || null;
+/* The HPE server a board is sized in, in the GPU view, so it names the server the Servers view recommends.
+   The board's figures are those of its default server, the first that sells it; the server named is the
+   first, in the Servers view's order (serverRec, or fleetRec with several models), of this board's servers
+   that hold the model (those in the Servers view's scope, or all of them when none in scope does) on which
+   the GPU view's answer is the same as in the default. So 1 × RTX PRO 6000 is said to be in the DL525 Gen13
+   the Servers view recommends, not the DL380a Gen12 that is listed first, and no figure changes. Only the
+   same answer will do: the GPU view keeps to the TP and Pipeline settings, which the Servers view's search
+   doesn't, so the Servers view's pick can be a server where the GPU view does worse (H200 NVL with no
+   bridge, at TP 2). With no such server, the default. */
+function hostFor(g){
+  const def = hostOf(g), many = S.models.length > 1, rec = many ? fleetRec : serverRec;
+  const mine = (many ? fleetConfigs() : allConfigs()).filter(c=> c.x.board===g.n && c.fits);
+  const cs = mine.some(c=> S.scope.has(c.sv.id)) ? mine.filter(c=> S.scope.has(c.sv.id)) : mine;
+  if(!def || !cs.length) return def;
+  const want = many ? fleetFor(boardWith(g, def), S.models) : deploymentFor(boardWith(g, def));
+  // the Servers view's pick, then its pick of the rest, and so on (fleetConfigs holds the GPU view's own fleetFor)
+  for(const left = cs.slice(); left.length; ){
+    const c = rec(left);
+    if(sameAnswer(many ? c.f : deploymentFor(c.b), want)) return findHost(c.sv.id);
+    left.splice(left.indexOf(c), 1);
+  }
+  return def;
+}
+/* two GPU view answers alike in what it shows: cards, layout, copies, users served, goal and speed (fleets: per model) */
+const sameAnswer = (a, b) => a.models ? a.servers.length===b.servers.length && a.memGB===b.memGB && a.meets===b.meets
+    && a.models.every((m, i)=> sameAnswer(m.d, b.models[i].d))
+  : a.fits===b.fits && a.gpus===b.gpus && a.tp===b.tp && a.pp===b.pp && a.reps===b.reps && !!a.partial===!!b.partial
+    && a.served===b.served && a.meets===b.meets && (!a.t || !b.t || Math.abs(a.t.perUser - b.t.perUser) < 1e-9*b.t.perUser);
 /* a board as its HPE server holds it: fewer cards, a narrower bridge, and the server's name with it */
-const inHost = g => boardWith(g, hostOf(g));
+const inHost = g => boardWith(g, hostFor(g));
 function boardWith(g, h){
   if(!h) return g;
   const o = h.boards[g.n], max = o.max;
@@ -2643,7 +2672,7 @@ function capacityFor(d){
    answer, the rest are its alternatives (the detail panel shows them). Pipelining is part of the search
    here, whatever Pipeline across bridge groups says, since the server's wiring decides what's possible. */
 const linkKind = x => !x.link || x.link==="pcie" ? "pcie" : x.link.bridge ? "bridge" : x.link;   // pcie | bridge | nvswitch | fabric
-/* the board as this server holds it (count, pop, bridge), as the GPU view's inHost does for a board's default server */
+/* the board as this server holds it (count, pop, bridge), as the GPU view's inHost does for the server it sizes the board in */
 function boardIn(sv, x){
   const g = GPUS.find(b=> b.n===x.board), h = HPE_HOSTS.find(y=> y.id===sv.id);
   return g && h ? boardWith(g, h) : null;
@@ -2743,11 +2772,14 @@ const rackU = c => cfgU(c) ?? 99;
    then the least GPU memory, then not pipelined, fewer GPUs per copy and faster; then most room, fewest rack units. */
 const leanOrder = (a, c)=> (+a.best.nr - +c.best.nr) || a.best.memGB - c.best.memGB || (+a.best.modeled - +c.best.modeled)
                        || a.best.L.n - c.best.L.n || c.best.t.perUser - a.best.t.perUser || c.best.room - a.best.room || rackU(a) - rackU(c);
+/* the recommendation among configurations that hold the model (the GPU view's hostFor uses it too) */
+const serverRec = fits => fits.filter(c=> c.ok).sort(leanOrder)[0]
+  || fits.slice().sort((a, c)=> (+a.best.nr - +c.best.nr) || c.best.served - a.best.served || leanOrder(a, c))[0] || null;
 function serverAnswer(cfgs){
   const inScope = cfgs.filter(c=> S.scope.has(c.sv.id)), fits = inScope.filter(c=> c.fits);
   const ok = fits.filter(c=> c.ok);
   const lean = leanOrder;
-  const rec = ok.slice().sort(lean)[0] || fits.slice().sort((a, c)=> (+a.best.nr - +c.best.nr) || c.best.served - a.best.served || lean(a, c))[0] || null;
+  const rec = serverRec(fits);
   if(!rec) return {inScope, fits, rec: null};
   const others = fits.filter(c=> c.sv.id!==rec.sv.id);
   const down = cfgU(rec) ? (others.filter(c=> c.ok && rackU(c) < cfgU(rec)).sort((a, c)=> rackU(a) - rackU(c) || lean(a, c))[0]
@@ -3124,9 +3156,11 @@ function bestFleet(ok){
   /* then whatever needs no more servers and no more GPU memory than that, in the usual order */
   return ok.filter(c=> c.k <= fewer.k && c.memGB <= fewer.memGB).sort(fleetOrder)[0];
 }
+/* the recommendation among configurations that hold every model (the GPU view's hostFor uses it too) */
+const fleetRec = fits => bestFleet(fits.filter(c=> c.ok)) || fits.slice().sort(fleetClose)[0] || null;
 function fleetAnswer(cfgs){
   const inScope = cfgs.filter(c=> S.scope.has(c.sv.id)), fits = inScope.filter(c=> c.fits), ok = fits.filter(c=> c.ok);
-  const rec = bestFleet(ok) || fits.slice().sort(fleetClose)[0] || null;
+  const rec = fleetRec(fits);
   return {inScope, fits, ok, rec};
 }
 /* which models run where on one server, in words */
