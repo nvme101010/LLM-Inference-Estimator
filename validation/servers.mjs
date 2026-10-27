@@ -8,12 +8,14 @@
 //   --index  sweeps another copy of the page instead of this one
 //   --quick  one scenario in seven
 //   --out    also writes every scenario's result here, as JSON
-// Two invariants are also checked on this page alone, whatever the base says:
+// Three invariants are also checked on this page alone, whatever the base says:
 //   1. a configuration listed as not holding the model holds no layout for even one user, so "Won't hold it"
 //      never hides a server whose caches merely can't take everyone;
-//   2. a board the GPU view sizes (deploymentFor, as in its default HPE server) is held by that server's
+//   2. a board the GPU view sizes (deploymentFor, in the HPE server it picks with hostFor) is held by that server's
 //      configuration here too, so the two views agree on what fits. (A server that holds the model but not
 //      every user's cache was listed as not holding it until 1.8.0 was fixed; the GPU view said "serves N".)
+//   3. when the GPU view suggests what the Servers view recommends (the same board, cards, layout and copies),
+//      it names the same server. (Until 1.10.1 it named each board's default server, the first that sells it.)
 // Exits 1 when anything differs or an invariant fails.
 
 import { execFileSync } from "node:child_process";
@@ -52,11 +54,14 @@ function sweep(path, invariants){
     for(const c of cfgs) if(!c.fits && P.layoutsOn(c.b).some(L=> P.evalLayout(c.b, L, 1, 1).fits))
       fails.push(`${k}: ${c.id} is listed as not holding the model, but a layout holds it for one user`);
     for(const g of P.boardsInPlay()){
-      const d = P.deploymentFor(g), h = P.hostOf(g);
+      const d = P.deploymentFor(g), h = g.host;
       if(!d || !d.fits || !h) continue;
       const c = cfgs.find(x=> x.id===`${h.id}|${g.n}`);
       if(c && !c.fits) fails.push(`${k}: the GPU view holds ${g.n} on ${d.gpus} GPUs (${d.partial ? `serves ${d.served}` : "everyone"}), but ${c.id} is listed as not holding the model`);
     }
+    const s = P.suggestDeployment(new Map(P.boardsInPlay().map(g=> [g.n, P.deploymentFor(g)]))), r = A.rec && A.rec.best;
+    if(s && r && s.g.n===r.g.n && s.gpus===r.gpus && s.tp===r.L.n && s.pp===r.pp && s.reps===r.reps && s.g.host && s.g.host.id!==A.rec.sv.id)
+      fails.push(`${k}: the GPU view suggests ${s.gpus} × ${s.g.n} in ${s.g.host.id}, but the Servers view recommends the same in ${A.rec.sv.id}`);
   }
   return {version: P.VERSION, out, fails};
 }
@@ -85,7 +90,7 @@ const diffs = both.flatMap(k=>{
 console.log(`Sized ${fmt(both.length)} scenarios on every server: this page (${cur.version}) against ${ref} (${base.version}), in ${Math.round((Date.now() - t0)/1000)} s.`);
 cur.fails.slice(0, 20).forEach(f=> console.log("FAIL", f));
 if(cur.fails.length) console.log(`${fmt(cur.fails.length)} invariant ${cur.fails.length===1 ? "failure" : "failures"}.`);
-else console.log("Both invariants hold: every server listed as not holding the model holds no layout for one user, and every board the GPU view holds is held by its server here.");
+else console.log("All three invariants hold: every server listed as not holding the model holds no layout for one user, every board the GPU view holds is held by its server here, and the GPU view names the server recommended here when it suggests the same.");
 if(!diffs.length){ console.log("No differences."); process.exit(cur.fails.length ? 1 : 0); }
 
 const tally = xs => Object.entries(xs.reduce((t, x)=> (t[x] = (t[x] || 0) + 1, t), {})).sort((a, b)=> b[1] - a[1]);
