@@ -2963,7 +2963,7 @@ function bomRows(c, g, n, parts, pills = "", extra = []){
     if(!sv.mem) row("Memory", `${commas(Math.ceil(sr.ram))} GB`, `2 × GPU memory`);
     else if(!mm) row("Memory", `${commas(Math.ceil(sr.ram))} GB`, `2 × GPU memory, more than ${cp.n===2 ? "two CPUs" : "one CPU"} here can hold`, true);
     else { const ml = memLines(mm, cp.n, sr.ram); row("Memory", `${commas(mm.total)} GB`, `${ml.sub}</span><span>${ml.extra}`, ml.flag); }
-    row("Storage", `${capParts(sr.diskGB).join(" ")} NVMe`, `Required usable capacity: 2 × ${parts.length>1 ? "each model's" : "model"} weights + 100 GB for images, caches and the engine's own logs</span><span>Doesn't include boot storage, kept records of prompts and replies, or KV cache offload`);
+    row("Storage", `${capParts(sr.diskGB).join(" ")} NVMe`, `Required usable capacity: 2 × ${parts.length>1 ? "each model's" : "model"} weights + 100 GB for container images, compile caches and the engine's own logs</span><span>Doesn't include boot storage, kept records of prompts and replies, or KV cache offload`);
   }
   row("Power", "Size in HPE Power Advisor", "PSUs and redundancy for this load", true);
   return `<dl class="bom">${rows.join("")}</dl>`;
@@ -3372,7 +3372,7 @@ const GUIDE = {sockets:2, ghz:2.0, memX:2};
 const LIGHT_GPUS = ["L4", "RTX PRO 4500 Blackwell"];   // 16 cores per GPU at any count
 const coresPerGpu = (n, g) => g && LIGHT_GPUS.includes(g.n) ? 16 : n >= 8 ? 16 : 32;
 const HPE_CORES = (n, g) => coresPerGpu(n, g) * n;   // physical cores for an n-GPU server of board g
-const DISK_ALLOW = 100, DISK_FILL = 0.8;          // GB for images, caches and the engine's logs; the most of the storage to fill
+const DISK_ALLOW = 100, DISK_FILL = 0.8;          // GB for container images, compile caches and the engine's logs; the most of the storage to fill
 const KV_TIER_MIN = 100;                          // GB: Dynamo's smallest CPU tier, which the disk tier is at least
 const GUIDE_URL = "https://docs.nvidia.com/certification-programs/latest/nvidia-certified-configuration-guide.html";
 const HPE_PCAI_URL = "https://www.hpe.com/us/en/collaterals/collateral.a50009216enw.html";
