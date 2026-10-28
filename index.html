@@ -3545,7 +3545,7 @@ function cacheNote(parts){
   if(!parts.length) return "";
   const each = parts.map(([n, P, fresh])=> `${commas(fresh)} token${fresh===1 ? "" : "s"} of each ${commas(P)}-token ${esc(n)} prompt`),
         list = each.length>1 ? `${each.slice(0, -1).join(", ")} and ${each[each.length-1]}` : each[0], are = parts.length>1 || parts[0][2]!==1 ? "are" : "is";
-  return say(`This assumes the server remembers repeated text: only ${list} ${are} new and need${are==="is" ? "s" : ""} reading before the first reply. New text takes longer to read; to size for prompts that never repeat, turn Prompt caching off in Advanced settings. `,
+  return say(`This assumes the server remembers repeated text: only ${list} ${are} new, so the model reads just ${are==="is" ? "that" : "those"} before it starts to reply. New text takes longer to read; to size for prompts that never repeat, turn Prompt caching off in Advanced settings. `,
              `This assumes a warm prompt cache: only ${list} ${are} read before the first reply, the rest reused. Prompts not yet in the cache take longer; to size for them, turn Prompt caching off in Advanced settings. `);
 }
 /* a speed that falls short of the goal, shown with a decimal when rounding would make it read as the goal itself */
