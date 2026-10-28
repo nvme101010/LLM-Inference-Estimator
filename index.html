@@ -2957,7 +2957,7 @@ function memLines(mm, cpus, minGB){
    configuration, with the servers that run the same GPUs air-cooled */
 function coolRow(c, row){
   const [k, ...alt] = coolOpts(c.x);
-  if(k.by==="air") return row("Cooling", "Air-cooled", alt.length ? `Also built with direct liquid cooling, in ${alt.map(a=> `${a.u}U`).join(" or ")}, which needs facility water` : "The server's own fans; no facility water");
+  if(k.by==="air") return row("Cooling", "Air-cooled", alt.length ? `Also built with direct liquid cooling, in ${alt.map(a=> `${a.u}U`).join(" or ")}, which needs facility water` : "");
   const air = CATALOG.servers.flatMap(o=> o.id===c.sv.id ? [] : o.gpus.filter(y=> y.board===c.x.board && coolOpts(y)[0].by==="air").map(y=> [o, y]));
   row("Cooling", "Direct liquid cooling only", `${k.u}U · needs facility water and a coolant distribution unit (CDU)`
     + (air.length ? `</span><span>${air.map(([o, y])=> { const u = y.cooling ? y.cooling[0].u : o.u; return `The ${esc(o.short)} runs the ${esc(y.board)} air-cooled${u ? ` in ${u}U` : ""}`; }).join("; ")}` : ""), true);
