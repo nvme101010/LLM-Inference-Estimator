@@ -436,6 +436,7 @@
        box-shadow:0 8px 28px rgba(0,0,0,.3); pointer-events:none;
        opacity:0; visibility:hidden; transition:opacity .12s ease}
   #tip.on{opacity:1; visibility:visible}
+  #tip.list{max-width:380px; white-space:pre-line}
   #tip b{font-weight:600}
   @media (prefers-reduced-motion:reduce){ #tip{transition:none} }
 
@@ -2991,9 +2992,9 @@ function bomRows(c, g, n, parts, pills = "", extra = []){
     if(!sv.mem) row("Memory", `${commas(Math.ceil(sr.ram))} GB`, twice);
     else if(!mm) row("Memory", `${commas(Math.ceil(sr.ram))} GB`, `${twice}, more than ${cp.n===2 ? "two CPUs" : "one CPU"} here can hold`, true);
     else { const ml = memLines(mm, cp.n, sr.ram); row("Memory", `${commas(mm.total)} GB`, `${ml.sub}</span><span>${ml.extra}`, ml.flag); }
-    row("Storage", `${capParts(sr.diskGB).join(" ")} NVMe`, say(
-      `Room for two copies of ${parts.length>1 ? "each model" : "the model"} (the one running and the next update) + 100 GB for the serving software, its saved setup files and its logs</span><span>Plus a separate drive for the operating system, and room for any saved conversations`,
-      `Required usable capacity: 2 × ${parts.length>1 ? "each model's" : "model"} weights + 100 GB for container images, compile caches and the engine's own logs</span><span>Doesn't include boot storage, kept records of prompts and replies, or KV cache offload`));
+    row(`<span class="tipl" data-tip="srvDisk" tabindex="0">Storage</span>`, `at least ${capParts(sr.diskGB).join(" ")} NVMe`, say(
+      `Two copies of ${parts.length>1 ? "each model" : "the model"} + 100 GB for the software that runs it · plus an OS drive`,
+      `2 × ${parts.length>1 ? "each model's" : "model"} weights + 100 GB for container images, compile caches and logs · plus a boot drive`));
   }
   row("Power", "Size in HPE Power Advisor", say("Power supplies, and spares in case one fails, for this load", "PSUs and redundancy for this load"), true);
   return `<dl class="bom">${rows.join("")}</dl>`;
@@ -5415,6 +5416,7 @@ const TIPS = {
 };
 /* the same explanations in everyday words, shown while Wording is Plain; a key missing here falls back to TIPS */
 const TIPS_PLAIN = {
+  srvDisk: srvDiskPlain(null),
   words:"Plain wording explains things in everyday words. Technical wording uses the terms engineers use. Only the explanations change; every number and recommendation stays the same.",
   weights:"The model itself: its learned numbers, loaded onto the GPUs once. Its size is the number of parameters times the bytes each one takes. It doesn't grow with more users or longer conversations.",
   kv:"The model's working memory for each conversation: a note of every word it has already read, so it doesn't have to read them again. It grows with every user and with every word in their conversation, so it is usually what runs out first. Newer models keep smaller notes. When a model is split across more GPUs than it can divide its notes between, some GPUs hold duplicate copies, so this can grow when you add GPUs.",
@@ -5473,8 +5475,16 @@ const TIPS_PLAIN = {
   step:"Everything needed to write one more word for every user at once, when no new question is being read. The biggest part is what holds things back. A big blue part means the GPUs spend a lot of time passing results to each other.",
   bneck:"What's holding back the speed right now. Memory: the GPU waits on reading the model and conversations, which is normal. Compute: very many users at once. Links: the GPUs spend more time passing results than working. Reading questions: new questions take half the time or more, so faster chips or remembering repeated text help most.",
 };
-const srvDiskPlain = kv => "Fast local storage this workload needs, beside a separate drive for the operating system. It holds two copies of the model (the one running and the next version downloading) plus 100 GB for the serving software, the setup files it saves so it starts faster, and its logs, kept under 80% full. Saved copies of conversations and other models need room of their own. "
-  + "Keeping overflow conversation memory on disk is uncommon on a single server" + (kv ? `; it would need ${kv} or more here.` : ".");
+/* the plain storage tooltip: what the space holds, as bullets (a function, so TIPS_PLAIN can call it before here) */
+function srvDiskPlain(kv){
+  return "The least fast local storage (NVMe) this workload needs, beside a separate drive for the operating system, kept under 80% full. It holds:"
+    + "\n• Two copies of the model: the one running and the next update, downloading."
+    + "\n• The serving software: the program that runs the model and answers requests, such as vLLM, SGLang or NVIDIA NIM. It comes as a container image of roughly 10–30 GB, and a server usually keeps more than one: the version in use, the one you're upgrading to, and sometimes an old one to roll back to."
+    + "\n• Its saved setup files: the first time the engine starts a model, it compiles optimised code for that model and GPU, which can take minutes, and saves it so later restarts are quick. This grows with each model, version and setup you run."
+    + "\n• Its logs: the engine's own records of starts, errors and requests."
+    + "\nThe last three share a flat 100 GB. Saved conversations and other models need room of their own."
+    + (kv ? ` Keeping overflow conversation memory on disk is uncommon on one server; it would need ${kv} or more here.` : "");
+}
 const tipText = k => (S.words==="plain" && TIPS_PLAIN[k]) || TIPS[k];
 
 const tipEl = document.createElement('div');
@@ -5484,6 +5494,7 @@ document.body.appendChild(tipEl);
 function showTip(el){
   const txt = tipText(el.dataset.tip); if(!txt) return;
   tipEl.textContent = txt;
+  tipEl.classList.toggle('list', txt.includes("\n"));
   tipEl.classList.add('on');
   const r = el.getBoundingClientRect();
   const tw = tipEl.offsetWidth, th = tipEl.offsetHeight, pad = 8;
