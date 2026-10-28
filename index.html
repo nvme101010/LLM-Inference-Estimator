@@ -983,7 +983,8 @@
  "vendor": "HPE",
  "checked": "2026-10-20",
  "about": "Every current HPE ProLiant and HPE Compute XD server that takes one of the estimator's boards, for the US. Which GPU and NVLink bridge each server takes: the matrix; for the XD690 and the Gen13 servers, which it doesn't list, their own QuickSpecs. How many cards, and each constraint: the server's US QuickSpecs (quickspecs: URL, version, date). max is per server; a node here is at most 8, so larger counts are capped at 8. pop, per board: the counts HPE builds, where the QuickSpecs restrict them. cooling: per board, the ways HPE builds that configuration as [{by: air or liquid, u: rack units}], the first sized and counted (air first where there is a choice); none listed means air-cooled in the server's own chassis. Gen11 servers with a Gen12 successor that takes the same GPUs are left out.",
- "memAbout": "mem: memory channels per CPU (ch), DIMMs per channel (dpc), the RDIMM sizes HPE sells for the server in GB (gb), from its US QuickSpecs; pop: how many DIMMs one CPU may hold, from the population table for the server in HPE's memory population rules for its processor family (rules; checked 2026-10-21), or for Gen13 servers the populations their QuickSpecs list. Xeon 6 servers take no 6-DIMM population; AMD servers with 2 DIMMs per channel go 12, 16, 20, 24.",
+ "memAbout": "mem: memory channels per CPU (ch), DIMMs per channel (dpc), the RDIMM sizes HPE sells for the server in GB (gb), from its US QuickSpecs; pop: how many DIMMs one CPU may hold, from the population table for the server in HPE's memory population rules for its processor family (rules; checked 2026-10-21), or for Gen13 servers the populations their QuickSpecs list. Xeon 6 servers take no 6-DIMM population; AMD servers with 2 DIMMs per channel go 12, 16, 20, 24. min: the least memory the server is sold with, GB, where its QuickSpecs set one; scarce: a DIMM size its QuickSpecs say is unlikely to be available or reasonably priced.",
+ "bootAbout": "boot: the server's boot device, where it isn't an NS204 (the default). psu, per board: the power supplies HPE ships with that configuration, where its QuickSpecs fix them, as {v: the supplies, sub: the line under them}; otherwise the page says to size them in HPE Power Advisor.",
  "matrix": {
   "title": "NVIDIA Accelerators for HPE QuickSpecs",
   "version": "83",
@@ -1533,7 +1534,8 @@
    "cpu": "AMD EPYC 9005",
    "url": "https://www.hpe.com/us/en/collaterals/collateral.a00073553enw.html",
    "notes": [
-    "Whole 8-GPU systems; CPUs, memory and storage come with the system."
+    "Sold as whole 8-GPU systems, configured to order: two CPUs of one model (EPYC 9005, 32 to 96 cores), 24 DIMM slots, drives and boot device.",
+    "Storage: 8 E3.S NVMe bays, 1.92 to 15.36 TB drives; 4 more bays with the SR932i-p controller."
    ],
    "gpus": [
     {
@@ -1546,29 +1548,32 @@
      "board": "HGX B200",
      "max": 8,
      "link": "nvswitch",
-     "cooling": [{"by": "liquid", "u": 5}]
+     "cooling": [{"by": "liquid", "u": 5}],
+     "psu": {"v": "12 × 3000 W", "sub": "HPE's default with this GPU; 10 where the rack can't take 12"}
     },
     {
      "board": "HGX B300",
      "max": 8,
      "link": "nvswitch",
-     "cooling": [{"by": "liquid", "u": 5}]
+     "cooling": [{"by": "liquid", "u": 5}],
+     "psu": {"v": "12 × 3000 W", "sub": "HPE's default with this GPU; 10 where the rack can't take 12"}
     },
     {
      "board": "AMD MI355X",
      "max": 8,
      "link": "fabric",
-     "cooling": [{"by": "liquid", "u": 5}]
+     "cooling": [{"by": "liquid", "u": 5}],
+     "psu": {"v": "12 × 3000 W", "sub": "HPE's default with this GPU; 10 where the rack can't take 12"}
     }
    ],
    "quickspecs": {
     "url": "https://www.hpe.com/us/en/collaterals/collateral.a00073553enw.html",
-    "version": "16",
+    "version": "15",
     "date": "2026-08-03"
    },
-   "mem": {"ch": 12, "dpc": 1, "gb": [64, 96, 128], "pop": [1, 2, 4, 6, 8, 10, 12], "rules": "https://www.hpe.com/psnow/doc/a50012817enw"},
+   "mem": {"ch": 12, "dpc": 1, "gb": [64, 96, 128], "pop": [1, 2, 4, 6, 8, 10, 12], "scarce": 128, "rules": "https://www.hpe.com/psnow/doc/a50012817enw"},
    "maxCores": 96,
-   "coreNote": "EPYC 9655",
+   "coreNote": "EPYC 9645 or 9655",
    "cpu1": {
     "*": 0
    },
@@ -1585,7 +1590,9 @@
    "cpu": "Intel Xeon 6",
    "url": "https://www.hpe.com/us/en/collaterals/collateral.a50009220enw.html",
    "notes": [
-    "Whole 8-GPU systems; CPUs, memory (2 TB or more) and storage come with the system.",
+    "Sold as whole 8-GPU systems, configured to order: two Xeon 6 CPUs (6776P or 6767P, both 64 cores), 2 TB of memory or more, drives and an optional M.2 boot drive.",
+    "Storage: all 8 E1.S NVMe bays are filled, with 1.92, 3.84 or 7.68 TB drives; no RAID controller.",
+    "Networking: 8 ConnectX-8 on the GPU board, plus one or two north-south NICs or DPUs.",
     "About 500 lb in 10U; HPE confirms the site can install it before shipping."
    ],
    "gpus": [
@@ -1593,7 +1600,8 @@
      "board": "HGX B300",
      "max": 8,
      "link": "nvswitch",
-     "cooling": [{"by": "air", "u": 10}]
+     "cooling": [{"by": "air", "u": 10}],
+     "psu": {"v": "12 × 3200 W", "sub": "Fixed: comes with the system, N+N redundant"}
     }
    ],
    "quickspecs": {
@@ -1601,8 +1609,10 @@
     "version": "6",
     "date": "2026-07-01"
    },
+   "mem": {"ch": 8, "dpc": 2, "gb": [64, 96], "pop": [16], "min": 2048, "rules": "https://www.hpe.com/us/en/collaterals/collateral.a50009220enw.html"},
+   "boot": "an M.2 boot drive",
    "maxCores": 64,
-   "coreNote": "Xeon 6776P",
+   "coreNote": "Xeon 6776P or 6767P",
    "cpu1": {
     "*": 0
    },
@@ -2981,6 +2991,7 @@ const MEM_NAME_PLAIN = ["least memory", "one module per channel", "every channel
 function memFor(sv, cpus, minGB, mode = S.mem){
   const m = sv.mem;
   if(!m) return null;
+  minGB = Math.max(minGB, m.min || 0);   // the least the server is sold with (the XD690's 2 TB)
   const pick = (k, gb)=> ({k, gb, total: cpus*k*gb, ch: Math.min(k, m.ch), two: Math.max(0, k - m.ch), of: m.ch, dimms: cpus*k});
   if(mode===0){
     let best = null;
@@ -2998,6 +3009,10 @@ function memFor(sv, cpus, minGB, mode = S.mem){
   }
   return null;
 }
+/* a line for modules the server's QuickSpecs say are hard to get (sv.mem.scarce), or "" */
+const scarceLine = (sv, mm) => sv.mem.scarce && mm.gb >= sv.mem.scarce ? `</span><span>${mm.gb} GB modules are hard to get, the QuickSpecs say; ask about lead times` : "";
+/* the most memory cpus CPUs of the server hold: every DIMM it takes, at the largest size */
+const memMost = (sv, cpus) => { const m = sv.mem; return cpus * Math.max(...m.pop.filter(k=> k <= m.ch*m.dpc)) * Math.max(...m.gb); };
 /* the Memory row's lines for memFor's pick: the modules, how many channels they fill, and the setting it was sized
    for; flagged when channels are left empty or hold two DIMMs */
 function memLines(mm, cpus, minGB){
@@ -3038,9 +3053,8 @@ function bomRows(c, g, n, parts, pills = "", extra = []){
   if(k==="bridge" && n>1){ const groups = groupsUsed(c, d);
     row("NVLink", `${groups} × ${esc(x.link.kit)}`, say(`bridge${groups===1 ? "" : "s"} joining ${x.link.bridge} cards each`, `${x.link.bridge}-way NVLink bridge${groups===1 ? "" : "s"}`)); }
   if(x.unconfirmed) row("Card count", "To confirm", esc(x.unconfirmed), true);
-  if(systemOf(g)){ row("Platform", "Comes with the system", `CPUs, memory and storage: ${esc(sv.cpu)}`); }
-  else {
-    const sr = serverOf(g, n, parts), per = sr.cores/n, cp = cpusFor(sv, d, sr.cores);
+  {
+    const sr = sizeServer(g, n, parts), per = sr.cores/n, cp = cpusFor(sv, d, sr.cores);
     const why = LIGHT_GPUS.includes(g.n) ? `, for the ${esc(g.n.replace(" Blackwell", ""))}` : "";
     const value = cp.n===2 ? `2 × ${esc(sv.cpu)}, ${commas(sr.cores/2)} physical cores each` : `1 × ${esc(sv.cpu)}, ${commas(sr.cores)} physical cores`;
     const tally = cp.n===2 ? `${commas(sr.cores)} physical cores in total · ${per} per GPU${why}` : `${per} physical cores per GPU${why}`;
@@ -3048,13 +3062,20 @@ function bomRows(c, g, n, parts, pills = "", extra = []){
     const mm = memFor(sv, cp.n, sr.ram);
     const twice = say("twice the GPU memory", "2 × GPU memory");
     if(!sv.mem) row("Memory", `${commas(Math.ceil(sr.ram))} GB`, twice);
-    else if(!mm) row("Memory", `${commas(Math.ceil(sr.ram))} GB`, `${twice}, more than ${cp.n===2 ? "two CPUs" : "one CPU"} here can hold`, true);
-    else { const ml = memLines(mm, cp.n, sr.ram); row("Memory", `${commas(mm.total)} GB`, `${ml.sub}</span><span>${ml.extra}`, ml.flag); }
+    else if(!mm){   // more than the server holds: the most it takes, short of the guidance
+      const most = memFor(sv, cp.n, memMost(sv, cp.n)), ml = most && memLines(most, cp.n, sr.ram);
+      if(most) row("Memory", `${commas(most.total)} GB`, `${ml.sub}</span><span>${say(`NVIDIA asks for twice the GPU memory, ${commas(Math.ceil(sr.ram))} GB, more than this server holds: this is the most it takes`,
+        `NVIDIA's 2 × GPU memory, ${commas(Math.ceil(sr.ram))} GB, is more than this server holds: this is its maximum`)}` + scarceLine(sv, most), true);
+      else row("Memory", `${commas(Math.ceil(sr.ram))} GB`, `${twice}, more than ${cp.n===2 ? "two CPUs" : "one CPU"} here can hold`, true);
+    }
+    else { const ml = memLines(mm, cp.n, sr.ram), scarce = scarceLine(sv, mm);
+      row("Memory", `${commas(mm.total)} GB`, `${ml.sub}</span><span>${ml.extra}` + scarce, ml.flag || !!scarce); }
     row(`<span class="tipl" data-tip="srvDisk" tabindex="0">Storage</span>`, `at least ${capParts(sr.diskGB).join(" ")} NVMe`, say(
-      `Two copies of ${parts.length>1 ? "each model" : "the model"} + 100 GB for the software that runs it · plus an NS204 boot device`,
-      `2 × ${parts.length>1 ? "each model's" : "model"} weights + 100 GB for container images, compile caches and logs · plus an NS204 boot device`));
+      `Two copies of ${parts.length>1 ? "each model" : "the model"} + 100 GB for the software that runs it · plus ${esc(sv.boot || "an NS204 boot device")}`,
+      `2 × ${parts.length>1 ? "each model's" : "model"} weights + 100 GB for container images, compile caches and logs · plus ${esc(sv.boot || "an NS204 boot device")}`));
   }
-  row("Power", "Size in HPE Power Advisor", say("Power supplies, and spares in case one fails, for this load", "PSUs and redundancy for this load"), true);
+  if(x.psu) row("Power", esc(x.psu.v), esc(x.psu.sub));   // fixed by the QuickSpecs for this configuration
+  else row("Power", "Size in HPE Power Advisor", say("Power supplies, and spares in case one fails, for this load", "PSUs and redundancy for this load"), true);
   return `<dl class="bom">${rows.join("")}</dl>`;
 }
 /* the sentence under a configuration: how its copy is laid out, and what's left in the server */
@@ -3470,8 +3491,9 @@ const CERTIFIED_URL = "https://docs.nvidia.com/certification-programs/latest/nvi
 function serverFor(d){ return serverOf(d.g, d.gpus, [[d, d.gpus]]); }
 /* An n-GPU server of board g running parts: [deployment, GPUs it takes here] for each model on it, one
    for a single model. Its storage holds each model's weights once, however many copies run here. */
-function serverOf(g, n, parts){
-  if(systemOf(g)) return {g, n, fixed:true};
+function serverOf(g, n, parts){ return systemOf(g) ? {g, n, fixed:true} : sizeServer(g, n, parts); }
+/* the same sizing for any board, whole systems too: the Servers view builds an XD685 or XD690 to order from it */
+function sizeServer(g, n, parts){
   const gpuGB = n*g.cap, ram = GUIDE.memX*gpuGB, wGB = parts.reduce((s, [d])=> s + d.r.weights/GB, 0);
   /* the engine gives each GPU's spare usable memory to its KV cache: what's left after the weights,
      activations and overhead (the overhead on the cache itself goes with the cache) */
