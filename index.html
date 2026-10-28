@@ -3199,7 +3199,7 @@ function renderAll(A, cfgs){
       + `<th scope="col" class="num">Per user</th><th scope="col" class="num">Room for</th><th scope="col" class="num">GPU memory</th></tr></thead><tbody>`
       + meet.map(x=>{ const c = x.top, d = c.best;
           return `<tr class="${x.sv.id===selSv ? "sel" : ""}"><th scope="row"><button type="button" class="rowbtn" data-cfg="${esc(c.id)}">${esc(x.sv.short)}</button>${tagOf(c)}<br><span class="cap">${esc(formOf(x.top))}</span></th>`
-            + `<td>${d.gpus} × ${esc(d.g.n)} · ${wiringShort(c)}</td><td>${layoutLine(d)}${flagPills(d)}</td>`
+            + `<td>${d.gpus} × ${esc(d.g.n)}${d.L.n>1 ? ` · ${wiringShort(c)}` : ""}</td><td>${layoutLine(d)}${flagPills(d)}</td>`
             + `<td class="num">${tpsSpan(d.t.perUser).join(" ")}${star(d)}</td><td class="num">${commas(d.room)}</td><td class="num">${boxTotal(d.memGB)}</td></tr>`; }).join("")
       + `</tbody></table></div><p class="cap">* Speed extrapolated: no published benchmark for this board; it applies the shares fitted on other boards' runs.</p>` : "")
     + (below.length ? `<div class="svsub"><h3>Below your goal</h3><span class="cap">They hold the model, but can't serve all ${plural(all, "user")}: not enough cache room, or not within your speed goal.</span></div>`
