@@ -1699,7 +1699,7 @@
 </script>
 <script>
 /* ---------------- model library ----------------
-   The most-used open models on Hugging Face as of September 2026. Architecture comes from each
+   The most-used open models on Hugging Face as of October 2026. Architecture comes from each
    model's config.json; parameter counts from its safetensors metadata (vision encoders and
    speculative-decoding heads included, since they load too); active parameters from the model card.
    p total params (B) · pa active per token (B) · E, K routed experts / used per token
@@ -1735,8 +1735,6 @@ const MODELS = [
     {id:"q38-flash", n:"Qwen3.8 Flash-Next (180B-A6B)", p:180.0, pa:6, E:512, K:10, lookup:51, L:48, h:2560, ffn:7040, v:248320, ctx:262144, nat:bf16(180.0),
      kv:[full(12,2,256,{read:2048}), indexKeys(12,128,{r:4}), linear(36,gdn(16,48),"linear-attention")],
      note:"Includes 51B of n-gram embedding tables, looked up a row at a time rather than read every step. "+HYBRID_NOTE},
-    {id:"q38-2t", n:"Qwen3.8 2.4T-A95B", p:2446.18, pa:95, E:512, K:10, L:92, h:8192, ffn:22528, v:248320, ctx:262144, nat:bf16(2446.18),
-     kv:[full(23,4,256), linear(69,gdn(16,128),"linear-attention")], note:HYBRID_NOTE},
     {id:"q36-35b", n:"Qwen3.6 35B-A3B", p:35.95, pa:3, E:256, K:8, L:40, h:2048, ffn:4608, v:248320, ctx:262144, nat:bf16(35.95),
      kv:[full(10,2,256), linear(30,gdn(16,32),"linear-attention")], note:HYBRID_NOTE},
     {id:"q35-9b", n:"Qwen3.5 9B", p:9.65, L:32, h:4096, ffn:12288, v:248320, ctx:262144, nat:bf16(9.65),
@@ -1767,6 +1765,10 @@ const MODELS = [
      note:"Half the layers keep only the last 128 tokens."},
   ]},
   {g:"DeepSeek", items:[
+    {id:"dsv41-flash", n:"DeepSeek V4.1 Flash (763B-A16B)", p:763.21, pa:16, E:384, K:6, lookup:196.6, L:40, h:5120, ffn:16128, v:129280, ctx:1048576,
+     nat:{f:"FP4 experts + FP8", gb:510.3, cls:"FP4"},
+     kv:[compressed(1,4,{read:512}), indexKeys(8,128,{r:4}), compressed(3,128), sliding(2,1,256,128)],
+     note:"Only 4 of 40 layers store a cache, shared by the others, and 197B of n-gram tables are looked up a row at a time. DeepSeek reports 890 bytes of cache per token; with the cache at FP16 the page sizes about 800. Modeled from config.json."},
     {id:"dsv4-flash", n:"DeepSeek V4 Flash (284B-A13B)", p:290.94, pa:13, E:256, K:6, L:43, h:4096, ffn:14336, v:129280, ctx:1048576,
      nat:{f:"FP4 experts + FP8", gb:159.6, cls:"FP4"},
      kv:[compressed(21,4,{read:512}), indexKeys(21,128,{r:4}), compressed(20,128), sliding(2,1,256,128)],
@@ -1779,7 +1781,10 @@ const MODELS = [
      nat:fp8(689.3), kv:[latent(61,576,{read:2048}), indexKeys(61,128)],
      note:"Latent attention (MLA) caches one compressed vector per token, and sparse attention reads only 2,048 of them per step."},
   ]},
-  {g:"Meta Llama", items:[
+  {g:"Meta", items:[
+    {id:"muse-spark", n:"Muse Spark Open (816B-A42B)", p:822.04, pa:42, E:256, K:8, L:62, h:8192, ffn:32768, v:202048, ctx:1048576, nat:bf16(822.04),
+     kv:[full(16,16,64), sliding(46,16,64,2048)],
+     note:"46 of 62 layers keep only the last 2,048 tokens. Gated on Hugging Face: request access first. An NVFP4 build is also published."},
     {id:"l4-scout", n:"Llama 4 Scout (109B-A17B)", p:108.64, pa:17, E:16, K:1, L:48, h:5120, ffn:16384, v:202048, ctx:1048576, nat:bf16(108.64),
      kv:[full(12,8,128), sliding(36,8,128,8192)],
      note:"36 of 48 layers attend within 8,192-token chunks. Supports up to 10M tokens; the slider stops at 1M."},
@@ -1805,16 +1810,38 @@ const MODELS = [
      note:"69 of 93 layers use linear attention. As released, its weights alone are more than an 8-GPU HGX B200 system holds."},
   ]},
   {g:"MiniMax", items:[
+    {id:"mm-m31-flash", n:"MiniMax-M3.1 Flash (428B-A23B)", p:427.05, pa:23, E:128, K:4, L:60, h:6144, ffn:15360, v:200064, ctx:1048576,
+     nat:{f:"NVFP4 experts + MXFP8", gb:252.4, cls:"FP4"}, kv:[full(60,4,128,{read:2176})],
+     note:"Sparse attention: each layer reads only 2,176 cached tokens per step, though every token stays cached. Modeled from config.json; treat cache figures as ±25%."},
+    {id:"mm-m3", n:"MiniMax-M3 (428B-A23B)", p:427.04, pa:23, E:128, K:4, L:60, h:6144, ffn:15360, v:200064, ctx:1048576, nat:bf16(427.04),
+     kv:[full(3,4,128), full(57,4,128,{read:2176})],
+     note:"Sparse attention: 57 of 60 layers read only 2,176 cached tokens per step, though every token stays cached. Modeled from config.json; treat cache figures as ±25%."},
     {id:"mm-m27", n:"MiniMax-M2.7 (229B-A10B)", p:228.69, pa:10, E:256, K:8, L:62, h:3072, ffn:12288, v:200064, ctx:204800,
      nat:fp8(230.1), kv:[full(62,8,128)]},
   ]},
   {g:"NVIDIA Nemotron", items:[
+    {id:"nemo35-super-vl", n:"Nemotron 3.5 Super VL 120B-A12B", p:124.45, pa:12, E:512, K:22, L:88, h:4096, ffn:64512, v:131072, ctx:1048576, nat:bf16(124.45),
+     kv:[full(8,2,128), linear(40,mamba(128,64,128,8),"Mamba-2")],
+     note:"Vision-language. Only 8 of 88 layers keep a KV cache; 40 Mamba-2 layers keep a fixed-size state. An NVFP4 build is also published."},
+    {id:"nemo35-bolt", n:"Nemotron 3.5 Bolt 74B-A9B", p:74.89, pa:9, E:346, K:9, L:88, h:4096, ffn:26056, v:131072, ctx:262144, nat:bf16(74.89),
+     kv:[full(8,2,128), linear(40,mamba(128,64,128,8),"Mamba-2")],
+     note:"A pruned Nemotron 3.5 Super. Only 8 of 88 layers keep a KV cache; 40 Mamba-2 layers keep a fixed-size state. Expert counts vary by layer, about 346 on average."},
     {id:"nemo-super", n:"Nemotron 3 Super 120B-A12B", p:123.61, pa:12, E:512, K:22, L:88, h:4096, ffn:64512, v:131072, ctx:262144, nat:bf16(123.61),
      kv:[full(8,2,128), linear(40,mamba(128,64,128,8),"Mamba-2")],
      note:"Only 8 of 88 layers keep a KV cache; 40 Mamba-2 layers keep a fixed-size state. Supports up to 1M tokens; an NVFP4 build is also published."},
     {id:"nemo-nano", n:"Nemotron 3 Nano / 3.5 Lightning 30B-A3B", p:31.58, pa:3, E:128, K:6, L:52, h:2688, ffn:14848, v:131072, ctx:262144, nat:bf16(31.58),
      kv:[full(6,2,128), linear(23,mamba(64,64,128,8),"Mamba-2")],
      note:"Only 6 of 52 layers keep a KV cache; 23 Mamba-2 layers keep a fixed-size state."},
+  ]},
+  {g:"Reflection AI", items:[
+    {id:"beam1", n:"Beam 1.0 (501B-A23B)", p:501.26, pa:23, E:256, K:8, L:52, h:5120, ffn:20480, v:151936, ctx:1048576, nat:bf16(501.26),
+     kv:[full(9,8,128), sliding(43,8,128,512)],
+     note:"43 of 52 layers keep only the last 512 tokens. FP8 and NVFP4 builds are also published."},
+  ]},
+  {g:"Aleph Alpha", items:[
+    {id:"kolibri1", n:"Kolibri-1 (78B-A3.5B)", p:78.1, pa:3.46, E:384, K:6, L:50, h:2560, ffn:3584, v:128000, ctx:262144, nat:fp8(78.8),
+     kv:[full(10,4,128), sliding(40,4,128,513)],
+     note:"40 of 50 layers keep only the last 513 tokens. Built for German and English."},
   ]},
   {g:"Mistral", items:[
     {id:"ms4", n:"Mistral Small 4 (119B-A6.5B)", p:119.4, pa:6.5, E:128, K:4, L:36, h:4096, ffn:10240, v:131072, ctx:1048576,
@@ -1841,13 +1868,13 @@ const MODELS = [
 const findModel = id => MODELS.flatMap(g=>g.items).find(m=>m.id===id);
 
 /* Does the model think (reason step by step) before answering? From each model card and chat template,
-   September 2026. always = thinking can't be switched off · default = on unless switched off ·
+   October 2026. always = thinking can't be switched off · default = on unless switched off ·
    optional = off unless switched on (or no stated default). Anything unlisted doesn't think.
    The Thinking switch starts at the model's default; a custom model is treated as optional. */
 const THINKS = {
-  always:   ["q38-2t","gptoss-120b","gptoss-20b","r1d-32b","glm53","glm53-flash","kimi-k3","mm-m27"],
-  default:  ["q38-27b","q38-flash","q36-35b","q35-9b","q35-4b","q3-32b","q3-30b","q3-8b","glm47-flash","nemo-super","nemo-nano"],
-  optional: ["dsv4-flash","dsv4-pro","dsv32","ms4","mm35","g4-31b","g4-26b","g4-12b","g4-e4b"],
+  always:   ["muse-spark","mm-m31-flash","gptoss-120b","gptoss-20b","r1d-32b","glm53","glm53-flash","kimi-k3","mm-m27"],
+  default:  ["q38-27b","q38-flash","q36-35b","q35-9b","q35-4b","q3-32b","q3-30b","q3-8b","glm47-flash","nemo-super","nemo-nano","nemo35-super-vl","nemo35-bolt","mm-m3","kolibri1"],
+  optional: ["dsv41-flash","dsv4-flash","dsv4-pro","dsv32","ms4","mm35","g4-31b","g4-26b","g4-12b","g4-e4b"],
 };
 const thinksOf = m => m.custom ? "optional" : Object.keys(THINKS).find(k=> THINKS[k].includes(m.id)) || "none";
 const THINK_LABEL = {always:"always thinks before answering", default:"thinks before answering by default",
@@ -5359,7 +5386,7 @@ const TIPS = {
   tpov:"What splitting across GPUs adds. Every GPU carries its own CUDA context, plus NCCL buffers for the all-reduce that runs after each layer. It is added memory, not saved memory.",
   overhead:"CUDA/driver context, allocator fragmentation, framework workspaces and CUDA graphs. Real but hard to predict — the slider sets how conservative you want to be.",
   wq:`Bytes per weight. As released uses the checkpoint exactly as published; many new models ship in FP8 or FP4. BF16 is 2 bytes; FP8 and INT8 halve it; FP4 and INT4 cut it about 4×. FP8 runs natively on ${nativeOn("fp8")}; FP4 on ${nativeOn("fp4")}.`,
-  model:"The most-used open models on Hugging Face as of September 2026, grouped by lab. Layer counts, attention types and cache sizes come from each model's published config.json.",
+  model:"The most-used open models on Hugging Face as of October 2026, grouped by lab. Layer counts, attention types and cache sizes come from each model's published config.json.",
   kq:"Precision of the cached keys and values. FP8 KV roughly halves cache size with little quality loss — often a better first move than quantizing the weights themselves.",
   ctx:"Tokens each request sends in: system prompt, conversation history, documents, code. Before the first reply the engine reads the new part of the prompt (all of it if prompt caching is off in Advanced settings), and the whole prompt stays in the user's cache while the reply is written.",
   reply:"Tokens in each answer the user reads. Thinking, if the model does it, is set separately below. Prompt + thinking + reply is the most cache one user holds.",
@@ -5425,7 +5452,7 @@ const TIPS_PLAIN = {
   tpov:"The extra memory that splitting one model across several GPUs costs: each GPU needs its own copy of the driver's setup and space for passing results to the others. Splitting adds memory; it never saves any.",
   overhead:"A safety margin for memory the software uses that is hard to predict: the GPU driver, gaps left between blocks of memory, and the serving software's own scratch space. The slider sets how cautious to be.",
   wq:`How many bytes each of the model's numbers takes. "As released" uses the model exactly as its makers published it. BF16 is 2 bytes per number; FP8 and INT8 are 1, so half the memory; FP4 and INT4 are half a byte, about a quarter. Smaller numbers lose a little accuracy. FP8 is built into ${nativeOn("fp8")}; FP4 into ${nativeOn("fp4")}.`,
-  model:"The most-used openly available models as of September 2026, grouped by who made them. Their sizes and memory needs come from each model's published description.",
+  model:"The most-used openly available models as of October 2026, grouped by who made them. Their sizes and memory needs come from each model's published description.",
   kq:"How precisely the model's per-conversation notes are stored. FP8 halves the memory they take with little loss in quality, and is often the first saving worth making.",
   ctx:"How much text each request sends in, in tokens (about three-quarters of a word each): instructions, the conversation so far, documents, code. The model reads it before it starts replying, and keeps notes on all of it until the reply is done.",
   reply:"How long each answer is, in tokens (about three-quarters of a word each). Any thinking the model does first is set separately below.",
