@@ -613,7 +613,12 @@
       </div>
     </div>
     <div class="top-actions">
-      <div class="unit-toggle" role="group" aria-label="Memory units">
+      <div class="unit-toggle" id="timeUnit" role="group" aria-label="Time units">
+        <span class="unit-lbl">Time in</span>
+        <button type="button" data-tunit="ms" aria-pressed="true">ms</button>
+        <button type="button" data-tunit="s" aria-pressed="false">s</button>
+      </div>
+      <div class="unit-toggle" id="memUnit" role="group" aria-label="Memory units">
         <span class="unit-lbl">Memory in <span class="i" data-tip="units" tabindex="0">i</span></span>
         <button type="button" data-unit="GB" aria-pressed="true">GB</button>
         <button type="button" data-unit="GiB" aria-pressed="false">GiB</button>
@@ -2121,6 +2126,8 @@ function promptParts(w = S){             // w = a workload: the first one (S) or
 /* memory units are display only; the viewer's choice is remembered in this browser */
 const UNIT_KEY = "vram-sizer-unit";   // kept from the tool's old name so saved choices carry over
 function loadUnit(){ try { return localStorage.getItem(UNIT_KEY)==="GiB" ? "GiB" : "GB"; } catch(e) { return "GB"; } }
+const TUNIT_KEY = "estimator-time-unit";   // short times in ms (the default) or in seconds
+function loadTunit(){ try { return localStorage.getItem(TUNIT_KEY)==="s" ? "s" : "ms"; } catch(e) { return "ms"; } }
 /* the wording of the tooltips and the server's notes: plain English (the default) or technical; display only,
    remembered in this browser, and carried in a shared link when technical */
 const WORDS_KEY = "estimator-words";
@@ -2155,7 +2162,7 @@ const S = { wq:2, wqLbl:"NATIVE", kq:2, tp:1, pp:1, tpo:"auto", pipe:0, chunk:51
             extra:[],          // workloads added to the first: {workload, users, prompt, reply, wantPrompt, wantReply, shared, fresh}
             custom:{c_params:7, c_layers:32, c_hidden:4096, c_kv:8, c_hd:128, c_ctx:32},   // the custom model's fields as typed (customNum clamps them)
             models:[], edit:0, // each model's settings (specs, see below) and which one the controls show
-            unit:loadUnit(), words:loadWords() };
+            unit:loadUnit(), tunit:loadTunit(), words:loadWords() };
 let M = findModel("l31-8b");
 let LAST = null;   // what the last render showed, for the downloadable summary
 
@@ -3126,7 +3133,7 @@ function configCard(c, eyebrow, cmp, back = ""){
     + bridgeBays(c, d)
     + ((c.x.constraints || []).length || (sv.notes || []).length ? `<div class="bom-notes"><span class="sublbl">Before you quote</span><ul class="svnotes">${[...(c.x.constraints || []), ...(sv.notes || [])].map(t=> `<li>${esc(t)}</li>`).join("")}</ul></div>` : "")
     + `</section>`
-    + `<section class="rec-col"><h3 class="colh">Performance</h3>${statsHtml(d)}`
+    + `<section class="rec-col"><h3 class="colh">Estimated performance</h3>${statsHtml(d)}`
     + (extrap ? `<p class="cap">${say("Speeds are estimated from the spec sheet", "Speeds are extrapolated")}: the ${esc(d.g.n.replace(" Blackwell", ""))} has no published benchmark here <span class="i" data-tip="extrap" tabindex="0">i</span>. Load-test before quoting them.</p>` : "")
     + (warmParts().length ? `<p class="cap">${cacheNote(warmParts())}</p>` : "")
     + (grow ? `<p class="rec-grow">Room to grow: ${growText(grow)} in this server serve up to ${commas(grow.room)} users.</p>` : "")
@@ -3293,7 +3300,7 @@ function fleetCard(c, eyebrow, cmp, back = ""){
     + `<section class="rec-col"><h3 class="colh">Build</h3>${builds}`
     + ((c.x.constraints || []).length || (sv.notes || []).length ? `<div class="bom-notes"><span class="sublbl">Before you quote</span><ul class="svnotes">${[...(c.x.constraints || []), ...(sv.notes || [])].map(t=> `<li>${esc(t)}</li>`).join("")}</ul></div>` : "")
     + `</section>`
-    + `<section class="rec-col"><h3 class="colh">Performance</h3>`
+    + `<section class="rec-col"><h3 class="colh">Estimated performance</h3>`
     + `<div class="tbl"><table class="fleet-t"><thead><tr><th scope="col">Model</th><th scope="col" class="num">GPUs</th><th scope="col" class="num">Per user</th><th scope="col" class="num ft">First token</th><th scope="col">Goal</th></tr></thead><tbody>${rows}</tbody></table></div>`
     + extrap
     + (warm.length ? `<p class="cap">${cacheNote(warm)}</p>` : "")
@@ -3595,7 +3602,8 @@ function cacheNote(parts){
 }
 /* a speed that falls short of the goal, shown with a decimal when rounding would make it read as the goal itself */
 const fmtTpsShort = x => { const goal = GOALS[S.goal].tps; return x < goal && fmtTps(x)===fmtTps(goal) ? (Math.floor(x*10)/10).toFixed(1) : fmtTps(x); };
-const fmtTime = s => s>=1 ? [s.toFixed(2), "s"] : [s>=0.01 ? String(Math.round(s*1000)) : (s*1000).toFixed(1), "ms"];
+/* a time under a second reads in ms, or in seconds when Time in is set to s */
+const fmtTime = s => s>=1 || S.tunit==="s" ? [s.toFixed(s>=0.01 ? 2 : 3), "s"] : [s>=0.01 ? String(Math.round(s*1000)) : (s*1000).toFixed(1), "ms"];
 const fmtWait = s => s>=90 ? `${(s/60).toFixed(1)} min` : s>=1 ? `${Math.round(s)} s` : "under 1 s";
 /* the likely range around an estimate: where measured results fell for the middle 80% of published
    benchmark points held out of the fit (RANGE, written by validation/fit.mjs) */
@@ -3603,7 +3611,8 @@ const fmtWait = s => s>=90 ? `${(s/60).toFixed(1)} min` : s>=1 ? `${Math.round(s
    The low end of speed keeps a decimal when rounding would make it read as the goal itself. */
 const tpsSpan  = x => [`${fmtTpsShort(x*RANGE.speed[0])}–${fmtTps(x*RANGE.speed[1])}`, "tok/s"];
 const timeSpan = s => { const lo = s*RANGE.ttft[0], hi = s*RANGE.ttft[1], d = x => x>=10 ? Math.round(x) : x.toFixed(1);
-  return hi >= 1 ? [`${d(lo)}–${d(hi)}`, "s"] : [`${Math.round(lo*1000)}–${Math.round(hi*1000)}`, "ms"]; };
+  return hi >= 1 ? [`${d(lo)}–${d(hi)}`, "s"] : S.tunit==="s" ? [`${lo.toFixed(2)}–${hi.toFixed(2)}`, "s"]
+       : [`${Math.round(lo*1000)}–${Math.round(hi*1000)}`, "ms"]; };
 const likelyTps  = x => `likely ${tpsSpan(x).join(" ")}`;
 const likelyTime = s => `likely ${timeSpan(s).join(" ")}`;
 
@@ -4847,7 +4856,7 @@ $('mixAdd').addEventListener('click', ()=>{
 });
 
 /* memory units: relabels every amount; the math is in bytes either way */
-const unitBox = document.querySelector('.unit-toggle');
+const unitBox = $('memUnit');
 function setUnit(u){
   S.unit = u;
   unitBox.querySelectorAll('[data-unit]').forEach(b=> b.setAttribute('aria-pressed', b.dataset.unit===u));
@@ -4856,6 +4865,16 @@ function setUnit(u){
 }
 unitBox.addEventListener('click', e=>{ const b = e.target.closest('[data-unit]'); if(b) setUnit(b.dataset.unit); });
 unitBox.querySelectorAll('[data-unit]').forEach(b=> b.setAttribute('aria-pressed', b.dataset.unit===S.unit));
+/* time units: short times in ms or in seconds; the math is in seconds either way */
+const tunitBox = $('timeUnit');
+function setTunit(u){
+  S.tunit = u;
+  tunitBox.querySelectorAll('[data-tunit]').forEach(b=> b.setAttribute('aria-pressed', b.dataset.tunit===u));
+  try { localStorage.setItem(TUNIT_KEY, u); } catch(e) {}
+  render();
+}
+tunitBox.addEventListener('click', e=>{ const b = e.target.closest('[data-tunit]'); if(b) setTunit(b.dataset.tunit); });
+tunitBox.querySelectorAll('[data-tunit]').forEach(b=> b.setAttribute('aria-pressed', b.dataset.tunit===S.tunit));
 
 /* wording: rewords the tooltips and the server's notes; the figures don't change */
 const syncWords = () => showSeg('words', S.words);
