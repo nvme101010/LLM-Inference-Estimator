@@ -2885,7 +2885,7 @@ function statsHtml(d){
            `after ${fmtWait(S.thinking/t.perUser)} of thinking users don't see · estimate ${fmtWait(answerStart(t))}${S.goal!=="any" ? ` · goal within ${g.ans} s` : ""}`,
            S.goal!=="any" && answerHigh(t) > g.ans ? "warn" : "")
        : statCell("ttft", "First token", ...timeSpan(t.ttft), `estimate ${fmtTime(t.ttft).join(" ")}${S.goal!=="any" ? ` · goal under ${g.ttft} s` : ""}`))
-    + statCell("capacity", "Room for", commas(d.room), d.room===1 ? "user" : "users", d.room < all ? `of your ${commas(all)}: below the goal past that` : `you have ${commas(all)}${d.memRoom > d.room ? ` · ${say("memory fits", "cache holds")} ${commas(d.memRoom)}` : ""}`, d.room < all ? "warn" : "")
+    + statCell("capacity", "Room for", commas(d.room), d.room===1 ? "user" : "users", d.room < all ? `of your ${commas(all)}: below the goal past that` : `you have ${commas(all)}`, d.room < all ? "warn" : "")
     + statCell("srvGpu", "GPU memory", boxTotal(d.memGB).split(" ")[0], S.unit, `${fmtMem(d.perGB)} used of ${boxMem(d.g)} per card`)
     + `</div>`;
 }
@@ -2896,7 +2896,7 @@ function statsHtml(d){
    split evenly across the sockets. short: even the CPUs the server takes can't give the cores. */
 function cpusFor(sv, d, cores){
   const max = sv.maxCores || Infinity, cap = `one CPU here has at most ${max} cores (${esc(sv.coreNote || "")})`;
-  const one = say("One CPU is enough, and keeps the GPUs and their memory close together", "One CPU keeps the GPUs and memory on one NUMA node");
+  const one = "";
   if(sv.sockets < 2) return cores <= max ? {n: 1, why: one}
                                          : {n: 1, short: true, why: `Needs ${cores} cores, but ${cap}: fewer cores per GPU, or another server`};
   const reach = sv.cpu1 ? (sv.cpu1[d.g.n] ?? sv.cpu1["*"]) : Infinity;
@@ -2986,7 +2986,7 @@ function bomRows(c, g, n, parts, pills = "", extra = []){
     const why = LIGHT_GPUS.includes(g.n) ? `, for the ${esc(g.n.replace(" Blackwell", ""))}` : "";
     const value = cp.n===2 ? `2 × ${esc(sv.cpu)}, ${commas(sr.cores/2)} physical cores each` : `1 × ${esc(sv.cpu)}, ${commas(sr.cores)} physical cores`;
     const tally = cp.n===2 ? `${commas(sr.cores)} physical cores in total · ${per} per GPU${why}` : `${per} physical cores per GPU${why}`;
-    row(cp.n===2 ? "CPUs" : "CPU", value, `${tally}</span><span>${cp.why}`, cp.short);
+    row(cp.n===2 ? "CPUs" : "CPU", value, tally + (cp.why ? `</span><span>${cp.why}` : ""), cp.short);
     const mm = memFor(sv, cp.n, sr.ram);
     const twice = say("twice the GPU memory", "2 × GPU memory");
     if(!sv.mem) row("Memory", `${commas(Math.ceil(sr.ram))} GB`, twice);
@@ -5386,7 +5386,7 @@ const TIPS = {
   pcache:"Chat and agent prompts mostly repeat: the same system prompt for everyone, and each user's earlier turns. vLLM and SGLang keep that part cached by default, so only the new text is read before the first reply, and the shared system prompt is stored once per GPU rather than once per user. Each workload preset sets how much of its prompt is new and how much is shared; the workload hint says. Turn it off to size for prompts that never repeat.",
   ovpct:"Headroom for allocator fragmentation and framework buffers, as a percentage of weights + cache + activations. 5–10% is typical; raise it if you have hit OOM under load.",
   goal:"How fast each user should see answers: at least this many tokens per second, and a first reply within the time limit. When users don't see a thinking model's thinking, the limit is on when the answer starts instead: 15 s for Fast, 30 s for Smooth chat, 60 s for Readable. The suggestion is the setup that reaches it with the least GPU memory in total, judged at the cautious end of the estimate: speed at the low end of its likely range, first token at the slow end. Any speed just finds the smallest setup that fits.",
-  capacity:"The most users this node holds at the current prompt and reply lengths, across all its copies. Either memory runs out, or each user's speed or first token, at the cautious end of the estimate, misses your goal, whichever comes first; when it is the speed, the sentence also says how many memory alone would hold. The gap to your user count is your room to grow. With several workloads, they grow together in the same proportions.",
+  capacity:"The most users this node holds at the current prompt and reply lengths, across all its copies. Either memory runs out, or each user's speed or first token, at the cautious end of the estimate, misses your goal, whichever comes first. The gap to your user count is your room to grow. With several workloads, they grow together in the same proportions.",
   units:"GB is 1,000,000,000 bytes, the unit on spec sheets and download pages. GiB is 1,073,741,824 bytes, the unit nvidia-smi, PyTorch and vLLM report. Switching only relabels memory; the recommendation doesn't change. Board capacities are the size on the box, counted as GB: 80 GB is 74.5 GiB.",
   usable:"The dashed line marks how much memory the model may use: 90% of each GPU. That is vLLM's default limit (gpu_memory_utilization = 0.9); the other 10% is left for the driver and anything else on the card. A setup fits only if its memory stays to the left of the line.",
   perGPU:"What each individual board must hold. This is the number that determines fit — a model can need 300 GB total and still run fine on 4 × 80 GB.",
