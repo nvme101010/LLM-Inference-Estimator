@@ -1027,7 +1027,8 @@
      "max": 8,
      "link": {
       "bridge": 4,
-      "kit": "S4A91C"
+      "kit": "S4A91C",
+      "name": "NVIDIA 4-way NVLink Bridge for H200 NVL"
      },
      "constraints": [
       "NVLink bridges are not supported in the 10-card layout."
@@ -1157,7 +1158,8 @@
      "max": 4,
      "link": {
       "bridge": 2,
-      "kit": "S4A90C"
+      "kit": "S4A90C",
+      "name": "NVIDIA 2-way NVLink Bridge for H200 NVL"
      },
      "constraints": [
       "iLO GPU power capping is required for 3 or 4 cards."
@@ -1965,7 +1967,7 @@ const popText  = g => { const p = popOf(g); return p.length>1 ? `${p.slice(0, -1
 /* ---------------- HPE servers ----------------
    The server catalog is the JSON block above the script (id="catalog-hpe"): one record per server, with
    each board it takes, how many, how those cards are wired (link: "pcie", "nvswitch", "fabric" or an NVLink
-   bridge {bridge: cards it joins, kit}), constraints, and where each figure comes from. Gen11 servers with a
+   bridge {bridge: cards it joins, kit: HPE part, name: as the page shows it}), constraints, and where each figure comes from. Gen11 servers with a
    Gen12 successor that takes the same GPUs are left out of it.
    CATALOG is that block, read once. HPE_HOSTS is the shape the GPU view uses: per board, only what the
    server changes from the board's own figures (max, pop, split, bridge, nolink, est), so with each board
@@ -1983,7 +1985,7 @@ const HPE_HOSTS = CATALOG.servers.map(sv=> ({
     if(!g) return [x.board, o];
     if(x.max < boardMax(g)) o.max = x.max;
     if(x.pop) o.pop = x.pop;
-    if(x.link && x.link.bridge){ if(x.link.bridge < boardMax(g)) o.split = x.link.bridge; o.bridge = `${x.link.kit} ${x.link.bridge}-way NVLink bridge`; }
+    if(x.link && x.link.bridge){ if(x.link.bridge < boardMax(g)) o.split = x.link.bridge; o.bridge = x.link.name; }
     if(x.link==="pcie" && g.link) o.nolink = true;   // a board that normally has NVLink, sold here without a bridge
     if(x.unconfirmed) o.est = x.unconfirmed;
     if(x.cooling) o.spec = `${coolForm(x.cooling[0])} · ${sv.sockets} × ${sv.cpu}`;   // its chassis and cooling, where the board decides them
@@ -2905,18 +2907,18 @@ const needGB = () => compute(1, 1, 1).total/GB;
    and the detail of one configuration (its wiring, every layout on its cards, its build). */
 const cfgById = (cfgs, id) => cfgs.find(c=> c.id===id) || null;
 const groupsUsed = (c, d) => linkKind(c.x)==="bridge" ? Math.ceil(d.gpus / c.x.link.bridge) : 0;
-/* how the cards in use are wired, in words: "one 4-way NVLink group (S4A91C)" */
+/* how the cards in use are wired, in words: "one 4-way NVLink group" (the NVLink row names the bridge) */
 function wiringText(c, d){
   const k = linkKind(c.x);
   if(k==="bridge"){ const n = groupsUsed(c, d), w = c.x.link.bridge;
-    return `${["one", "two", "three", "four"][n-1] || n} ${w}-way NVLink group${n===1 ? "" : "s"} (${n>1 ? `${n} × ` : ""}${c.x.link.kit})`; }
+    return `${["one", "two", "three", "four"][n-1] || n} ${w}-way NVLink group${n===1 ? "" : "s"}`; }
   return k==="nvswitch" ? "NVSwitch" : k==="fabric" ? "Infinity Fabric, one link per pair" : "PCIe only, no GPU-to-GPU link";
 }
 /* the same in everyday words, for Plain wording */
 function wiringPlain(c, d){
   const k = linkKind(c.x);
   if(k==="bridge"){ const n = groupsUsed(c, d), w = c.x.link.bridge;
-    return `linked in ${n===1 ? "one group" : `${n} groups`} of ${w} by NVLink bridges (${n>1 ? `${n} × ` : ""}${c.x.link.kit})`; }
+    return `linked in ${n===1 ? "one group" : `${n} groups`} of ${w} by NVLink bridges`; }
   return k==="nvswitch" ? "all linked to each other through NVSwitch" : k==="fabric" ? "each linked directly to every other (Infinity Fabric)" : "no fast direct link between the GPUs";
 }
 const wiringShort = c => { const k = linkKind(c.x);
@@ -2937,8 +2939,8 @@ const star = d => d.g.bench ? "" : `<span class="tipl" data-tip="extrap" tabinde
 /* the server's GPU bays: bridged groups with their kit, the cards in use filled */
 function baysHtml(c, d){
   const k = linkKind(c.x), size = k==="bridge" ? c.x.link.bridge : c.max, groups = Math.ceil(c.max / size);
-  const kit = k==="bridge" ? c.x.link.kit : k==="nvswitch" ? "NVSwitch" : k==="fabric" ? "Infinity Fabric" : "PCIe";
-  const label = `${c.max} GPU bays, ${d ? d.gpus : 0} in use` + (k==="bridge" ? `, in ${groups} groups of ${size} joined by ${kit} NVLink bridges` : `, ${kit}`);
+  const kit = k==="bridge" ? `${size}-way NVLink` : k==="nvswitch" ? "NVSwitch" : k==="fabric" ? "Infinity Fabric" : "PCIe";
+  const label = `${c.max} GPU bays, ${d ? d.gpus : 0} in use` + (k==="bridge" ? `, in ${groups} groups of ${size} joined by ${kit} bridges` : `, ${kit}`);
   return `<div class="bays" role="img" aria-label="${label}">` + Array.from({length: groups}, (_, gi)=>{
     const from = gi*size, n = Math.min(size, c.max - from), used = d ? Math.max(0, Math.min(n, d.gpus - from)) : 0;
     const linked = k!=="pcie" && used > 1;
@@ -3056,7 +3058,7 @@ function bomRows(c, g, n, parts, pills = "", extra = []){
                                                  : `${k==="pcie" ? say(`in a full-speed PCIe Gen${g.slot} slot · `, `PCIe Gen${g.slot} x16 · `) : ""}${more}`);
   for(const [lbl, v, sub] of extra) row(lbl, v, sub);
   if(k==="bridge" && n>1){ const groups = groupsUsed(c, d);
-    row("NVLink", `${groups} × ${esc(x.link.kit)}`, say(`bridge${groups===1 ? "" : "s"} joining ${x.link.bridge} cards each`, `${x.link.bridge}-way NVLink bridge${groups===1 ? "" : "s"}`)); }
+    row("NVLink", `${groups} × ${esc(x.link.name)}`, `joining ${x.link.bridge} cards${groups===1 ? "" : " each"}`); }
   if(x.unconfirmed) row("Card count", "To confirm", esc(x.unconfirmed), true);
   {
     const sr = sizeServer(g, n, parts), per = sr.cores/n, cp = cpusFor(sv, d, sr.cores);
@@ -3225,7 +3227,7 @@ function renderCfg(A, cfgs){
   const wire = k!=="bridge" ? `<p class="rec-why">${wiringSentence(c)}</p>` : `<div class="wiring">` + Array.from({length: groups}, (_, gi)=>{
       const from = gi*size, n = Math.min(size, c.max - from), on = Math.max(0, Math.min(n, used - from));
       const title = groups>1 ? `Group ${String.fromCharCode(65 + gi)} · bays ${from + 1}–${from + n}` : `Bays 1–${c.max}`;
-      const link = k==="bridge" ? `${c.x.link.kit} ${c.x.link.bridge}-way bridge` : k==="nvswitch" ? "NVSwitch, every GPU to every GPU" : k==="fabric" ? "Infinity Fabric, one link per pair" : "PCIe Gen5 x16 per card";
+      const link = k==="bridge" ? esc(c.x.link.name) : k==="nvswitch" ? "NVSwitch, every GPU to every GPU" : k==="fabric" ? "Infinity Fabric, one link per pair" : "PCIe Gen5 x16 per card";
       return `<div class="wgroup${on ? " on" : ""}"><div class="wtop"><b>${title}</b><span class="cap">${link}</span></div>`
         + `<div class="cards" style="--n:${Math.min(n, 8)}">${Array.from({length: n}, (_, i)=> `<span class="card${i < on ? " on" : ""}">${i < on ? esc(d.g.n.replace(" Blackwell", "")) : "open"}</span>`).join("")}</div></div>`
         + (gi < groups - 1 ? `<div class="wlink"><b>PCIe Gen5</b><span>${PCIE_BW} GB/s each way, through the host. Only pipeline hand-offs cross here, never an all-reduce.</span></div>` : "");
