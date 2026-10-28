@@ -2922,9 +2922,10 @@ function wiringPlain(c, d){
 const wiringShort = c => { const k = linkKind(c.x);
   return k==="bridge" ? `${c.x.link.bridge}-way NVLink` : k==="nvswitch" ? "NVSwitch" : k==="fabric" ? "Infinity Fabric" : "PCIe only"; };
 const layoutLine = d => d.reps>1 ? `${d.reps} copies × ${layoutName(d.L)}` : `1 copy · ${layoutName(d.L)}`;
-/* fewer cards than the configuration has can hold everyone (an 8-GPU system, a model on one card): say how many */
+/* fewer cards than the configuration has can hold everyone (an 8-GPU system, a model on one card): say how many,
+   naming the GPU, not the HGX board it sits on ("1 × H200", not "1 × HGX H200") */
 const neededLine = d => { const all = allUsers(), n = Math.ceil(all / (d.room / d.reps)) * d.L.n;
-  return d.room >= all && n < d.gpus ? `<br><span class="cap">${n} × ${esc(d.g.n)} ${n===1 ? "is" : "are"} needed for your ${plural(all, "user")}</span>` : ""; };
+  return d.room >= all && n < d.gpus ? `<br><span class="cap">${n} × ${esc(d.g.n.replace(/^HGX /, ""))} ${n===1 ? "is" : "are"} needed for your ${plural(all, "user")}</span>` : ""; };
 /* what the speed figure rests on: a board with no benchmark of its own, a pipeline, a split over PCIe */
 const speedBasis = d => [d.g.bench ? "" : say("estimated from specs", "extrapolated"), d.modeled ? say("staged split, untested", "pipeline modeled") : "",
                          d.nr ? say("split over a slow link", "split over PCIe") : ""].filter(Boolean);
