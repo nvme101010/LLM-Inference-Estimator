@@ -3068,15 +3068,15 @@ function bomRows(c, g, n, parts, pills = "", extra = []){
     row(cp.n===2 ? "CPUs" : "CPU", value, tally + (cp.why ? `</span><span>${cp.why}` : ""), cp.short);
     const mm = memFor(sv, cp.n, sr.ram);
     const twice = say("twice the GPU memory", "2 × GPU memory");
-    if(!sv.mem) row("Memory", `${commas(Math.ceil(sr.ram))} GB`, twice);
+    if(!sv.mem) row("Memory", `at least ${commas(Math.ceil(sr.ram))} GB`, twice);
     else if(!mm){   // more than the server holds: the most it takes, short of the guidance
       const most = memFor(sv, cp.n, memMost(sv, cp.n)), ml = most && memLines(most, cp.n, sr.ram);
       if(most) row("Memory", `${commas(most.total)} GB`, `${ml.sub}</span><span>${say(`NVIDIA asks for twice the GPU memory, ${commas(Math.ceil(sr.ram))} GB, more than this server holds: this is the most it takes`,
         `NVIDIA's 2 × GPU memory, ${commas(Math.ceil(sr.ram))} GB, is more than this server holds: this is its maximum`)}` + scarceLine(sv, most), true);
-      else row("Memory", `${commas(Math.ceil(sr.ram))} GB`, `${twice}, more than ${cp.n===2 ? "two CPUs" : "one CPU"} here can hold`, true);
+      else row("Memory", `at least ${commas(Math.ceil(sr.ram))} GB`, `${twice}, more than ${cp.n===2 ? "two CPUs" : "one CPU"} here can hold`, true);
     }
     else { const ml = memLines(mm, cp.n, sr.ram), scarce = scarceLine(sv, mm);
-      row("Memory", `${commas(mm.total)} GB`, `${ml.sub}</span><span>${ml.extra}` + scarce, ml.flag || !!scarce); }
+      row("Memory", `at least ${commas(mm.total)} GB`, `${ml.sub}</span><span>${ml.extra}` + scarce, ml.flag || !!scarce); }
     row(`<span class="tipl" data-tip="srvDisk" tabindex="0">Storage</span>`, `at least ${capParts(sr.diskGB).join(" ")} NVMe`, say(
       `Two copies of ${parts.length>1 ? "each model" : "the model"} + 100 GB for the software that runs it · plus ${esc(sv.boot || "an NS204 boot device")}`,
       `2 × ${parts.length>1 ? "each model's" : "model"} weights + 100 GB for container images, compile caches and logs · plus ${esc(sv.boot || "an NS204 boot device")}`));
