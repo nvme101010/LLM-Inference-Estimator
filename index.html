@@ -2950,8 +2950,7 @@ function memLines(mm, cpus, minGB){
   if(mm.ch === mm.of) return {sub: say(`${mods} · every memory channel${each} used, for full memory speed`, `${mods} · every channel${each} populated`), extra: floor, flag: false};
   return {sub: say(`${mods} · ${mm.ch} of ${mm.of} memory channels${each} used, so memory runs at about ${Math.round(100*mm.ch/mm.of)}% of full speed`,
                    `${mods} · ${mm.ch} of ${mm.of} memory channels${each} populated, so about ${Math.round(100*mm.ch/mm.of)}% of the CPU's memory bandwidth`),
-          extra: say(`${floor}. Use more channels if the server will do heavy work of its own`,
-                     `${floor}. Fill more channels if the CPU offloads KV cache or does heavy work of its own`), flag: true};
+          extra: floor, flag: true};
 }
 /* the build's Cooling row: air-cooled, or direct liquid cooling, flagged when that is the only way HPE builds the
    configuration, with the servers that run the same GPUs air-cooled */
