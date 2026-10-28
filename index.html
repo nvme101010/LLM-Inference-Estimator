@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <meta name="description" content="Sizing estimate: the HPE ProLiant server and GPUs it takes to serve open LLMs to your users, each model within one server, on NVIDIA and AMD boards.">
-<title>HPE Server Inference Estimator</title>
+<title>HPE LLM Inference Estimator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
@@ -608,7 +608,7 @@
     <div class="brand">
       <svg class="logo" viewBox="27 539 3787 1082" role="img" aria-label="HPE"><path fill="currentColor" d="M27 539h216v427h710V539h216v1082H953v-439H243v439H27z"/><path fill="currentColor" fill-rule="evenodd" d="M1422 539h717.5a408.5 408.5 0 0 1 0 817H1638v265h-216zM1638 755v385h501.5a192.5 192.5 0 0 0 0-385z"/><path fill="currentColor" d="M2756 539h1058v216H2972v90h-216z"/><path fill="#03A883" fill-rule="evenodd" d="M2756 948h1058v673H2756zM2972 1164v241h842v-241z"/></svg>
       <div>
-        <h1>Server Inference Estimator</h1>
+        <h1>LLM Inference Estimator</h1>
         <div class="sub">The HPE server and GPUs your models and users need. Each model runs within one server.</div>
       </div>
     </div>
@@ -5267,7 +5267,7 @@ ${SUMMARY_CSS}
 </style>
 <main>
   <button class="print" onclick="print()">Print or save as PDF</button>
-  <div class="eyebrow">HPE Server Inference Estimator · ${esc(role)}</div>
+  <div class="eyebrow">HPE LLM Inference Estimator · ${esc(role)}</div>
   <h1>${esc(head)}</h1>
   <p class="sub">${esc(name)} · ${commas(all)} concurrent user${all===1 ? "" : "s"} · ${esc(what)} · ${esc(prec)}</p>
   <div class="date">Prepared ${esc(date)} · estimator ${esc(VERSION)} · model and board data as of ${esc(DATA_AS_OF)}${link}</div>
@@ -5343,7 +5343,7 @@ ${SUMMARY_CSS}
 </style>
 <main>
   <button class="print" onclick="print()">Print or save as PDF</button>
-  <div class="eyebrow">HPE Server Inference Estimator · ${esc(role)}</div>
+  <div class="eyebrow">HPE LLM Inference Estimator · ${esc(role)}</div>
   <h1>${esc(head)}</h1>
   <p class="sub">${n} models · ${commas(all)} concurrent users</p>
   <div class="date">Prepared ${esc(date)} · estimator ${esc(VERSION)} · model and board data as of ${esc(DATA_AS_OF)}${link}</div>

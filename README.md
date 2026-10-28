@@ -1,4 +1,4 @@
-# HPE Server Inference Estimator
+# HPE LLM Inference Estimator
 
 Sizing estimate: the HPE server and GPUs your models and users need, with each model running within one server. Does not cover a model spread over several servers, or NVL rack-scale systems.
 
