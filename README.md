@@ -17,6 +17,8 @@ Every result is one server of up to 8 GPUs. If one node of a board can't serve e
 
 GPU counts round up to what can be bought. H200 NVL servers take 1, 2, 4 or 8 cards, but an NVLink bridge joins at most 4 of them, so one copy of a model spans at most 4 and 8 cards run two copies. **Pipeline across bridge groups** in Advanced settings (off by default) lets one copy span both groups as two pipeline stages, tensor-parallel within each and handing activations between them over PCIe (vLLM's `--tensor-parallel-size 4 --pipeline-parallel-size 2`): that fits a model or a KV cache that one group can't hold, at about one group's speed per user, since each stage still reads all of its weights for every token; two copies of 4 are still preferred when they fit. Pipelined figures are modeled, not yet fitted to a benchmark. The HGX H200, HGX B200 and HGX B300 are sold only as 8-GPU systems, with all 8 GPUs joined through NVSwitch. So is the AMD MI355X, but with no switch: each GPU has one Infinity Fabric link to each of the other 7, so a copy split across 2 or 4 of them uses only the links among them and pays more per layer than on an HGX. RTX PRO 4500 servers hold up to 5 cards (the limit on HPE servers).
 
+A copy is split only where the engine can split it: vLLM divides a layer's attention heads evenly over the tensor-parallel GPUs, so the query heads must divide by the split, and the KV heads must too (or the split by them). Phi-4's 10 KV heads run on 1 or 2 GPUs, and Qwen2.5 7B (28 heads) and GLM-4.7 Flash (20) on up to 4.
+
 ### Servers view
 
 The answer opens by server. **Servers in scope** picks the HPE servers to consider (all by default; the customer's standard builds, say). The page sizes the model on every configuration of those servers — each server with each GPU it takes, at the count and wiring HPE supports — and shows:
@@ -24,7 +26,9 @@ The answer opens by server. **Servers in scope** picks the HPE servers to consid
 - **the recommendation**: the configuration the GPU view would suggest — not split over PCIe, then the least GPU memory, not pipelined, fewer GPUs per copy, faster — then the most room and the fewest rack units, with its build (chassis, GPUs, bridges, CPUs, memory, storage, power), figures and how the model is laid out on the cards;
 - **room to grow**: on the recommendation, what the same server serves with its open bays filled;
 - **every server in scope**: the configurations that hold the model, with the smallest server that also works tagged *Smaller server* and bigger ones with more room tagged *More room*; for the rest, the most GPU memory they carry against what the model needs;
-- **one configuration in detail**, folded away under its name until opened with the arrow: how its cards are wired, every layout the wiring allows (TP within an NVLink group or NVSwitch; TP within groups × PP across them; on PCIe cards, TP over PCIe or PP over PCIe) at each number of copies, and its build.
+- **one configuration in detail**, folded away under its name until opened with the arrow: how its cards are wired, every layout the wiring allows (TP within an NVLink group or NVSwitch; TP within groups × PP across them, when Pipeline across bridge groups is on; on PCIe cards, TP over PCIe or PP over PCIe) at each number of copies, and its build.
+
+GPUs per copy, when fixed in Advanced settings, and Pipeline across bridge groups limit the layouts here as they do in the GPU view.
 
 **Several models** are sized together, as the GPU view does: each model runs as copies of its own, the copies are packed into servers of one kind with one kind of GPU, and spare GPUs run extra copies of the models furthest from their goals. Each model must fit on one server. The recommendation follows the GPU view's order, plus one rule it never needs: on the same GPU, fewer servers win even with more cards. The card gives each server's build and every model's figures and layout; the configuration detail is for one model only.
 
@@ -120,7 +124,7 @@ docker run --rm -p 8080:8080 --read-only --tmpfs /tmp ghcr.io/nvme101010/llm-inf
 [`deploy/k8s`](deploy/k8s) holds a Deployment (2 replicas, non-root, read-only root filesystem, no capabilities, readiness and liveness probes on `/healthz`, 10m CPU and 16 Mi memory requested), a Service on port 80, a PodDisruptionBudget, and an optional Ingress. Apply it from the repository or straight from GitHub:
 
 ```bash
-kubectl apply -k "https://github.com/nvme101010/LLM-Inference-Estimator//deploy/k8s?ref=v1.10.5"
+kubectl apply -k "https://github.com/nvme101010/LLM-Inference-Estimator//deploy/k8s?ref=v1.11.0"
 ```
 
 Then port-forward to try it (`kubectl port-forward svc/llm-inference-estimator 8080:80`) or set the host in `ingress.yaml` and add it to the kustomization. The image runs two nginx workers regardless of node size, so the 32 Mi limit holds everywhere.
