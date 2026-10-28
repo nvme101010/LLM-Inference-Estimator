@@ -1704,6 +1704,7 @@
    speculative-decoding heads included, since they load too); active parameters from the model card.
    p total params (B) · pa active per token (B) · E, K routed experts / used per token
    lookup  B params in lookup tables read a row at a time (n-gram / per-layer embeddings)
+   qh      attention heads, given only where a split of 2, 4 or 8 GPUs doesn't divide them (splitsHeads)
    L layers · h hidden · ffn MLP width used per token · v vocab · ctx native context
    nat     weights as released: format, size (GB), and which kernel class runs them
    kv      the cache, one entry per kind of layer:
@@ -1801,7 +1802,7 @@ const MODELS = [
      nat:{f:"FP8 + BF16", gb:328.3, cls:"FP8"},
      kv:[latent(11,512,{read:2048}), indexKeys(11,128,{r:4}), linear(34,kda(64),"linear-attention")],
      note:"34 of 45 layers use linear attention with a fixed-size state."},
-    {id:"glm47-flash", n:"GLM-4.7 Flash (31B MoE)", p:31.22, pa:4.6, E:64, K:4, L:47, h:2048, ffn:7680, v:154880, ctx:202752, nat:bf16(31.22),
+    {id:"glm47-flash", n:"GLM-4.7 Flash (31B MoE)", qh:20, p:31.22, pa:4.6, E:64, K:4, L:47, h:2048, ffn:7680, v:154880, ctx:202752, nat:bf16(31.22),
      kv:[latent(47,576)], note:"Latent attention (MLA). Active parameters computed from config.json."},
   ]},
   {g:"Moonshot Kimi", items:[
@@ -1851,7 +1852,7 @@ const MODELS = [
     {id:"ministral3-14b", n:"Ministral 3 14B", p:13.95, L:40, h:5120, ffn:16384, v:131072, ctx:262144, nat:fp8(15.7), kv:[full(40,8,128)]},
   ]},
   {g:"Earlier generation (still widely deployed)", items:[
-    {id:"q25-7b", n:"Qwen2.5 7B", p:7.62, L:28, h:3584, ffn:18944, v:152064, ctx:32768, nat:bf16(7.62), kv:[full(28,4,128)]},
+    {id:"q25-7b", n:"Qwen2.5 7B", qh:28, p:7.62, L:28, h:3584, ffn:18944, v:152064, ctx:32768, nat:bf16(7.62), kv:[full(28,4,128)]},
     {id:"q25-72b", n:"Qwen2.5 72B", p:72.71, L:80, h:8192, ffn:29568, v:152064, ctx:32768, nat:bf16(72.71), kv:[full(80,8,128)]},
     {id:"g3-27b", n:"Gemma 3 27B", p:27.43, L:62, h:5376, ffn:21504, v:262208, ctx:131072, nat:bf16(27.43),
      kv:[full(10,16,128), sliding(52,16,128,1024)], note:GEMMA_NOTE},
@@ -2090,8 +2091,9 @@ const DATA_AS_OF = "October 2026";   // when the model and board figures were la
 /* The estimator's version, carried in every shared link and summary. A link made under an older
    version opens with the changes since then listed, so a sizing never shifts without saying so.
    Bump it with each release tag; add to CHANGES whenever a release changes what the figures come to. */
-const VERSION = "1.10.5";
+const VERSION = "1.11.0";
 const CHANGES = [
+  {v:"1.11.0", what:"Fixes from an outside review. A copy of a model is no longer split across a number of GPUs its attention heads don't divide by, since vLLM refuses such a split: Phi-4 runs on 1 or 2 GPUs per copy, and Qwen2.5 7B and GLM-4.7 Flash on up to 4. A prompt read across pipeline stages now takes as long as on one stage, since it passes through each stage in turn; pipelined first-token times used to come out several times too short. The Servers view now follows GPUs per copy and Pipeline across bridge groups in Advanced settings, so with pipelining off (the default) it no longer pipelines a copy across H200 NVL bridge groups. The engine setting shown counts the running replies that share each step with a prompt piece (512 + 16 for 16 users, not 512). With thinking hidden, the daily-traffic helper assumes the speed your answer wait needs. The Servers view's first token now says when the answer starts."},
   {v:"1.10.1", what:"The GPU view now names the HPE server the Servers view recommends. It used to say each board was sized as in the first server that sells it, so 1 × RTX PRO 6000 could be \"sized as in\" a DL380a Gen12 while the Servers view recommended the DL525 Gen13 for the same deployment. It now names the server the Servers view would pick for the board, among the servers in scope, whenever the board does the same there: same cards, layout, copies, users and speed. No figure changes, only the server named. Where TP is set or Pipeline across bridge groups is off, which the Servers view's search ignores, the two views can still recommend different layouts, and so different servers."},
   {v:"1.10.0", what:"Two HPE ProLiant Gen13 servers join the catalog, from their first US QuickSpecs (7 October 2026). The DL585a Gen13: 10U, 2 × AMD EPYC 9006, and 1, 2, 4 or 8 × RTX PRO 6000 Blackwell on a PCIe Gen6 switchboard. The DL525 Gen13: 1U, one EPYC 9006, and 2 × RTX PRO 6000, 4 × RTX PRO 4500 or 3 × L4. Each board keeps its default server, so the GPU view and every other server's figures are unchanged; the Servers view can now recommend either."},
   {v:"1.9.0", what:"The HPE Compute XD690 joins the servers: 8 × HGX B300, air-cooled, in 10U. Cooling is now set per configuration: on the XD685 the HGX H200 is air-cooled in 6U (or liquid-cooled in 5U), and the HGX B200, B300 and MI355X are liquid-cooled only, in 5U, where all of them used to count as 6U. Rack units follow the configuration; across the 9,850 scenarios the validation sweeps, no recommendation changes. Each build has a Cooling row, flagged when it is liquid-cooled only."},
@@ -2340,10 +2342,12 @@ function compute(tpOverride, usersOverride, pp = 1){
      intermediates, which dominate. Compute dtype is bf16 (2 B) even when weights are
      quantized. FlashAttention keeps scores off-HBM, so there is no T² term.
      Logits are materialized in fp32 for the last token of each sequence. */
-  /* With pipeline stages the engine runs pp microbatches, one per stage at a time, so a stage's pass
-     holds a pp-th of the batch (a prompt piece stays whole). The last stage alone holds the logits;
-     every GPU is sized as if it did, so the tightest one fits. */
-  const T        = Math.max(S.chunk, Math.ceil(users/pp));          // tokens per forward pass, per stage
+  /* A pass carries a prompt piece and the next token of every running reply together: the engine's
+     token budget (max_num_batched_tokens) is the two summed. With pipeline stages the engine runs pp
+     microbatches, one per stage at a time, so a stage's pass holds a pp-th of the replies (a prompt
+     piece stays whole). The last stage alone holds the logits; every GPU is sized as if it did, so the
+     tightest one fits. */
+  const T        = S.chunk + Math.ceil(users/pp);                   // tokens per forward pass, per stage
   const ffn      = m.ffn, vocab = m.v;
   const actBuf   = T * (m.h*4 + ffn*2) * 2;                         // hidden + MLP intermediates
   const actLogit = users * vocab * 4;                               // fp32 logits, one row per seq
@@ -2466,10 +2470,10 @@ function throughput(g, tp, chunk = S.chunk, users = allUsers(), pp = 1){
   /* A step that also reads k prompt tokens (chunked prefill). They add compute to a step that is
      usually waiting on memory, so a small piece rides along almost free and a big one makes the step
      compute-bound; their activations join the batch's all-reduces. With stages, the piece rides in one
-     microbatch and crosses every stage, each adding its pp-th of the piece's compute, so the step grows
-     by the same amount on every stage: one pass carries the piece, the other pp − 1 do not. */
-  const stepWith = (k, secTok) => (pp-1)*(Math.max(tMemPass, tCompPass) + tCommPass + CAL.step)
-                                + Math.max(tMemPass, tCompPass + k*secTok/pp) + 2*m.L/pp * allReduce((uPass + k)*m.h*2) + CAL.step
+     microbatch and crosses every stage in turn, each doing its pp-th of the piece's compute. The stages
+     move in lockstep, so in every one of the step's pp passes some stage is carrying the piece and the
+     others wait for it: every pass grows, and the piece takes as long to read as with no stages. */
+  const stepWith = (k, secTok) => pp*(Math.max(tMemPass, tCompPass + k*secTok/pp) + 2*m.L/pp * allReduce((uPass + k)*m.h*2) + CAL.step)
                                 + tPipe + (pp>1 ? (pp-1)*k*m.h*2/(hopBW*GB) : 0);
 
   /* Reading one prompt, in pieces, each in a step shared with everyone else's next token:
@@ -2567,6 +2571,12 @@ const fitsOn = (g, perGB) => perGB <= g.cap*USABLE;
    layer sizes evenly, and 1, 2, 4 and 8 are the splits production deployments run. It is a software
    rule and applies to every board; it is separate from how many cards a server can hold (pop, max). */
 const TP_OPTIONS = [1,2,4,8];
+/* The engine splits a layer's attention heads evenly over a copy's tensor-parallel GPUs, so the query
+   heads must divide by the split, and so must the KV heads, or the split by them (each KV head is then
+   copied). vLLM refuses any other split at start-up: Phi-4's 10 KV heads run on 1 or 2 GPUs, not 4 or 8. */
+const splitsHeads = (m, tp) => tp===1 || ((!m.qh || m.qh % tp===0)
+  && (m.kv||[]).every(g=> g.state || g.heads<=1 || g.heads % tp===0 || tp % g.heads===0));
+const headsText = (m, tp) => m.qh && m.qh % tp ? `${m.qh} attention heads` : `${Math.max(...m.kv.filter(g=> !g.state).map(g=> g.heads))} KV heads`;
 const NODE = 8;   // GPUs in one node
 const nodeMax = g => popOf(g) ? Math.max(...popOf(g)) : g.max || NODE;   // fewer on a board whose servers hold fewer
 /* and a copy spans no more than its link joins — unless it may pipeline across the server's bridged groups */
@@ -2622,10 +2632,12 @@ function buyableCopies(g, tp, reps){
 }
 function deploymentFor(g){
   // a copy can only be as wide as the board's server: 5 RTX PRO 4500s leave room for a split of 4, not 8
-  const tps = (S.tpo==="auto" ? TP_OPTIONS : [S.tpo]).filter(tp=> tp <= splitMax(g));
-  if(!tps.length){                         // a fixed split wider than this board's server holds
+  const m = activeModel();
+  const tps = (S.tpo==="auto" ? TP_OPTIONS : [S.tpo]).filter(tp=> tp <= splitMax(g) && splitsHeads(m, tp));
+  if(!tps.length){                         // a fixed split wider than this board's server holds, or one the heads don't divide by
     const d = evaluate(g, S.tpo, 1, 1);
-    return Object.assign(d, {fits:false, t:null, meets:false, tooWide:true, memOnly:null});
+    return Object.assign(d, {fits:false, t:null, meets:false, memOnly:null},
+                         splitsHeads(m, S.tpo) ? {tooWide:true} : {badSplit:true});
   }
   const all = allUsers();
   const layouts = (memOnly, round = true) => tps.map(tp=>{
@@ -2683,7 +2695,7 @@ function memoryReason(d){
   const n = d.tp/2, holds = copyCapacity(d.g, n, 1e6, true), half = partsOf(d.g, n);
   const r = {holds, on: n===1 ? "one GPU" : `${n} GPUs`, verb: n===1 ? "has" : "have"};
   if(!holds) r.over = {need: compute(half.tp, 1, half.pp).perGPU*n/GB, usable: d.g.cap*USABLE*n};
-  return r;
+  return holds < allUsers() ? r : null;   // half as many hold everyone: memory isn't the reason (a split fixed in Advanced settings is)
 }
 /* how the node's GPUs are used, in words: the model can run once per GPU, as a few copies of several
    GPUs each, or as one copy spread across them */
@@ -2729,8 +2741,8 @@ function capacityFor(d){
    every server in scope (S.scope), and recommends one of them.
    On each configuration the search tries every card count and every layout the wiring allows (layoutsOn),
    with as many copies as the server holds, and keeps them all: the best becomes the configuration's
-   answer, the rest are its alternatives (the detail panel shows them). Pipelining is part of the search
-   here, whatever Pipeline across bridge groups says, since the server's wiring decides what's possible. */
+   answer, the rest are its alternatives (the detail panel shows them). As in the GPU view, GPUs per copy
+   (when fixed) and Pipeline across bridge groups in Advanced settings limit the layouts tried. */
 const linkKind = x => !x.link || x.link==="pcie" ? "pcie" : x.link.bridge ? "bridge" : x.link;   // pcie | bridge | nvswitch | fabric
 /* the board as this server holds it (count, pop, bridge), as the GPU view's inHost does for the server it sizes the board in */
 function boardIn(sv, x){
@@ -2745,11 +2757,13 @@ function layoutsOn(b){
   const out = [], max = nodeMax(b);
   for(const n of TP_OPTIONS){
     if(n > max) break;
-    if(b.split && n > b.split){ if(n % b.split===0) out.push({n, tp: b.split, pp: n/b.split}); continue; }
+    if(S.tpo!=="auto" && n!==S.tpo) continue;
+    if(b.split && n > b.split){ if(S.pipe && n % b.split===0) out.push({n, tp: b.split, pp: n/b.split}); continue; }
     out.push({n, tp: n, pp: 1});
     if(!b.link && n > 1) out.push({n, tp: 1, pp: n});
   }
-  return out;
+  const m = activeModel();
+  return out.filter(L=> splitsHeads(m, L.tp));
 }
 const layoutName = L => L.pp>1 ? (L.tp>1 ? `TP ${L.tp} × PP ${L.pp}` : `PP ${L.pp}`) : `TP ${L.tp}`;
 /* one layout with reps copies, upr users on each: memory, speed, goal (as evaluate does for the GPU view) */
@@ -2912,7 +2926,8 @@ function statsHtml(d){
        ? statCell("answer", "Answer starts", ...answerSpan(t),
            `after ${fmtWait(S.thinking/t.perUser)} of thinking users don't see · estimate ${fmtWait(answerStart(t))}${S.goal!=="any" ? ` · goal within ${g.ans} s` : ""}`,
            S.goal!=="any" && answerHigh(t) > g.ans ? "warn" : "")
-       : statCell("ttft", "First token", ...timeSpan(t.ttft), `estimate ${fmtTime(t.ttft).join(" ")}${S.goal!=="any" ? ` · goal under ${g.ttft} s` : ""}`))
+       : statCell("ttft", "First token", ...timeSpan(t.ttft), `estimate ${fmtTime(t.ttft).join(" ")}${S.goal!=="any" ? ` · goal under ${g.ttft} s` : ""}`
+           + (S.thinking ? `<br>answer after ${fmtWait(answerStart(t))} of thinking users see` : "")))
     + statCell("capacity", "Room for", commas(d.room), d.room===1 ? "user" : "users", d.room < all ? `of your ${commas(all)}: below the goal past that` : `you have ${commas(all)}`, d.room < all ? "warn" : "")
     + statCell("srvGpu", "GPU memory", boxTotal(d.memGB).split(" ")[0], S.unit, `${fmtMem(d.perGB)} used of ${boxMem(d.g)} per card`)
     + `</div>`;
@@ -3035,7 +3050,8 @@ function layoutWhy(c, d){
             : d.tpw>1 ? `One copy, tensor-parallel across ${d.tpw} ${bridged ? "bridged " : ""}cards.` : `One copy on one card.`;
   const pcie = !d.nr ? "" : d.tpw>1 ? ` The cards have no direct link, so an all-reduce crosses PCIe after every layer; the speed shown reflects that.`
              : ` The cards have no direct link, so each hand-off between stages crosses PCIe.`;
-  return how + pcie;
+  const fixed = S.tpo!=="auto" ? ` ${S.tpo} GPU${S.tpo===1 ? "" : "s"} per copy, as fixed in Advanced settings.` : "";
+  return how + pcie + fixed;
 }
 /* a layout with more cards, in words: "8 cards as 2 copies of TP 4" */
 const growText = d => `${d.gpus} cards as ` + (d.reps>1 ? (d.tpw===1 && d.pp===1 ? "one copy per card" : `${d.reps} copies of ${layoutName(d.L)}`) : `one copy, ${layoutName(d.L)}`);
@@ -3529,7 +3545,7 @@ function fleetFor(g, specs){
   }
   for(const m of ms) if(!m.fixed) withSpec(m.spec, ()=>{
     const gpus = m.tp*m.copies;
-    for(const tp of (S.tpo==="auto" ? TP_OPTIONS : [S.tpo]).filter(t=> t < m.tp)){
+    for(const tp of (S.tpo==="auto" ? TP_OPTIONS : [S.tpo]).filter(t=> t < m.tp && splitsHeads(activeModel(), t))){
       const d = evaluate(g, tp, gpus/tp);
       if(d.meets){ Object.assign(m, {tp, copies: gpus/tp, d}); break; }
     }
@@ -3767,6 +3783,7 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
         : reps>1
         ? `${On} ${mr.verb} room for only ${commas(mr.holds)} of your ${commas(all)} users after the weights, so this runs ${reps} copies. `
         : `${On} ${mr.verb} room for only ${commas(mr.holds)} of your ${commas(all)} users after the weights. Splitting the model across ${tp} GPUs frees enough for everyone, and ${tp===2 ? "both" : `all ${tp}`} serve every user together. `;
+      else if(S.tpo!=="auto") why += `${tp} GPUs per copy is fixed in Advanced settings; fewer would hold everyone. `;
     }
     if(forSpeed(active) && !active.partial){
       const lean = active.memOnly;
@@ -3795,9 +3812,12 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
     // a speed goal is met on the estimate only, so say how to make it sure
     if(hasGoal && active.meets) why = why.trimEnd() + ` Speed is an estimate: load-test before buying.`;
   } else {
-    lbl = "No single node fits";
-    main = S.tpo==="auto" ? "Too big for one 8-GPU node" : `No board holds a copy at TP ${tp}`;
-    sub += `<br>One copy of the model needs more than ${S.tpo==="auto" ? "8 GPUs" : `${tp} GPU${tp>1?"s":""}`}. Lower the precision or the prompt and reply lengths.`;
+    const heads = S.tpo!=="auto" && !splitsHeads(m, tp);   // a fixed split the engine refuses
+    lbl = heads ? "Can't split this way" : "No single node fits";
+    main = S.tpo==="auto" ? "Too big for one 8-GPU node" : heads ? `A copy can't run on ${tp} GPUs` : `No board holds a copy at TP ${tp}`;
+    sub += heads
+      ? `<br>The model's ${headsText(m, tp)} don't divide across ${tp} GPUs, so the engine can't split a copy ${tp} ways.`
+      : `<br>One copy of the model needs more than ${S.tpo==="auto" ? "8 GPUs" : `${tp} GPU${tp>1?"s":""}`}. Lower the precision or the prompt and reply lengths.`;
     acts = autoTp;
   }
   $('vlbl').textContent = lbl;
@@ -3827,7 +3847,7 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
       (g ? statCell("perGPU", "Per GPU", fmtMemN(perGB), `of ${boxMem(g)}`,
              fits ? `${Math.round(perGB/g.cap*100)}% full${active.gpus>1 ? ` · ${fmtMem(totGB*reps)} in all` : ""}`
                   : `${fmtMem(perGB - g.cap*USABLE)} over the usable ${fmtMem(g.cap*USABLE)}`, fits ? "" : "bad")
-         : statCell("perGPU", "Per GPU", fmtMemN(perGB), S.unit, `split ${tp} ways — more than any board holds`, "bad"))
+         : statCell("perGPU", "Per GPU", fmtMemN(perGB), S.unit, S.tpo!=="auto" && !splitsHeads(m, tp) ? `split ${tp} ways, which the engine can't run` : `split ${tp} ways — more than any board holds`, "bad"))
     + (speed ? statCell("tpsUser", "Speed per user", ...tpsSpan(speed.perUser),
                  (hasGoal ? tpsVsGoal(speed) : feelFor(speed.perUser)) + `<br>estimate ${fmtTpsShort(speed.perUser)} tok/s${extrapBadge(g)}` + between, slowTps ? "warn" : "")
              : statCell("tpsUser", "Speed per user", "—", "", na))
@@ -3923,7 +3943,8 @@ function renderCards(deps, active, suggested, picked){
                    : d.reps>1 ? `${On} ${mr.verb} room for only ${commas(mr.holds)} of your ${commas(all)} users after the weights, so this runs ${d.reps} copies${d.tp>1 ? ` of ${d.tp} GPUs` : ""}, each serving ~${commas(d.upr)} of them.`
                               : `${On} ${mr.verb} room for only ${commas(mr.holds)} of your ${commas(all)} users after the weights. Splitting the model across ${d.gpus} GPUs frees enough for everyone, and ${d.gpus===2 ? "both" : `all ${d.gpus}`} serve every user together.`;
     }
-    const why = d.tooWide ? (b.split && d.tp > b.split && d.tp <= nodeMax(b)
+    const why = d.badSplit ? `${activeModel().n}'s ${headsText(activeModel(), d.tp)} don't divide across ${d.tp} GPUs, so the engine can't split a copy ${d.tp} ways. Choose another number of GPUs per copy in Advanced settings.`
+        : d.tooWide ? (b.split && d.tp > b.split && d.tp <= nodeMax(b)
           ? `A copy split across ${d.tp} GPUs doesn't fit here: ${b.bridge ? `in the ${b.host.short} the ${b.bridge}` : "an NVLink bridge"} joins at most ${b.split} ${b.n} cards, so one copy spans at most ${b.split}. ${nodeMax(b)} cards run ${nodeMax(b)/b.split} copies instead${S.pipe ? "" : ", unless Pipeline across bridge groups is on"}.`
           : `A copy split across ${d.tp} GPUs doesn't fit here: this board's servers hold up to ${nodeMax(b)}.`)
         : !d.fits ? `The model needs ${fmtMem(d.perGB*d.tp)}, but ${d.tp} GPU${d.tp===1 ? "" : "s"} can use only ${fmtMem(b.cap*USABLE*d.tp)} (90% of capacity).${
@@ -3980,7 +4001,8 @@ function renderChunkOptions(d){
          + ` on ${d.tp} × ${d.g.n}${d.reps>1 ? `, ${commas(d.upr)} users per copy` : ""}.`)
     + (fresh<=512 ? `<br>All three are the same here: 512 new tokens or fewer are read in one piece either way.`
        : fresh<=2048 ? `<br>Balanced and Fast first reply are the same here: 2K new tokens or fewer are read in one piece either way.` : "")
-    + `<br>Engine setting: <code>max_num_batched_tokens = ${commas(S.chunk)}</code>`;
+    + (d ? `<br>Engine setting: <code>max_num_batched_tokens = ${commas(S.chunk + Math.ceil(d.upr/d.pp))}</code>`
+         + ` <small>(a ${commas(S.chunk)}-token prompt piece + 1 token for each of ${commas(Math.ceil(d.upr/d.pp))} running ${Math.ceil(d.upr/d.pp)===1 ? "reply" : "replies"})</small>` : "");
 }
 
 const BOTTLENECK = {
@@ -4039,7 +4061,8 @@ function renderThroughput(d){
 
   body.innerHTML = `
     <div class="statstrip">
-      ${statCell("tpsTotal", "Output, all users", fmtTps(t.total*copiesBusy(d)), "tok/s", `${perMin(t.rate*copiesBusy(d))} replies a minute`)}
+      ${statCell("tpsTotal", "Output, all users", fmtTps(t.total*copiesBusy(d)), "tok/s", `${perMin(t.rate*copiesBusy(d))} replies a minute`
+         + (S.thinking ? `<br>thinking included; ${fmtTps(t.per.reduce((s, x)=> s + x.rate*x.w.reply, 0)*copiesBusy(d))} tok/s of answers` : ""))}
       ${statCell("pause", "Pause while a prompt is read", paN, paU, pauseFeel + (many ? `, from a ${names[t.stall.i]} prompt` : ""))}
       ${statCell("prefill", "Prompt reading", fmtTps(t.prefillTps), "tok/s", `in pieces of ${commas(S.chunk)} tokens${many ? ` · ${names[t.slow.i]}` : ""}`)}
     </div>${load}${perWl}
@@ -4858,14 +4881,16 @@ tbtn.addEventListener('click', ()=>{
 /* ---------------- concurrent users from traffic ----------------
    Requests in progress = requests per second × seconds each takes (Little's law). A request takes the
    wait before its first token plus its thinking and reply streamed at the speed goal's rate: the
-   slowest the goal allows, so the estimate errs high. The busiest hour is a multiple of the average. */
+   slowest the goal allows, so the estimate errs high. With the thinking hidden, the goal's answer wait
+   also sets a speed: the thinking must stream within it. The busiest hour is a multiple of the average. */
 function trafficEstimate(){
   const T = S.traffic, goal = GOALS[S.goal];
-  const tps = goal.tps || 20, start = Number.isFinite(goal.ttft) ? goal.ttft : 2;
+  const think = hideThink() && Number.isFinite(goal.ans) ? Math.ceil(S.thinking / goal.ans) : 0;   // the speed the answer wait needs
+  const tps = Math.max(goal.tps || 20, think), start = Number.isFinite(goal.ttft) ? goal.ttft : 2;
   const perSec = T.people * T.req / (T.hours * 3600);
   const secs = start + (S.thinking + S.reply) / tps;
   const avg = perSec * secs;
-  return {perSec, secs, tps, start, avg, users: Math.min(USERS_MAX, Math.max(1, Math.ceil(avg * T.peak)))};
+  return {perSec, secs, tps, start, avg, byAnswer: think > (goal.tps || 20), users: Math.min(USERS_MAX, Math.max(1, Math.ceil(avg * T.peak)))};
 }
 const trafficInUse = () => !!S.trafficApplied && S.trafficApplied.users===S.users;
 const fmtRate  = x => x>=10 ? commas(Math.round(x)) : x>=1 ? x.toFixed(1) : x.toFixed(2);
@@ -4877,7 +4902,7 @@ function renderTraffic(){
   $('tfOut').innerHTML = `<span class="tf-num">≈ ${commas(e.users)}</span><span>concurrent ${mixed() ? `${groupNames()[0]} ` : ""}users in the busiest hour</span>`
     + `<button type="button" class="btn-sm" id="tfUse"${using ? " disabled" : ""}>${using ? "In use" : `Use ${commas(e.users)}`}</button>`
     + `<div class="hint">${commas(Math.round(T.people*T.req))} requests a day over ${T.hours} hour${T.hours===1 ? "" : "s"} is ${fmtRate(e.perSec)} a second. `
-    + `Each takes about ${fmtWait(e.secs)}: ${gen} at ${e.tps} tok/s ${goal.tps ? "(your speed goal)" : "(a typical chat speed)"}, plus up to ${e.start} s before it starts. `
+    + `Each takes about ${fmtWait(e.secs)}: ${gen} at ${e.tps} tok/s ${e.byAnswer ? `(what thinking needs to end within your ${goal.ans} s answer wait)` : goal.tps ? "(your speed goal)" : "(a typical chat speed)"}, plus up to ${e.start} s before it starts. `
     + `That's ${fmtCount(e.avg)} at once on average${T.peak>1 ? `, ${T.peak}× that in the busiest hour` : ""}.</div>`;
 }
 function syncTrafficInputs(){
