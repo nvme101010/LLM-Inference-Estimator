@@ -2794,6 +2794,8 @@ function layoutCapacity(b, L, upTo, memOnly){
   return lo;
 }
 const ROOM_MAX = 100000;   // capacity is counted up to this many users
+/* between two options that serve no one within the goal, the one closer to it first (0 otherwise) */
+const nearer = (a, c) => a.served || c.served ? 0 : goalGap(a.t) - goalGap(c.t);
 /* Every option on one configuration: each layout, at each number of copies the server holds (rounded to
    counts it is bought in), with its users spread evenly over the copies. room = users it serves within
    the goal, memRoom = users whose caches it holds at all. */
@@ -2817,11 +2819,13 @@ function configFor(sv, x){
     }
   }
   /* best: meets the goal for everyone, not split over PCIe, fewest cards, copies over width, then faster;
-     else the option that serves the most within the goal */
+     else the option that serves the most within the goal, and when none serves anyone within it, the one
+     that comes closest to it (as the GPU view's closest): one user on 8 copies of TP 1 is no nearer the goal
+     than on 1 copy of TP 8, and the wider copy is far faster */
   const okOf = d => d.meets && !d.partial;
   const best = opts.slice().sort((a, c)=> (+okOf(c) - +okOf(a)) || (okOf(a)
       ? (+a.nr - +c.nr) || a.gpus - c.gpus || a.L.n - c.L.n || c.t.perUser - a.t.perUser
-      : (c.served - a.served) || (+a.nr - +c.nr) || a.gpus - c.gpus))[0] || null;
+      : (c.served - a.served) || (+a.nr - +c.nr) || nearer(a, c) || a.gpus - c.gpus))[0] || null;
   return {sv, x, b, opts, best, fits: !!best, usable: max*b.cap*USABLE, max,
           ok: !!best && best.meets && !best.partial, id: `${sv.id}|${x.board}`};
 }
@@ -2858,7 +2862,7 @@ const leanOrder = (a, c)=> (+a.best.nr - +c.best.nr) || a.best.memGB - c.best.me
                        || a.best.L.n - c.best.L.n || c.best.t.perUser - a.best.t.perUser || c.best.room - a.best.room || rackU(a) - rackU(c);
 /* the recommendation among configurations that hold the model (the GPU view's hostFor uses it too) */
 const serverRec = fits => fits.filter(c=> c.ok).sort(leanOrder)[0]
-  || fits.slice().sort((a, c)=> (+a.best.nr - +c.best.nr) || c.best.served - a.best.served || leanOrder(a, c))[0] || null;
+  || fits.slice().sort((a, c)=> (+a.best.nr - +c.best.nr) || c.best.served - a.best.served || nearer(a.best, c.best) || leanOrder(a, c))[0] || null;
 function serverAnswer(cfgs){
   const inScope = cfgs.filter(c=> S.scope.has(c.sv.id)), fits = inScope.filter(c=> c.fits);
   const ok = fits.filter(c=> c.ok);
@@ -2938,7 +2942,7 @@ function statsHtml(d){
            S.goal!=="any" && answerHigh(t) > g.ans ? "warn" : "")
        : statCell("ttft", "First token", ...timeSpan(t.ttft), `estimate ${fmtTime(t.ttft).join(" ")}${S.goal!=="any" ? ` · goal under ${g.ttft} s` : ""}`
            + (S.thinking ? `<br>answer after ${fmtWait(answerStart(t))} of thinking users see` : "")))
-    + statCell("capacity", "Room for", commas(d.room), d.room===1 ? "user" : "users", d.room < all ? `of your ${commas(all)}: below the goal past that` : `you have ${commas(all)}`, d.room < all ? "warn" : "")
+    + statCell("capacity", "Room for", commas(d.room), d.room===1 ? "user" : "users", d.room < all ? (d.room ? `of your ${commas(all)}: below the goal past that` : `of your ${commas(all)}: none within the goal`) : `you have ${commas(all)}`, d.room < all ? "warn" : "")
     + statCell("srvGpu", "GPU memory", boxTotal(d.memGB).split(" ")[0], S.unit, `${fmtMem(d.perGB)} used of ${boxMem(d.g)} per card`)
     + `</div>`;
 }
