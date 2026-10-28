@@ -888,6 +888,14 @@
           </div>
           <div class="hint">How the Servers view builds each server's memory from its own DIMMs, at least 2 × GPU memory: the fewest GB, one DIMM per channel, or every channel filled.</div>
         </div>
+        <div>
+          <p class="eyebrow">Wording <span class="i" data-tip="words" tabindex="0">i</span></p>
+          <div class="seg" id="words" role="group" aria-label="Wording of the explanations">
+            <button data-v="plain" aria-pressed="true">Plain</button>
+            <button data-v="tech" aria-pressed="false">Technical</button>
+          </div>
+          <div class="hint">How the tooltips and the server's notes are worded. Plain uses everyday words; Technical uses engineering terms. The figures don't change.</div>
+        </div>
       </div>
     </details>
 
@@ -2020,9 +2028,9 @@ const meetsGoal = t => tpsLow(t) >= GOALS[S.goal].tps && waitHigh(t) <= waitLimi
 /* how far a setup is from the goal, on whichever side is worse: 1 or less means it's met */
 const goalGap = t => Math.max(GOALS[S.goal].tps / tpsLow(t), waitHigh(t) / waitLimit());
 /* a figure against the goal, in words: short of it outright, or only at the cautious end */
-const tpsVsGoal  = t => { const g = GOALS[S.goal].tps;  return t.perUser < g ? `below the ${g}+ goal` : tpsLow(t) < g ? `below the ${g}+ goal at the low end` : `meets the ${g}+ goal`; };
-const ttftVsGoal = t => { const g = GOALS[S.goal].ttft; return t.ttft > g ? `over the ${g} s goal` : ttftHigh(t) > g ? `over the ${g} s goal at the slow end` : `within the ${g} s goal`; };
-const answerVsGoal = t => { const g = GOALS[S.goal].ans; return answerStart(t) > g ? `over the ${g} s goal` : answerHigh(t) > g ? `over the ${g} s goal at the slow end` : `within the ${g} s goal`; };
+const tpsVsGoal  = t => { const g = GOALS[S.goal].tps;  return t.perUser < g ? `below the ${g}+ goal` : tpsLow(t) < g ? `below the ${g}+ goal ${say("on the cautious side", "at the low end")}` : `meets the ${g}+ goal`; };
+const ttftVsGoal = t => { const g = GOALS[S.goal].ttft; return t.ttft > g ? `over the ${g} s goal` : ttftHigh(t) > g ? `over the ${g} s goal ${say("on the cautious side", "at the slow end")}` : `within the ${g} s goal`; };
+const answerVsGoal = t => { const g = GOALS[S.goal].ans; return answerStart(t) > g ? `over the ${g} s goal` : answerHigh(t) > g ? `over the ${g} s goal ${say("on the cautious side", "at the slow end")}` : `within the ${g} s goal`; };
 /* a wait of seconds to minutes, as a figure and its unit, and the likely range of the answer's start */
 const waitParts = s => s >= 90 ? [(s/60).toFixed(1), "min"] : s >= 10 ? [String(Math.round(s)), "s"] : [s.toFixed(1), "s"];
 const likelyAnswer = t => { const lo = t.ttft*RANGE.ttft[0] + S.thinking/(t.perUser*RANGE.speed[1]), hi = answerHigh(t);
@@ -2082,6 +2090,11 @@ function promptParts(w = S){             // w = a workload: the first one (S) or
 /* memory units are display only; the viewer's choice is remembered in this browser */
 const UNIT_KEY = "vram-sizer-unit";   // kept from the tool's old name so saved choices carry over
 function loadUnit(){ try { return localStorage.getItem(UNIT_KEY)==="GiB" ? "GiB" : "GB"; } catch(e) { return "GB"; } }
+/* the wording of the tooltips and the server's notes: plain English (the default) or technical; display only,
+   remembered in this browser, and carried in a shared link when technical */
+const WORDS_KEY = "estimator-words";
+function loadWords(){ try { return localStorage.getItem(WORDS_KEY)==="tech" ? "tech" : "plain"; } catch(e) { return "plain"; } }
+const say = (plain, tech) => S.words==="plain" ? plain : tech;
 
 
 /* ---------------- state ---------------- */
@@ -2111,7 +2124,7 @@ const S = { wq:2, wqLbl:"NATIVE", kq:2, tp:1, pp:1, tpo:"auto", pipe:0, chunk:51
             extra:[],          // workloads added to the first: {workload, users, prompt, reply, wantPrompt, wantReply, shared, fresh}
             custom:{c_params:7, c_layers:32, c_hidden:4096, c_kv:8, c_hd:128, c_ctx:32},   // the custom model's fields as typed (customNum clamps them)
             models:[], edit:0, // each model's settings (specs, see below) and which one the controls show
-            unit:loadUnit() };
+            unit:loadUnit(), words:loadWords() };
 let M = findModel("l31-8b");
 let LAST = null;   // what the last render showed, for the downloadable summary
 
@@ -2831,11 +2844,19 @@ function wiringText(c, d){
     return `${["one", "two", "three", "four"][n-1] || n} ${w}-way NVLink group${n===1 ? "" : "s"} (${n>1 ? `${n} × ` : ""}${c.x.link.kit})`; }
   return k==="nvswitch" ? "NVSwitch" : k==="fabric" ? "Infinity Fabric, one link per pair" : "PCIe only, no GPU-to-GPU link";
 }
+/* the same in everyday words, for Plain wording */
+function wiringPlain(c, d){
+  const k = linkKind(c.x);
+  if(k==="bridge"){ const n = groupsUsed(c, d), w = c.x.link.bridge;
+    return `linked in ${n===1 ? "one group" : `${n} groups`} of ${w} by NVLink bridges (${n>1 ? `${n} × ` : ""}${c.x.link.kit})`; }
+  return k==="nvswitch" ? "all linked to each other through NVSwitch" : k==="fabric" ? "each linked directly to every other (Infinity Fabric)" : "no fast direct link between the GPUs";
+}
 const wiringShort = c => { const k = linkKind(c.x);
   return k==="bridge" ? `${c.x.link.bridge}-way NVLink` : k==="nvswitch" ? "NVSwitch" : k==="fabric" ? "Infinity Fabric" : "PCIe only"; };
 const layoutLine = d => d.reps>1 ? `${d.reps} copies × ${layoutName(d.L)}` : `1 copy · ${layoutName(d.L)}`;
 /* what the speed figure rests on: a board with no benchmark of its own, a pipeline, a split over PCIe */
-const speedBasis = d => [d.g.bench ? "" : "extrapolated", d.modeled ? "pipeline modeled" : "", d.nr ? "split over PCIe" : ""].filter(Boolean);
+const speedBasis = d => [d.g.bench ? "" : say("estimated from specs", "extrapolated"), d.modeled ? say("staged split, untested", "pipeline modeled") : "",
+                         d.nr ? say("split over a slow link", "split over PCIe") : ""].filter(Boolean);
 const flagPills = d => (d.nr ? ` <span class="pill bad">split over PCIe</span>` : "")
   + (d.modeled ? ` <span class="pill neutral" data-tip="svModeled" tabindex="0">pipeline modeled</span>` : "");
 const star = d => d.g.bench ? "" : `<span class="tipl" data-tip="extrap" tabindex="0">*</span>`;
@@ -2863,7 +2884,7 @@ function statsHtml(d){
            `after ${fmtWait(S.thinking/t.perUser)} of thinking users don't see · ${likelyAnswer(t)}${S.goal!=="any" ? ` · goal within ${g.ans} s` : ""}`,
            S.goal!=="any" && answerHigh(t) > g.ans ? "warn" : "")
        : statCell("ttft", "First token", fmtTime(t.ttft)[0], fmtTime(t.ttft)[1], `${likelyTime(t.ttft)}${S.goal!=="any" ? ` · goal under ${g.ttft} s` : ""}`))
-    + statCell("capacity", "Room for", commas(d.room), d.room===1 ? "user" : "users", d.room < all ? `of your ${commas(all)}: below the goal past that` : `you have ${commas(all)}${d.memRoom > d.room ? ` · cache holds ${commas(d.memRoom)}` : ""}`, d.room < all ? "warn" : "")
+    + statCell("capacity", "Room for", commas(d.room), d.room===1 ? "user" : "users", d.room < all ? `of your ${commas(all)}: below the goal past that` : `you have ${commas(all)}${d.memRoom > d.room ? ` · ${say("memory fits", "cache holds")} ${commas(d.memRoom)}` : ""}`, d.room < all ? "warn" : "")
     + statCell("srvGpu", "GPU memory", boxTotal(d.memGB).split(" ")[0], S.unit, `${fmtMem(d.perGB)} used of ${boxMem(d.g)} per card`)
     + `</div>`;
 }
@@ -2874,7 +2895,7 @@ function statsHtml(d){
    split evenly across the sockets. short: even the CPUs the server takes can't give the cores. */
 function cpusFor(sv, d, cores){
   const max = sv.maxCores || Infinity, cap = `one CPU here has at most ${max} cores (${esc(sv.coreNote || "")})`;
-  const one = "One CPU keeps the GPUs and memory on one NUMA node";
+  const one = say("One CPU is enough, and keeps the GPUs and their memory close together", "One CPU keeps the GPUs and memory on one NUMA node");
   if(sv.sockets < 2) return cores <= max ? {n: 1, why: one}
                                          : {n: 1, short: true, why: `Needs ${cores} cores, but ${cap}: fewer cores per GPU, or another server`};
   const reach = sv.cpu1 ? (sv.cpu1[d.g.n] ?? sv.cpu1["*"]) : Infinity;
@@ -2896,6 +2917,7 @@ function cpusFor(sv, d, cores){
         minimum; two per channel only when one can't.
    two: channels holding a second DIMM, which slows the memory. null: the server can't hold that much. */
 const MEM_NAME = ["least memory", "one DIMM per channel", "every channel"];
+const MEM_NAME_PLAIN = ["least memory", "one module per channel", "every channel"];
 function memFor(sv, cpus, minGB, mode = S.mem){
   const m = sv.mem;
   if(!m) return null;
@@ -2919,12 +2941,16 @@ function memFor(sv, cpus, minGB, mode = S.mem){
 /* the Memory row's lines for memFor's pick: the modules, how many channels they fill, and the setting it was sized
    for; flagged when channels are left empty or hold two DIMMs */
 function memLines(mm, cpus, minGB){
-  const each = cpus===2 ? " on each CPU" : "", mods = `${mm.dimms} × ${mm.gb} GB` + (cpus===2 ? `, ${mm.k} per CPU` : "");
-  const floor = `NVIDIA's minimum is 2 × GPU memory, ${commas(Math.ceil(minGB))} GB · sized for ${MEM_NAME[S.mem]} (System memory, in Advanced settings)`;
-  if(mm.two) return {sub: `${mods} · every channel${each} populated, ${mm.two} with two DIMMs, so memory runs at the slower two-per-channel speed`, extra: floor, flag: true};
-  if(mm.ch === mm.of) return {sub: `${mods} · every channel${each} populated`, extra: floor, flag: false};
-  return {sub: `${mods} · ${mm.ch} of ${mm.of} memory channels${each} populated, so about ${Math.round(100*mm.ch/mm.of)}% of the CPU's memory bandwidth`,
-          extra: `${floor}. Fill more channels if the CPU offloads KV cache or does heavy work of its own`, flag: true};
+  const each = cpus===2 ? " on each CPU" : "", mods = say(`${mm.dimms} memory modules of ${mm.gb} GB`, `${mm.dimms} × ${mm.gb} GB`) + (cpus===2 ? `, ${mm.k} per CPU` : "");
+  const floor = say(`NVIDIA's minimum is twice the GPU memory, ${commas(Math.ceil(minGB))} GB · sized for ${MEM_NAME_PLAIN[S.mem]} (System memory, in Advanced settings)`,
+                    `NVIDIA's minimum is 2 × GPU memory, ${commas(Math.ceil(minGB))} GB · sized for ${MEM_NAME[S.mem]} (System memory, in Advanced settings)`);
+  if(mm.two) return {sub: say(`${mods} · every memory channel${each} used, ${mm.two} with two modules, which makes the memory a little slower`,
+                              `${mods} · every channel${each} populated, ${mm.two} with two DIMMs, so memory runs at the slower two-per-channel speed`), extra: floor, flag: true};
+  if(mm.ch === mm.of) return {sub: say(`${mods} · every memory channel${each} used, for full memory speed`, `${mods} · every channel${each} populated`), extra: floor, flag: false};
+  return {sub: say(`${mods} · ${mm.ch} of ${mm.of} memory channels${each} used, so memory runs at about ${Math.round(100*mm.ch/mm.of)}% of full speed`,
+                   `${mods} · ${mm.ch} of ${mm.of} memory channels${each} populated, so about ${Math.round(100*mm.ch/mm.of)}% of the CPU's memory bandwidth`),
+          extra: say(`${floor}. Use more channels if the server will do heavy work of its own`,
+                     `${floor}. Fill more channels if the CPU offloads KV cache or does heavy work of its own`), flag: true};
 }
 /* the build's Cooling row: air-cooled, or direct liquid cooling, flagged when that is the only way HPE builds the
    configuration, with the servers that run the same GPUs air-cooled */
@@ -2947,10 +2973,11 @@ function bomRows(c, g, n, parts, pills = "", extra = []){
   const k = linkKind(x), more = n < c.max ? `the server takes up to ${c.max}` : `the most this server takes`;
   row("Chassis", esc(sv.short), esc(formOf(c)));
   coolRow(c, row);
-  row("GPUs", `${n} × ${esc(g.n)}${pills}`, n>1 ? `${esc(wiringText(c, d))} · ${more}` : `${k==="pcie" ? `PCIe Gen${g.slot} x16 · ` : ""}${more}`);
+  row("GPUs", `${n} × ${esc(g.n)}${pills}`, n>1 ? `${esc(say(wiringPlain(c, d), wiringText(c, d)))} · ${more}`
+                                                 : `${k==="pcie" ? say(`in a full-speed PCIe Gen${g.slot} slot · `, `PCIe Gen${g.slot} x16 · `) : ""}${more}`);
   for(const [lbl, v, sub] of extra) row(lbl, v, sub);
   if(k==="bridge" && n>1){ const groups = groupsUsed(c, d);
-    row("NVLink", `${groups} × ${esc(x.link.kit)}`, `${x.link.bridge}-way NVLink bridge${groups===1 ? "" : "s"}`); }
+    row("NVLink", `${groups} × ${esc(x.link.kit)}`, say(`bridge${groups===1 ? "" : "s"} joining ${x.link.bridge} cards each`, `${x.link.bridge}-way NVLink bridge${groups===1 ? "" : "s"}`)); }
   if(x.unconfirmed) row("Card count", "To confirm", esc(x.unconfirmed), true);
   if(systemOf(g)){ row("Platform", "Comes with the system", `CPUs, memory and storage: ${esc(sv.cpu)}`); }
   else {
@@ -2960,12 +2987,15 @@ function bomRows(c, g, n, parts, pills = "", extra = []){
     const tally = cp.n===2 ? `${commas(sr.cores)} physical cores in total · ${per} per GPU${why}` : `${per} physical cores per GPU${why}`;
     row(cp.n===2 ? "CPUs" : "CPU", value, `${tally}</span><span>${cp.why}`, cp.short);
     const mm = memFor(sv, cp.n, sr.ram);
-    if(!sv.mem) row("Memory", `${commas(Math.ceil(sr.ram))} GB`, `2 × GPU memory`);
-    else if(!mm) row("Memory", `${commas(Math.ceil(sr.ram))} GB`, `2 × GPU memory, more than ${cp.n===2 ? "two CPUs" : "one CPU"} here can hold`, true);
+    const twice = say("twice the GPU memory", "2 × GPU memory");
+    if(!sv.mem) row("Memory", `${commas(Math.ceil(sr.ram))} GB`, twice);
+    else if(!mm) row("Memory", `${commas(Math.ceil(sr.ram))} GB`, `${twice}, more than ${cp.n===2 ? "two CPUs" : "one CPU"} here can hold`, true);
     else { const ml = memLines(mm, cp.n, sr.ram); row("Memory", `${commas(mm.total)} GB`, `${ml.sub}</span><span>${ml.extra}`, ml.flag); }
-    row("Storage", `${capParts(sr.diskGB).join(" ")} NVMe`, `Required usable capacity: 2 × ${parts.length>1 ? "each model's" : "model"} weights + 100 GB for container images, compile caches and the engine's own logs</span><span>Doesn't include boot storage, kept records of prompts and replies, or KV cache offload`);
+    row("Storage", `${capParts(sr.diskGB).join(" ")} NVMe`, say(
+      `Room for two copies of ${parts.length>1 ? "each model" : "the model"} (the one running and the next update) + 100 GB for the serving software, its saved setup files and its logs</span><span>Plus a separate drive for the operating system, and room for any saved conversations`,
+      `Required usable capacity: 2 × ${parts.length>1 ? "each model's" : "model"} weights + 100 GB for container images, compile caches and the engine's own logs</span><span>Doesn't include boot storage, kept records of prompts and replies, or KV cache offload`));
   }
-  row("Power", "Size in HPE Power Advisor", "PSUs and redundancy for this load", true);
+  row("Power", "Size in HPE Power Advisor", say("Power supplies, and spares in case one fails, for this load", "PSUs and redundancy for this load"), true);
   return `<dl class="bom">${rows.join("")}</dl>`;
 }
 /* the sentence under a configuration: how its copy is laid out, and what's left in the server */
@@ -3052,7 +3082,7 @@ function configCard(c, eyebrow, cmp, back = ""){
     + ((c.x.constraints || []).length || (sv.notes || []).length ? `<div class="bom-notes"><span class="sublbl">Before you quote</span><ul class="svnotes">${[...(c.x.constraints || []), ...(sv.notes || [])].map(t=> `<li>${esc(t)}</li>`).join("")}</ul></div>` : "")
     + `</section>`
     + `<section class="rec-col"><h3 class="colh">Performance</h3>${statsHtml(d)}`
-    + (extrap ? `<p class="cap">Speeds are extrapolated: the ${esc(d.g.n.replace(" Blackwell", ""))} has no published benchmark here <span class="i" data-tip="extrap" tabindex="0">i</span>. Load-test before quoting them.</p>` : "")
+    + (extrap ? `<p class="cap">${say("Speeds are estimated from the spec sheet", "Speeds are extrapolated")}: the ${esc(d.g.n.replace(" Blackwell", ""))} has no published benchmark here <span class="i" data-tip="extrap" tabindex="0">i</span>. Load-test before quoting them.</p>` : "")
     + (warmParts().length ? `<p class="cap">${cacheNote(warmParts())}</p>` : "")
     + (grow ? `<p class="rec-grow">Room to grow: ${growText(grow)} in this server serve up to ${commas(grow.room)} users.</p>` : "")
     + `<h3 class="colh">Layout</h3><p class="rec-why">${layoutWhy(c, d)}</p>`
@@ -3209,7 +3239,7 @@ function fleetCard(c, eyebrow, cmp, back = ""){
       + `<br><span class="cap">${layoutText(d)} · ${plural(m.users, "user")}</span></th>`
       + `<td class="num">${d.gpus}</td><td class="num">${t ? `${fmtTps(t.perUser)} tok/s${star(d)}` : "—"}</td><td class="num ft">${t ? fmtTime(t.ttft).join(" ") : "—"}</td><td>${st}</td></tr>`;
   }).join("");
-  const extrap = f.g.bench ? "" : `<p class="cap">Speeds are extrapolated: the ${esc(f.g.n.replace(" Blackwell", ""))} has no published benchmark here <span class="i" data-tip="extrap" tabindex="0">i</span>. Load-test before quoting them.</p>`;
+  const extrap = f.g.bench ? "" : `<p class="cap">${say("Speeds are estimated from the spec sheet", "Speeds are extrapolated")}: the ${esc(f.g.n.replace(" Blackwell", ""))} has no published benchmark here <span class="i" data-tip="extrap" tabindex="0">i</span>. Load-test before quoting them.</p>`;
   const warm = f.models.flatMap(m=> withSpec(m.spec, warmParts).map(([n, ...p])=> [`${specName(m.spec)} ${n}`, ...p]));
   return `<div class="rec-head">${eyebrow}<h2 class="rec-name">${many ? `${k} × ` : ""}${hostLink(HPE_HOSTS.find(h=> h.id===sv.id))}</h2>`
     + `<p class="rec-spec">${all} models, ${plural(S.models.reduce((n, x)=> n + specUsers(x), 0), "user")} in all · ${f.gpus} × ${esc(f.g.n)}, ${boxTotal(f.memGB)} of GPU memory${many ? ` · ${fleetRackText(c)}` : ""}</p></div>`
@@ -3402,7 +3432,7 @@ function serverRows(s){
   const g = s.g, [diskN, diskU] = capParts(s.diskGB);
   return [
     {tip:"srvGpu", k:"GPUs", n:String(s.n), unit:`× ${g.n}`,
-     sub:`${s.perSocket} per socket · PCIe Gen${g.slot} x16${s.pcieSwitch ? " · PCIe switches" : ""}`},
+     sub:say(`${s.perSocket} per processor, each in a full-speed slot`, `${s.perSocket} per socket · PCIe Gen${g.slot} x16${s.pcieSwitch ? " · PCIe switches" : ""}`)},
     {tip:"srvCpu", k:"CPU cores", n:commas(s.cores), unit:"physical",
      sub:`2 × ${commas(s.cores/GUIDE.sockets)}-core CPUs · ${GUIDE.ghz.toFixed(1)} GHz base or more`},
     {tip:"srvRam", k:"Recommended minimum system memory", n:commas(s.ram), unit:"GB",
@@ -3513,9 +3543,10 @@ const warmParts = () => !S.cache ? [] : groups().map((w, i)=> [groupNames()[i], 
   .filter(([, , p])=> p.shared > 0).map(([n, P, p])=> [n, P, p.fresh]);
 function cacheNote(parts){
   if(!parts.length) return "";
-  const each = parts.map(([n, P, fresh])=> `${commas(fresh)} of each ${commas(P)}-token ${esc(n)} prompt`);
-  return `Assumes a warm prompt cache: only ${each.length>1 ? `${each.slice(0, -1).join(", ")} and ${each[each.length-1]}` : each[0]}`
-    + ` ${parts.length>1 ? "are" : "is"} read before the first reply, the rest reused. Prompts not yet in the cache take longer: turn Prompt caching off in Advanced settings to size for them. `;
+  const each = parts.map(([n, P, fresh])=> `${commas(fresh)} token${fresh===1 ? "" : "s"} of each ${commas(P)}-token ${esc(n)} prompt`),
+        list = each.length>1 ? `${each.slice(0, -1).join(", ")} and ${each[each.length-1]}` : each[0], are = parts.length>1 || parts[0][2]!==1 ? "are" : "is";
+  return say(`This assumes repeated text is remembered, so the model reads only ${list} before replying. For prompts that never repeat, turn off Prompt caching in Advanced settings. `,
+             `This assumes a warm prompt cache: only ${list} ${are} read before the first reply. For prompts that never repeat, turn off Prompt caching in Advanced settings. `);
 }
 /* a speed that falls short of the goal, shown with a decimal when rounding would make it read as the goal itself */
 const fmtTpsShort = x => { const goal = GOALS[S.goal].tps; return x < goal && fmtTps(x)===fmtTps(goal) ? (Math.floor(x*10)/10).toFixed(1) : fmtTps(x); };
@@ -3529,7 +3560,7 @@ const likelyTime = s => { const lo = s*RANGE.ttft[0], hi = s*RANGE.ttft[1], d = 
 
 /* a board with no benchmark of its own: its speed and first token apply shares fitted on other boards */
 const VALIDATION_URL = "https://github.com/nvme101010/LLM-Inference-Estimator/blob/main/validation/README.md";
-const extrapBadge = g => g && !g.bench ? `<span class="pill neutral est" data-tip="extrap" tabindex="0">extrapolated</span>` : "";
+const extrapBadge = g => g && !g.bench ? `<span class="pill neutral est" data-tip="extrap" tabindex="0">${say("estimated from specs", "extrapolated")}</span>` : "";
 /* ---------------- render ---------------- */
 const $ = id => document.getElementById(id);
 const LAYER_LABEL = {
@@ -3758,8 +3789,8 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
     ? `${names[speed.slow.i]}, the slowest to start · ${speed.per.filter(x=> x!==speed.slow).map(x=> `${names[x.i]}: ${wlWait(x)}`).join(" · ")}<br>` : "";
   /* both figures are averages while new prompts keep arriving; say what that costs when it's noticeable:
      the speed between prompt reads, and the part of the first token spent waiting for other prompts */
-  const between = speed && speed.between > speed.perUser*1.05 ? `<br>${fmtTps(speed.between)} tok/s between prompt reads` : "";
-  const queued  = speed && speed.wait >= 0.01 && speed.wait >= speed.ttft*0.05 ? `${fmtTime(speed.wait).join(" ")} of it waiting for other prompts<br>` : "";
+  const between = speed && speed.between > speed.perUser*1.05 ? `<br>${fmtTps(speed.between)} tok/s ${say("while no new question is being read", "between prompt reads")}` : "";
+  const queued  = speed && speed.wait >= 0.01 && speed.wait >= speed.ttft*0.05 ? `${fmtTime(speed.wait).join(" ")} of it waiting for other ${say("questions", "prompts")}<br>` : "";
   $('vstats').innerHTML =
       (g ? statCell("perGPU", "Per GPU", fmtMemN(perGB), `of ${boxMem(g)}`,
              fits ? `${Math.round(perGB/g.cap*100)}% full${active.gpus>1 ? ` · ${fmtMem(totGB*reps)} in all` : ""}`
@@ -3776,7 +3807,7 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
                  slowWait ? "warn" : "")
        : statCell("ttft", "First token", ...fmtTime(speed.ttft),
                  (answerAt !== null ? `<div class="n2">answer after ${fmtWait(answerAt)} <small>of thinking users see</small></div>` : "")
-                 + perWl + queued + (hasGoal ? ttftVsGoal(speed) : `${commas(speed.prompt)} new prompt tokens`) + `<br>${likelyTime(speed.ttft)}${extrapBadge(g)}`,
+                 + perWl + queued + (hasGoal ? ttftVsGoal(speed) : `${commas(speed.prompt)} ${say("new tokens to read", "new prompt tokens")}`) + `<br>${likelyTime(speed.ttft)}${extrapBadge(g)}`,
                  slowWait ? "warn" : ""));
 }
 
@@ -3812,7 +3843,7 @@ function renderServer(d){
     return null;
   }
   const s = serverFor(d), g = d.g;
-  TIPS.srvDisk = srvDiskTip(s.fixed ? null : capParts(s.kvOffGB).join(" "));
+  TIPS.srvDisk = srvDiskTip(s.fixed ? null : capParts(s.kvOffGB).join(" ")); TIPS_PLAIN.srvDisk = srvDiskPlain(s.fixed ? null : capParts(s.kvOffGB).join(" "));
   if(s.fixed){
     cap.innerHTML = `Around <b>${deployName(d)}</b>${g.host ? ` in an ${hostLink(g.host)}, as one example` : ""}.`;
     body.innerHTML = `<div class="empty">The ${g.n} is a whole ${s.n}-GPU system: its CPUs, memory and storage come from ${g.host ? `the ${hostLink(g.host)} spec sheet (${g.hostSpec})` : "the manufacturer's spec sheet"}.</div>`;
@@ -3964,11 +3995,15 @@ function renderThroughput(d){
      average speed against the speed between reads, and the wait before a prompt starts to be read */
   const copy = d.reps>1 ? `Each copy's ${commas(d.upr)} users` : `The ${commas(all)} user${all===1 ? "" : "s"}`;
   const secs = t.rate > 0 ? d.upr / t.rate : 0;                         // how long a request lasts, by Little's law
-  const load = `<div class="hint load">${copy} send about ${fmtRate(t.rate)} requests a second, each lasting about ${fmtWait(secs)}. `
-    + `Reading their new prompt tokens keeps the engine busy <b>${Math.round(t.busy*100)}%</b> of the time, so replies stream at <b>${fmtTps(t.perUser)} tok/s</b> on average`
-    + (t.between > t.perUser*1.005 ? ` (${fmtTps(t.between)} tok/s between prompt reads)` : "")
-    + `, and a new request waits about ${fmtTime(t.wait).join(" ")} for prompts ahead of it before its own is read. `
-    + `This assumes each user sends a new request as soon as the last is answered, at random moments.</div>`;
+  const load = `<div class="hint load">${copy} send about ${fmtRate(t.rate)} requests a second, each lasting about ${fmtWait(secs)}. ` + say(
+      `Reading the new text in them keeps the GPUs busy <b>${Math.round(t.busy*100)}%</b> of the time, so answers appear at <b>${fmtTps(t.perUser)} tok/s</b> on average`
+      + (t.between > t.perUser*1.005 ? ` (${fmtTps(t.between)} tok/s while no new question is being read)` : "")
+      + `, and a new request waits about ${fmtTime(t.wait).join(" ")} for the questions ahead of it before its own is read. `
+      + `This assumes each user asks again as soon as they get an answer.</div>`,
+      `Reading their new prompt tokens keeps the engine busy <b>${Math.round(t.busy*100)}%</b> of the time, so replies stream at <b>${fmtTps(t.perUser)} tok/s</b> on average`
+      + (t.between > t.perUser*1.005 ? ` (${fmtTps(t.between)} tok/s between prompt reads)` : "")
+      + `, and a new request waits about ${fmtTime(t.wait).join(" ")} for prompts ahead of it before its own is read. `
+      + `This assumes each user sends a new request as soon as the last is answered, at random moments.</div>`);
 
   body.innerHTML = `
     <div class="statstrip">
@@ -4151,7 +4186,7 @@ function renderAdvState(){
   const changed = [S.kq!==2, S.tpo!=="auto", S.pipe, S.chunk!==S.chunkBase, S.ovpct!==7, !S.cache, S.srv, S.mem!==1].filter(Boolean).length;
   const many = S.models.length > 1;   // with several models, say which settings are the shown model's and which every model's
   $('advState').innerHTML = (changed ? `<b>${changed} changed</b> · ` : "") + (many ? `${esc(specName(S.models[S.edit]))}: ` : "")
-    + `KV ${kqLabel()} · TP ${S.tpo==="auto" ? "auto" : S.tpo}${S.pipe ? " · pipeline across bridges" : ""} · ${CHUNK_NAME[S.chunk]} · ${many ? "all models: " : ""}${S.ovpct}% overhead · prompt caching ${S.cache ? "on" : "off"}`
+    + `KV ${kqLabel()} · TP ${S.tpo==="auto" ? "auto" : S.tpo}${S.pipe ? " · pipeline across bridges" : ""} · ${CHUNK_NAME[S.chunk]} · ${many ? "all models: " : ""}${S.ovpct}% overhead · prompt caching ${S.cache ? "on" : "off"}${S.words==="tech" ? " · technical wording" : ""}`
     + ` · ${S.srv ? "server by NVIDIA guidance (beta)" : "GPUs only"} · memory: ${MEM_NAME[S.mem]}`;
 }
 
@@ -4384,7 +4419,7 @@ function renderFleetServers(f){
   const cap = $('srvcap'), body = $('srvbody');
   if(!f){ cap.textContent = ""; body.innerHTML = `<div class="empty">The servers are sized once one kind of board holds every model.</div>`; return null; }
   const ss = fleetServers(f), g = f.g;
-  TIPS.srvDisk = srvDiskTip(null);
+  TIPS.srvDisk = srvDiskTip(null); TIPS_PLAIN.srvDisk = srvDiskPlain(null);
   if(systemOf(g)){
     cap.innerHTML = `Around <b>${fleetName(f)}</b>.`;
     body.innerHTML = `<div class="empty">The ${g.n} is a whole ${systemOf(g)}-GPU system: its CPUs, memory and storage come from the manufacturer's spec sheet.</div>`;
@@ -4767,6 +4802,16 @@ function setUnit(u){
 unitBox.addEventListener('click', e=>{ const b = e.target.closest('[data-unit]'); if(b) setUnit(b.dataset.unit); });
 unitBox.querySelectorAll('[data-unit]').forEach(b=> b.setAttribute('aria-pressed', b.dataset.unit===S.unit));
 
+/* wording: rewords the tooltips and the server's notes; the figures don't change */
+const syncWords = () => showSeg('words', S.words);
+$('words').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if(!b) return;
+  S.words = b.dataset.v; syncWords();
+  try { localStorage.setItem(WORDS_KEY, S.words); } catch(e) {}
+  hideTip(); render();
+});
+syncWords();
+
 /* theme toggle */
 const root=document.documentElement, tbtn=$('themeBtn');
 tbtn.addEventListener('click', ()=>{
@@ -4843,7 +4888,7 @@ let DL = null;   // claude.ai's downloads capability, when this page runs there
 /* The address holds only what differs from the defaults: the version first, then the page's settings and
    each model's. Model 1's keys are as they have always been; model k's are the same keys with k appended
    (m2, u2…). KEY_ORDER keeps a one-model link exactly as earlier versions wrote it. */
-const KEY_ORDER = ["v","m","c","u","w","p","r","cb","x","th","tv","wq","g","kv","tp","pp","ck","ov","pc","sv","mm","vw","hs","cf","sh","fr","b","tf","e"];   // e: the model the controls show, when not the first
+const KEY_ORDER = ["v","m","c","u","w","p","r","cb","x","th","tv","wq","g","kv","tp","pp","ck","ov","pc","sv","mm","vw","hs","cf","sh","fr","b","tf","tx","e"];   // tx: technical wording · e: the model the controls show, when not the first
 function stateToHash(){
   saveSpec();
   const out = [["v", VERSION]];               // the estimator the link was made with, first so it reads at a glance
@@ -4851,6 +4896,7 @@ function stateToHash(){
   if(S.ovpct!==7) out.push(["ov", S.ovpct]);
   if(!S.cache) out.push(["pc", "off"]);
   if(S.srv) out.push(["sv", "nv"]);
+  if(S.words==="tech") out.push(["tx", "on"]);
   if(S.mem!==1) out.push(["mm", S.mem ? "all" : "least"]);
   if(S.view!=="srv") out.push(["vw", S.view]);
   if(S.scope.size < CATALOG.servers.length) out.push(["hs", [...S.scope].join(".") || "none"]);
@@ -4988,6 +5034,7 @@ function applyHash(){
     S.ovpct = q.has("ov") && ov>=0 && ov<=25 ? ov : 7;
     S.cache = q.get("pc")==="off" ? 0 : 1;
     S.srv = q.get("sv")==="nv" ? 1 : 0;
+    if(q.get("tx")==="on"){ S.words = "tech"; syncWords(); }   // the sender's technical wording, not saved as this viewer's choice
     S.mem = q.get("mm")==="least" ? 0 : q.get("mm")==="all" ? 2 : 1;
     /* the Servers view is the answer unless the link says otherwise; links made before it existed open as they were, in the GPU view */
     S.view = q.get("vw")==="gpu" || (!q.has("vw") && olderThan(v || LINK_BEFORE, "1.7.0")) ? "gpu" : "srv";
@@ -5361,14 +5408,78 @@ const TIPS = {
   answer:"When the answer starts, on average, with the thinking hidden from users: the first token (the engine taking the request in, any queue, reading the prompt), then the thinking at the per-user speed. This is the wait users feel, so the speed goal is judged on it, at the cautious end: the first token at the slow end of its range and the thinking at the low end of the speed range. The likely range under it is where that lands. Shorter thinking budgets and faster setups start answers sooner.",
   step:"Everything needed to produce one token for every active user, when no new prompt is being read. Memory read and compute use the fitted shares of the board's datasheet figures; the scheduler segment is vLLM's fitted fixed cost per step. The largest segment is the bottleneck. A big blue interconnect segment means tensor parallelism is costing you real speed.",
   bneck:"What limits token generation right now. Memory-bound is normal for decode: the GPU waits on reading weights and cache. Compute-bound appears at very large batches. Interconnect-bound means the GPUs spend more time talking than working. Prompt-bound means reading new prompts takes half the engine's time or more, so faster compute, FP8, prompt caching or shorter prompts help more than memory bandwidth.",
+  words:"Technical wording uses the terms engineers use: KV cache, tensor parallelism, all-reduce, NUMA, DIMM channels. Plain wording says the same thing in everyday words. Only the explanations change; every figure and recommendation stays the same.",
 };
+/* the same explanations in everyday words, shown while Wording is Plain; a key missing here falls back to TIPS */
+const TIPS_PLAIN = {
+  words:"Plain wording explains things in everyday words. Technical wording uses the terms engineers use. Only the explanations change; every number and recommendation stays the same.",
+  weights:"The model itself: its learned numbers, loaded onto the GPUs once. Its size is the number of parameters times the bytes each one takes. It doesn't grow with more users or longer conversations.",
+  kv:"The model's working memory for each conversation: a note of every word it has already read, so it doesn't have to read them again. It grows with every user and with every word in their conversation, so it is usually what runs out first. Newer models keep smaller notes. When a model is split across more GPUs than it can divide its notes between, some GPUs hold duplicate copies, so this can grow when you add GPUs.",
+  act:"Scratch space the GPU uses while it works through each step, cleared after every step. It depends on how many words are processed at once, not on how long conversations are.",
+  tpov:"The extra memory that splitting one model across several GPUs costs: each GPU needs its own copy of the driver's setup and space for passing results to the others. Splitting adds memory; it never saves any.",
+  overhead:"A safety margin for memory the software uses that is hard to predict: the GPU driver, gaps left between blocks of memory, and the serving software's own scratch space. The slider sets how cautious to be.",
+  wq:`How many bytes each of the model's numbers takes. "As released" uses the model exactly as its makers published it. BF16 is 2 bytes per number; FP8 and INT8 are 1, so half the memory; FP4 and INT4 are half a byte, about a quarter. Smaller numbers lose a little accuracy. FP8 is built into ${nativeOn("fp8")}; FP4 into ${nativeOn("fp4")}.`,
+  model:"The most-used openly available models as of September 2026, grouped by who made them. Their sizes and memory needs come from each model's published description.",
+  kq:"How precisely the model's per-conversation notes are stored. FP8 halves the memory they take with little loss in quality, and is often the first saving worth making.",
+  ctx:"How much text each request sends in, in tokens (about three-quarters of a word each): instructions, the conversation so far, documents, code. The model reads it before it starts replying, and keeps notes on all of it until the reply is done.",
+  reply:"How long each answer is, in tokens (about three-quarters of a word each). Any thinking the model does first is set separately below.",
+  traffic:"Users at once means people waiting on an answer at the same moment, not everyone who has access. This works it out from daily traffic: requests per second times how long each takes. It errs on the high side.",
+  think:"Many newer models reason step by step before they answer. That thinking takes memory and time like any other text, even though users usually don't see it. The switch starts at the model's own default. About 4K tokens of thinking is typical; hard maths or code can run past 10K.",
+  seeThink:"Whether your chat app shows users the model's thinking as it happens. On: users see text as soon as the thinking starts. Off: they see nothing until the answer starts, so the wait they feel includes all the thinking. With it off the time limits are longer: 15 s for Fast, 30 s for Smooth, 60 s for Readable.",
+  workload:"What each request looks like: how much text goes in and how long the answer is. Pick a preset for a common use, or set your own lengths.",
+  mix:"Other kinds of request the same model handles at the same time, each with its own number of users and its own lengths. They share the same GPUs, so memory adds up, and everyone sees text appear at the same speed. What differs is how long each waits for its first word.",
+  users:"How many people are waiting on an answer at the same moment. Each one needs memory for their own conversation, so this is the main thing that sets how many GPUs you need.",
+  chunk:"When a new question arrives, the server reads it in pieces while it keeps writing answers for everyone else. Small pieces keep everyone's answers flowing smoothly but make new questions wait a little longer for their first word. Big pieces start new answers sooner but briefly pause everyone else's. The numbers on each choice show both effects.",
+  pause:"While a new question is being read, everyone already getting an answer waits. This is the longest pause they would notice between words. Under 0.1 s isn't noticeable; pick Smooth streaming to shorten it.",
+  tp:"How many GPUs share one copy of the model. Splitting a copy across more GPUs makes it faster for each user, but the GPUs have to pass results to each other constantly, so they need a fast direct link between them. Copies are split 1, 2, 4 or 8 ways. Auto picks the smallest setup that works.",
+  svScope:"Which HPE servers the answer may choose from: every current HPE ProLiant server that takes one of these GPUs. Pick the customer's standard servers, or the ones you can sell, to size only those. Older servers with a newer replacement that takes the same GPUs are left out.",
+  svModeled:"This setup splits one copy of the model into stages that pass work along a slower connection. Its memory figure is exact, but its speed hasn't been checked against a real test yet, so load-test it before promising a speed.",
+  pipe:"Lets one copy of the model stretch across two groups of linked H200 NVL cards, half the model in each group, passing work between them over a slower connection. Use it when one group can't hold the model or its users. It doesn't make anyone faster, and two separate copies are preferred when they fit.",
+  copies:"A copy is a complete, independent instance of the model on its own GPUs, serving its share of the users. More copies serve more users without slowing each other down.",
+  fleet:"Each model runs as its own copies on its own GPUs, sized as if it were alone; then all the copies are packed into as few servers as possible, and spare GPUs run extra copies. Models don't share GPUs, so each one's speed is its own. The strip shows every server's GPUs, numbered by model.",
+  fleetGpus:"GPUs for all the models together, in as few servers as the board's sizes allow.",
+  fleetMem:"All the GPU memory you'd buy: every GPU in every server, spare ones included. The suggestion is the board where every model meets its goal with the least of it.",
+  fleetGoal:"How many models serve all their users within their own speed goal, judged on the cautious side of the estimate.",
+  prefill:"How fast a new question is read, in tokens per second. This depends on the GPU's raw calculating power, so faster chips and smaller number formats (FP8, FP4) help most.",
+  memSet:"How the server's own memory (RAM) is built from memory sticks. Least memory: the fewest GB that meet NVIDIA's minimum, even if that leaves the memory slower. One per channel (the default): no slowdown, for a little more memory. Every channel: every memory slot path used, as NVIDIA asks, for the fastest memory and the most of it. Only the Memory row changes; GPUs and speed don't.",
+  pcache:"Chat and agent requests mostly repeat: the same instructions for everyone, and each user's earlier messages. Serving software normally remembers that part, so only the new text is read before answering, and shared instructions are stored once instead of once per user. Turn this off to size for requests that never repeat.",
+  ovpct:"A safety margin on top of the model, the conversation memory and the scratch space, as a percentage. 5–10% is typical; raise it if the server has run out of memory under load.",
+  goal:"How fast each user should see answers: at least this many tokens per second, and a first word within the time limit. When users don't see a model's thinking, the limit is on when the answer starts instead: 15 s for Fast, 30 s for Smooth, 60 s for Readable. The suggestion is the smallest setup that reaches the goal, judged on the cautious side of the estimate. Any speed just finds the smallest setup that fits.",
+  capacity:"The most users this setup holds at these lengths before something runs out: either memory, or speed falling below your goal, whichever comes first. The gap to your user count is your room to grow.",
+  units:"GB is a billion bytes, the unit on spec sheets. GiB is slightly bigger (about 1.07 GB) and is what GPU monitoring tools show. Switching only changes the labels, not the recommendation.",
+  usable:"The dashed line is how much of each GPU the model may use: 90%. Serving software leaves the other 10% free for the GPU driver. A setup fits only if its memory stays left of the line.",
+  perGPU:"What each single GPU has to hold. This decides whether it fits: a model can need 300 GB in total and still run fine on 4 GPUs of 80 GB each.",
+  fit:"What one server of each board needs to serve everyone: up to 8 GPUs, as one copy of the model or several, and how much GPU memory that adds up to. If one server can't serve everyone, its row says how many it does serve.",
+  nvlink:"NVLink is NVIDIA's fast direct connection between GPUs, which splitting one copy of a model across GPUs needs. On H200 NVL cards a bridge joins 2 or 4 cards, never more, so 8 cards run as two groups of 4 with a copy in each. In an 8-GPU HGX system all 8 GPUs are joined by a switch, so any of them can work together at full speed.",
+  fabricAmd:"Infinity Fabric is AMD's fast direct connection between GPUs. On the MI355X's 8-GPU board each GPU has its own link to each of the other 7, with no switch in between, so a copy split across 2 or 4 GPUs uses only some of the links and is slower per step than on an NVIDIA HGX.",
+  pcie:"No direct connection between these GPUs, only the server's ordinary internal one. Fine for one GPU per copy, but splitting a copy across several GPUs makes them wait on that slow connection, so speed suffers badly.",
+  pcieSlow:"Not recommended. This board has no fast direct connection between GPUs, and here one copy of the model has to be split across several of them, so they wait on the server's slower internal connection. The speed shown already includes that. It works, but it's never the suggestion: prefer a board that fits a copy on one GPU, or one with NVLink.",
+  pcieAmd:"No Infinity Fabric (AMD's fast direct connection between GPUs), only the server's ordinary internal one. Fine for one GPU per copy, but splitting a copy across several GPUs makes them wait on that slow connection, so speed suffers badly.",
+  pcieSlowAmd:"Not recommended. This board has no Infinity Fabric (AMD's fast direct connection between GPUs), and here one copy of the model has to be split across several of them, so they wait on the server's slower internal connection. The speed shown already includes that. It works, but it's never the suggestion.",
+  srvSet:"GPUs only sizes just the GPUs. NVIDIA guidance follows NVIDIA's recommendations for AI servers: 2, 4 or 8 GPUs in a two-processor server, with a Server panel under the answer for the processors, memory and storage around them. Rounding GPU counts up this way can change which board is suggested.",
+  srv:"The rest of the server around the GPUs, following NVIDIA's recommendations for AI servers: two processors with the GPUs shared evenly between them, system memory of twice the GPU memory, and fast local storage. Processor cores follow the servers HPE builds for HPE Private Cloud AI. A starting point for a vendor, not a certification.",
+  srvGpu:"How many GPUs the server holds and how they connect: shared evenly between the two processors, each in a full-speed slot. With 8 GPUs, extra connection chips sit between them and the processors.",
+  srvCpu:"Processor cores across the server, as HPE builds its AI servers: 32 per GPU in a 2- or 4-GPU server, 16 per GPU in an 8-GPU one (16 at any size for the smaller L4 and RTX PRO 4500), well above NVIDIA's minimum of 6. The serving software uses only a few; the rest run everything else on the server, like Kubernetes or a search database for RAG.",
+  srvRam:"The least system memory (RAM) NVIDIA recommends for an AI server: twice the GPU memory, spread evenly across both processors. Shown in GB as sold.",
+  extrap:"No published test covers this board. Its speed is worked out from its spec sheet using the same rules that match the tested boards (H200, B200, L40S and MI355X), so it's less certain than theirs. Confirm with a load test before buying.",
+  tput:"An estimate from the board's specs, with rules tuned to match published tests; not a measurement of this exact setup. It allows for new questions arriving all the time. The likely range beside each figure is where real results fell 80% of the time when tested. Use it to compare setups and choose what to test, not to promise a service level.",
+  tpsTotal:"Words (tokens) produced per second for all users together. It's less than users times speed per user, because each user also waits for their question to be read before their answer starts streaming.",
+  tpsUser:"How fast one person sees an answer appear, in tokens per second (about three-quarters of a word each), on average while new questions keep arriving. Everyone gets the same speed. Around 20 or more feels smooth in chat; under 10 feels sluggish. The likely range is where real results fell 80% of the time; the speed goal is judged at its low end.",
+  ttft:`How long until the first word appears, on average: the server taking the request in, waiting for questions already in line, then reading this one. Fewer users per copy shorten the wait; faster chips shorten the reading. For a thinking model the first word is the start of its thinking; if users don't see the thinking, the wait they feel runs to the start of the answer instead. It includes the ${Math.round(CAL.request*1000)} ms the server takes to accept a request; add your network's own delay.`,
+  answer:"When the answer starts, on average, with the thinking hidden from users: the first word, then all of the thinking. This is the wait users feel, so the speed goal is judged on it, on the cautious side. Shorter thinking and faster setups start answers sooner.",
+  step:"Everything needed to write one more word for every user at once, when no new question is being read. The biggest part is what holds things back. A big blue part means the GPUs spend a lot of time passing results to each other.",
+  bneck:"What's holding back the speed right now. Memory: the GPU waits on reading the model and conversations, which is normal. Compute: very many users at once. Links: the GPUs spend more time passing results than working. Reading questions: new questions take half the time or more, so faster chips or remembering repeated text help most.",
+};
+const srvDiskPlain = kv => "Fast local storage this workload needs, beside a separate drive for the operating system. It holds two copies of the model (the one running and the next version downloading) plus 100 GB for the serving software, the setup files it saves so it starts faster, and its logs, kept under 80% full. Saved copies of conversations and other models need room of their own. "
+  + "Keeping overflow conversation memory on disk is uncommon on a single server" + (kv ? `; it would need ${kv} or more here.` : ".");
+const tipText = k => (S.words==="plain" && TIPS_PLAIN[k]) || TIPS[k];
 
 const tipEl = document.createElement('div');
 tipEl.id = 'tip'; tipEl.setAttribute('role','tooltip');
 document.body.appendChild(tipEl);
 
 function showTip(el){
-  const txt = TIPS[el.dataset.tip]; if(!txt) return;
+  const txt = tipText(el.dataset.tip); if(!txt) return;
   tipEl.textContent = txt;
   tipEl.classList.add('on');
   const r = el.getBoundingClientRect();
@@ -5398,7 +5509,7 @@ window.addEventListener('resize', hideTip);
 /* give every trigger an accessible name; the "i" icons are also buttons, since a plain span's label isn't announced */
 function labelTips(){
   document.querySelectorAll('[data-tip]').forEach(el=>{
-    const txt = TIPS[el.dataset.tip];
+    const txt = tipText(el.dataset.tip);
     if(!txt) return;
     if(el.classList.contains('i')){ el.setAttribute('role', 'button'); el.setAttribute('aria-label', "Explain: " + txt); }
     else el.setAttribute('aria-description', txt);
