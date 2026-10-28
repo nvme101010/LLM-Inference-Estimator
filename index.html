@@ -617,11 +617,6 @@
         <button type="button" data-unit="GB" aria-pressed="true">GB</button>
         <button type="button" data-unit="GiB" aria-pressed="false">GiB</button>
       </div>
-      <div class="unit-toggle words-toggle" role="group" aria-label="Wording of the explanations">
-        <span class="unit-lbl">Wording <span class="i" data-tip="words" tabindex="0">i</span></span>
-        <button type="button" data-words="plain" aria-pressed="true">Plain</button>
-        <button type="button" data-words="tech" aria-pressed="false">Technical</button>
-      </div>
       <button class="theme-btn" id="themeBtn" aria-label="Toggle color theme">◐ Theme</button>
     </div>
   </header>
@@ -892,6 +887,14 @@
             <button data-v="2" aria-pressed="false">Every channel</button>
           </div>
           <div class="hint">How the Servers view builds each server's memory from its own DIMMs, at least 2 × GPU memory: the fewest GB, one DIMM per channel, or every channel filled.</div>
+        </div>
+        <div>
+          <p class="eyebrow">Wording <span class="i" data-tip="words" tabindex="0">i</span></p>
+          <div class="seg" id="words" role="group" aria-label="Wording of the explanations">
+            <button data-v="plain" aria-pressed="true">Plain</button>
+            <button data-v="tech" aria-pressed="false">Technical</button>
+          </div>
+          <div class="hint">How the tooltips and the server's notes are worded. Plain uses everyday words; Technical uses engineering terms. The figures don't change.</div>
         </div>
       </div>
     </details>
@@ -4182,7 +4185,7 @@ function renderAdvState(){
   const changed = [S.kq!==2, S.tpo!=="auto", S.pipe, S.chunk!==S.chunkBase, S.ovpct!==7, !S.cache, S.srv, S.mem!==1].filter(Boolean).length;
   const many = S.models.length > 1;   // with several models, say which settings are the shown model's and which every model's
   $('advState').innerHTML = (changed ? `<b>${changed} changed</b> · ` : "") + (many ? `${esc(specName(S.models[S.edit]))}: ` : "")
-    + `KV ${kqLabel()} · TP ${S.tpo==="auto" ? "auto" : S.tpo}${S.pipe ? " · pipeline across bridges" : ""} · ${CHUNK_NAME[S.chunk]} · ${many ? "all models: " : ""}${S.ovpct}% overhead · prompt caching ${S.cache ? "on" : "off"}`
+    + `KV ${kqLabel()} · TP ${S.tpo==="auto" ? "auto" : S.tpo}${S.pipe ? " · pipeline across bridges" : ""} · ${CHUNK_NAME[S.chunk]} · ${many ? "all models: " : ""}${S.ovpct}% overhead · prompt caching ${S.cache ? "on" : "off"}${S.words==="tech" ? " · technical wording" : ""}`
     + ` · ${S.srv ? "server by NVIDIA guidance (beta)" : "GPUs only"} · memory: ${MEM_NAME[S.mem]}`;
 }
 
@@ -4799,11 +4802,10 @@ unitBox.addEventListener('click', e=>{ const b = e.target.closest('[data-unit]')
 unitBox.querySelectorAll('[data-unit]').forEach(b=> b.setAttribute('aria-pressed', b.dataset.unit===S.unit));
 
 /* wording: rewords the tooltips and the server's notes; the figures don't change */
-const wordsBox = document.querySelector('.words-toggle');
-const syncWords = () => wordsBox.querySelectorAll('[data-words]').forEach(b=> b.setAttribute('aria-pressed', b.dataset.words===S.words));
-wordsBox.addEventListener('click', e=>{
-  const b = e.target.closest('[data-words]'); if(!b) return;
-  S.words = b.dataset.words; syncWords();
+const syncWords = () => showSeg('words', S.words);
+$('words').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if(!b) return;
+  S.words = b.dataset.v; syncWords();
   try { localStorage.setItem(WORDS_KEY, S.words); } catch(e) {}
   hideTip(); render();
 });
