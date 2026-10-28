@@ -2025,9 +2025,9 @@ const meetsGoal = t => tpsLow(t) >= GOALS[S.goal].tps && waitHigh(t) <= waitLimi
 /* how far a setup is from the goal, on whichever side is worse: 1 or less means it's met */
 const goalGap = t => Math.max(GOALS[S.goal].tps / tpsLow(t), waitHigh(t) / waitLimit());
 /* a figure against the goal, in words: short of it outright, or only at the cautious end */
-const tpsVsGoal  = t => { const g = GOALS[S.goal].tps;  return t.perUser < g ? `below the ${g}+ goal` : tpsLow(t) < g ? `below the ${g}+ goal at the low end` : `meets the ${g}+ goal`; };
-const ttftVsGoal = t => { const g = GOALS[S.goal].ttft; return t.ttft > g ? `over the ${g} s goal` : ttftHigh(t) > g ? `over the ${g} s goal at the slow end` : `within the ${g} s goal`; };
-const answerVsGoal = t => { const g = GOALS[S.goal].ans; return answerStart(t) > g ? `over the ${g} s goal` : answerHigh(t) > g ? `over the ${g} s goal at the slow end` : `within the ${g} s goal`; };
+const tpsVsGoal  = t => { const g = GOALS[S.goal].tps;  return t.perUser < g ? `below the ${g}+ goal` : tpsLow(t) < g ? `below the ${g}+ goal ${say("on the cautious side", "at the low end")}` : `meets the ${g}+ goal`; };
+const ttftVsGoal = t => { const g = GOALS[S.goal].ttft; return t.ttft > g ? `over the ${g} s goal` : ttftHigh(t) > g ? `over the ${g} s goal ${say("on the cautious side", "at the slow end")}` : `within the ${g} s goal`; };
+const answerVsGoal = t => { const g = GOALS[S.goal].ans; return answerStart(t) > g ? `over the ${g} s goal` : answerHigh(t) > g ? `over the ${g} s goal ${say("on the cautious side", "at the slow end")}` : `within the ${g} s goal`; };
 /* a wait of seconds to minutes, as a figure and its unit, and the likely range of the answer's start */
 const waitParts = s => s >= 90 ? [(s/60).toFixed(1), "min"] : s >= 10 ? [String(Math.round(s)), "s"] : [s.toFixed(1), "s"];
 const likelyAnswer = t => { const lo = t.ttft*RANGE.ttft[0] + S.thinking/(t.perUser*RANGE.speed[1]), hi = answerHigh(t);
@@ -2852,7 +2852,8 @@ const wiringShort = c => { const k = linkKind(c.x);
   return k==="bridge" ? `${c.x.link.bridge}-way NVLink` : k==="nvswitch" ? "NVSwitch" : k==="fabric" ? "Infinity Fabric" : "PCIe only"; };
 const layoutLine = d => d.reps>1 ? `${d.reps} copies × ${layoutName(d.L)}` : `1 copy · ${layoutName(d.L)}`;
 /* what the speed figure rests on: a board with no benchmark of its own, a pipeline, a split over PCIe */
-const speedBasis = d => [d.g.bench ? "" : "extrapolated", d.modeled ? "pipeline modeled" : "", d.nr ? "split over PCIe" : ""].filter(Boolean);
+const speedBasis = d => [d.g.bench ? "" : say("estimated from specs", "extrapolated"), d.modeled ? say("staged split, untested", "pipeline modeled") : "",
+                         d.nr ? say("split over a slow link", "split over PCIe") : ""].filter(Boolean);
 const flagPills = d => (d.nr ? ` <span class="pill bad">split over PCIe</span>` : "")
   + (d.modeled ? ` <span class="pill neutral" data-tip="svModeled" tabindex="0">pipeline modeled</span>` : "");
 const star = d => d.g.bench ? "" : `<span class="tipl" data-tip="extrap" tabindex="0">*</span>`;
@@ -2880,7 +2881,7 @@ function statsHtml(d){
            `after ${fmtWait(S.thinking/t.perUser)} of thinking users don't see · ${likelyAnswer(t)}${S.goal!=="any" ? ` · goal within ${g.ans} s` : ""}`,
            S.goal!=="any" && answerHigh(t) > g.ans ? "warn" : "")
        : statCell("ttft", "First token", fmtTime(t.ttft)[0], fmtTime(t.ttft)[1], `${likelyTime(t.ttft)}${S.goal!=="any" ? ` · goal under ${g.ttft} s` : ""}`))
-    + statCell("capacity", "Room for", commas(d.room), d.room===1 ? "user" : "users", d.room < all ? `of your ${commas(all)}: below the goal past that` : `you have ${commas(all)}${d.memRoom > d.room ? ` · cache holds ${commas(d.memRoom)}` : ""}`, d.room < all ? "warn" : "")
+    + statCell("capacity", "Room for", commas(d.room), d.room===1 ? "user" : "users", d.room < all ? `of your ${commas(all)}: below the goal past that` : `you have ${commas(all)}${d.memRoom > d.room ? ` · ${say("memory fits", "cache holds")} ${commas(d.memRoom)}` : ""}`, d.room < all ? "warn" : "")
     + statCell("srvGpu", "GPU memory", boxTotal(d.memGB).split(" ")[0], S.unit, `${fmtMem(d.perGB)} used of ${boxMem(d.g)} per card`)
     + `</div>`;
 }
@@ -3078,7 +3079,7 @@ function configCard(c, eyebrow, cmp, back = ""){
     + ((c.x.constraints || []).length || (sv.notes || []).length ? `<div class="bom-notes"><span class="sublbl">Before you quote</span><ul class="svnotes">${[...(c.x.constraints || []), ...(sv.notes || [])].map(t=> `<li>${esc(t)}</li>`).join("")}</ul></div>` : "")
     + `</section>`
     + `<section class="rec-col"><h3 class="colh">Performance</h3>${statsHtml(d)}`
-    + (extrap ? `<p class="cap">Speeds are extrapolated: the ${esc(d.g.n.replace(" Blackwell", ""))} has no published benchmark here <span class="i" data-tip="extrap" tabindex="0">i</span>. Load-test before quoting them.</p>` : "")
+    + (extrap ? `<p class="cap">${say("Speeds are estimated from the spec sheet", "Speeds are extrapolated")}: the ${esc(d.g.n.replace(" Blackwell", ""))} has no published benchmark here <span class="i" data-tip="extrap" tabindex="0">i</span>. Load-test before quoting them.</p>` : "")
     + (warmParts().length ? `<p class="cap">${cacheNote(warmParts())}</p>` : "")
     + (grow ? `<p class="rec-grow">Room to grow: ${growText(grow)} in this server serve up to ${commas(grow.room)} users.</p>` : "")
     + `<h3 class="colh">Layout</h3><p class="rec-why">${layoutWhy(c, d)}</p>`
@@ -3235,7 +3236,7 @@ function fleetCard(c, eyebrow, cmp, back = ""){
       + `<br><span class="cap">${layoutText(d)} · ${plural(m.users, "user")}</span></th>`
       + `<td class="num">${d.gpus}</td><td class="num">${t ? `${fmtTps(t.perUser)} tok/s${star(d)}` : "—"}</td><td class="num ft">${t ? fmtTime(t.ttft).join(" ") : "—"}</td><td>${st}</td></tr>`;
   }).join("");
-  const extrap = f.g.bench ? "" : `<p class="cap">Speeds are extrapolated: the ${esc(f.g.n.replace(" Blackwell", ""))} has no published benchmark here <span class="i" data-tip="extrap" tabindex="0">i</span>. Load-test before quoting them.</p>`;
+  const extrap = f.g.bench ? "" : `<p class="cap">${say("Speeds are estimated from the spec sheet", "Speeds are extrapolated")}: the ${esc(f.g.n.replace(" Blackwell", ""))} has no published benchmark here <span class="i" data-tip="extrap" tabindex="0">i</span>. Load-test before quoting them.</p>`;
   const warm = f.models.flatMap(m=> withSpec(m.spec, warmParts).map(([n, ...p])=> [`${specName(m.spec)} ${n}`, ...p]));
   return `<div class="rec-head">${eyebrow}<h2 class="rec-name">${many ? `${k} × ` : ""}${hostLink(HPE_HOSTS.find(h=> h.id===sv.id))}</h2>`
     + `<p class="rec-spec">${all} models, ${plural(S.models.reduce((n, x)=> n + specUsers(x), 0), "user")} in all · ${f.gpus} × ${esc(f.g.n)}, ${boxTotal(f.memGB)} of GPU memory${many ? ` · ${fleetRackText(c)}` : ""}</p></div>`
@@ -3539,9 +3540,9 @@ const warmParts = () => !S.cache ? [] : groups().map((w, i)=> [groupNames()[i], 
   .filter(([, , p])=> p.shared > 0).map(([n, P, p])=> [n, P, p.fresh]);
 function cacheNote(parts){
   if(!parts.length) return "";
-  const each = parts.map(([n, P, fresh])=> `${commas(fresh)} of each ${commas(P)}-token ${esc(n)} prompt`);
-  return `Assumes a warm prompt cache: only ${each.length>1 ? `${each.slice(0, -1).join(", ")} and ${each[each.length-1]}` : each[0]}`
-    + ` ${parts.length>1 ? "are" : "is"} read before the first reply, the rest reused. Prompts not yet in the cache take longer: turn Prompt caching off in Advanced settings to size for them. `;
+  const each = parts.map(([n, P, fresh])=> `${commas(fresh)} of each ${commas(P)}-token ${esc(n)} prompt`), list = each.length>1 ? `${each.slice(0, -1).join(", ")} and ${each[each.length-1]}` : each[0];
+  return say(`Assumes the server remembers repeated text: only ${list} ${parts.length>1 ? "are" : "is"} new and read before the first reply. Text it hasn't seen before takes longer: turn Prompt caching off in Advanced settings to size for that. `,
+             `Assumes a warm prompt cache: only ${list} ${parts.length>1 ? "are" : "is"} read before the first reply, the rest reused. Prompts not yet in the cache take longer: turn Prompt caching off in Advanced settings to size for them. `);
 }
 /* a speed that falls short of the goal, shown with a decimal when rounding would make it read as the goal itself */
 const fmtTpsShort = x => { const goal = GOALS[S.goal].tps; return x < goal && fmtTps(x)===fmtTps(goal) ? (Math.floor(x*10)/10).toFixed(1) : fmtTps(x); };
@@ -3555,7 +3556,7 @@ const likelyTime = s => { const lo = s*RANGE.ttft[0], hi = s*RANGE.ttft[1], d = 
 
 /* a board with no benchmark of its own: its speed and first token apply shares fitted on other boards */
 const VALIDATION_URL = "https://github.com/nvme101010/LLM-Inference-Estimator/blob/main/validation/README.md";
-const extrapBadge = g => g && !g.bench ? `<span class="pill neutral est" data-tip="extrap" tabindex="0">extrapolated</span>` : "";
+const extrapBadge = g => g && !g.bench ? `<span class="pill neutral est" data-tip="extrap" tabindex="0">${say("estimated from specs", "extrapolated")}</span>` : "";
 /* ---------------- render ---------------- */
 const $ = id => document.getElementById(id);
 const LAYER_LABEL = {
@@ -3784,8 +3785,8 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
     ? `${names[speed.slow.i]}, the slowest to start · ${speed.per.filter(x=> x!==speed.slow).map(x=> `${names[x.i]}: ${wlWait(x)}`).join(" · ")}<br>` : "";
   /* both figures are averages while new prompts keep arriving; say what that costs when it's noticeable:
      the speed between prompt reads, and the part of the first token spent waiting for other prompts */
-  const between = speed && speed.between > speed.perUser*1.05 ? `<br>${fmtTps(speed.between)} tok/s between prompt reads` : "";
-  const queued  = speed && speed.wait >= 0.01 && speed.wait >= speed.ttft*0.05 ? `${fmtTime(speed.wait).join(" ")} of it waiting for other prompts<br>` : "";
+  const between = speed && speed.between > speed.perUser*1.05 ? `<br>${fmtTps(speed.between)} tok/s ${say("while no new question is being read", "between prompt reads")}` : "";
+  const queued  = speed && speed.wait >= 0.01 && speed.wait >= speed.ttft*0.05 ? `${fmtTime(speed.wait).join(" ")} of it waiting for other ${say("questions", "prompts")}<br>` : "";
   $('vstats').innerHTML =
       (g ? statCell("perGPU", "Per GPU", fmtMemN(perGB), `of ${boxMem(g)}`,
              fits ? `${Math.round(perGB/g.cap*100)}% full${active.gpus>1 ? ` · ${fmtMem(totGB*reps)} in all` : ""}`
@@ -3802,7 +3803,7 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
                  slowWait ? "warn" : "")
        : statCell("ttft", "First token", ...fmtTime(speed.ttft),
                  (answerAt !== null ? `<div class="n2">answer after ${fmtWait(answerAt)} <small>of thinking users see</small></div>` : "")
-                 + perWl + queued + (hasGoal ? ttftVsGoal(speed) : `${commas(speed.prompt)} new prompt tokens`) + `<br>${likelyTime(speed.ttft)}${extrapBadge(g)}`,
+                 + perWl + queued + (hasGoal ? ttftVsGoal(speed) : `${commas(speed.prompt)} ${say("new tokens to read", "new prompt tokens")}`) + `<br>${likelyTime(speed.ttft)}${extrapBadge(g)}`,
                  slowWait ? "warn" : ""));
 }
 
@@ -3990,11 +3991,15 @@ function renderThroughput(d){
      average speed against the speed between reads, and the wait before a prompt starts to be read */
   const copy = d.reps>1 ? `Each copy's ${commas(d.upr)} users` : `The ${commas(all)} user${all===1 ? "" : "s"}`;
   const secs = t.rate > 0 ? d.upr / t.rate : 0;                         // how long a request lasts, by Little's law
-  const load = `<div class="hint load">${copy} send about ${fmtRate(t.rate)} requests a second, each lasting about ${fmtWait(secs)}. `
-    + `Reading their new prompt tokens keeps the engine busy <b>${Math.round(t.busy*100)}%</b> of the time, so replies stream at <b>${fmtTps(t.perUser)} tok/s</b> on average`
-    + (t.between > t.perUser*1.005 ? ` (${fmtTps(t.between)} tok/s between prompt reads)` : "")
-    + `, and a new request waits about ${fmtTime(t.wait).join(" ")} for prompts ahead of it before its own is read. `
-    + `This assumes each user sends a new request as soon as the last is answered, at random moments.</div>`;
+  const load = `<div class="hint load">${copy} send about ${fmtRate(t.rate)} requests a second, each lasting about ${fmtWait(secs)}. ` + say(
+      `Reading the new text in them keeps the GPUs busy <b>${Math.round(t.busy*100)}%</b> of the time, so answers appear at <b>${fmtTps(t.perUser)} tok/s</b> on average`
+      + (t.between > t.perUser*1.005 ? ` (${fmtTps(t.between)} tok/s while no new question is being read)` : "")
+      + `, and a new request waits about ${fmtTime(t.wait).join(" ")} for the questions ahead of it before its own is read. `
+      + `This assumes each user asks again as soon as they get an answer.</div>`,
+      `Reading their new prompt tokens keeps the engine busy <b>${Math.round(t.busy*100)}%</b> of the time, so replies stream at <b>${fmtTps(t.perUser)} tok/s</b> on average`
+      + (t.between > t.perUser*1.005 ? ` (${fmtTps(t.between)} tok/s between prompt reads)` : "")
+      + `, and a new request waits about ${fmtTime(t.wait).join(" ")} for prompts ahead of it before its own is read. `
+      + `This assumes each user sends a new request as soon as the last is answered, at random moments.</div>`);
 
   body.innerHTML = `
     <div class="statstrip">
