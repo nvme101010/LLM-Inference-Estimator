@@ -3721,7 +3721,7 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
         : active.partial ? "Closest single node · serves the most users"
         : `Suggested deployment · least GPU memory that ${hasGoal ? "meets your goal" : "fits"}`;
     main = deployName(active);
-    why += hostSentence(active) + cacheNote(warmParts());
+    why += hostSentence(active) + (warmParts().length ? `Assumes <span class="tipl" data-tip="pcache" tabindex="0">prompt caching</span>. ` : "");
     // what the workload needs, apart from what the server it goes in holds
     if(!systemOf(g) && popOf(g) && active.need < active.gpus)
       facts = `Workload needs <b>${active.need} GPU${active.need===1 ? "" : "s"}</b> · `
@@ -3758,15 +3758,14 @@ function renderVerdict({m, r, tp, reps, totGB, perGB, g, fits, active, picked, s
       why += layout + (hasGoal && !active.meets ? `<span class="warnx">Below your speed goal</span> — ${goalText}.` : "");
     } else {
       why += layout + (active.meets
-        ? `${hasGoal ? "Estimated to serve everyone within your speed goal, even at the cautious end of the estimate" : "Holds everyone"}, with ${boxTotal(active.memGB)} of GPU memory in all.`
+        ? `${hasGoal ? "Meets your speed goal for" : "Holds"} all ${commas(all)} user${all===1 ? "" : "s"}.`
         : `<span class="warnx">Nothing reaches your speed goal</span> (${goalText}), so this is the setup that comes closest. Try FP8 or shorter prompts.`);
     }
     // how far it stretches, in a sentence rather than a fourth tile; memory's limit is said apart from the speed estimate's
     if(!active.partial && cap && cap.users >= all && cap.users > 0)
-      why = why.trimEnd() + ` <span class="tipl" data-tip="capacity">Room for up to <b>${commas(cap.users)}</b> user${cap.users===1 ? "" : "s"}</span> ${mixed() ? "in this mix" : "at these lengths"}${reps>1 ? ` across ${reps} copies` : ""}, `
-        + (cap.limit==="speed" ? `then speed drops below the goal; memory alone holds ${commas(cap.memory)}.` : `then memory runs out.`);
+            why = why.trimEnd() + ` <span class="tipl" data-tip="capacity">Room for up to <b>${commas(cap.users)}</b></span>.`;
     // a speed goal is met on the estimate only, so say how to make it sure
-    if(hasGoal && active.meets) why = why.trimEnd() + ` Speed is estimated (${likelyTps(active.t.perUser)} per user), not measured: confirm with a load test before buying.`;
+    if(hasGoal && active.meets) why = why.trimEnd() + ` Speed is an estimate: load-test before buying.`;
   } else {
     lbl = "No single node fits";
     main = S.tpo==="auto" ? "Too big for one 8-GPU node" : `No board holds a copy at TP ${tp}`;
@@ -4178,7 +4177,7 @@ function renderPipeNote(active){
 function hostSentence(d){
   const g = d.g;
   if(!g.host) return "";
-  const s = `Sized as in an <b>${hostLink(g.host)}</b> (${g.hostSpec}), one HPE server that takes it; the Servers view compares every one that does. `
+  const s = `In an <b>${hostLink(g.host)}</b> (${g.hostSpec}). `
     + (g.est ? `<span class="warnx">Card count to confirm: ${g.est}.</span> ` : "");
   if(d.pp>1) return s + `One copy spans its ${d.pp} NVLink bridge groups${g.bridge ? ` (${d.pp} × ${g.bridge})` : ""}: tensor-parallel across the ${d.tpw} cards of each group and ${d.pp} pipeline stages between them. `;
   if(g.split && d.tp>1) return s + `Each copy sits inside one NVLink bridge group${g.bridge ? ` (${g.bridge})` : ""}, tensor-parallel across its ${d.tp} cards${d.reps>1 ? `, one copy per group` : ""}. `;
