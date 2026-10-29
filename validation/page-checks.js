@@ -74,6 +74,10 @@
   check("partial node: the pill names the full node and the goal", !!ppill && /^Full node serves [\d,]+ of 150 within goal$/.test(ppill.textContent) && ppill.dataset.tip==="partial", ppill ? ppill.textContent : "no pill on the RTX PRO 6000 row");
   check("partial node: the Why row says what limits it", !!pwhy && pwhy.classList.contains("bwhy") && /largest node this board allows/.test(pwhy.textContent) && /the limit is speed/.test(pwhy.textContent), pwhy ? pwhy.textContent : "no Why row");
   check("partial node: the tooltip exists in both wordings", typeof TIPS.partial==="string" && typeof TIPS_PLAIN.partial==="string");
+  ppill && ppill.focus();
+  const tipEl = document.getElementById('tip');
+  check("partial node: hovering the pill shows the row's own explanation", !!ppill && tipEl.classList.contains('on') && tipEl.textContent===pwhy.textContent.replace(/ Not recommended:.*$/s, "") && /largest node this board allows/.test(tipEl.textContent), tipEl.textContent);
+  ppill && ppill.blur();
 
   removeEventListener('error', onErr);
   check("no uncaught errors during the checks", errs.length===0, errs.join("; "));

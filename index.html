@@ -3960,10 +3960,10 @@ function renderServer(d){
 const OPEN_WHY = new Set();
 /* A board whose largest node can't serve everyone: the pill says so with the full node's figure, and the Why row says
    what limits it. "Serves" counts users within the speed goal, "holds" users by memory alone, below the goal. */
-function partialPill(d, users, hasGoal){
+function partialPill(d, users, hasGoal, why){
   const txt = d.meets ? `Full node serves ${commas(d.served)} of ${commas(users)}${hasGoal ? " within goal" : ""}`
                       : `Full node holds ${commas(d.served)} of ${commas(users)}, below goal`;
-  return `<span class="pill warn" data-tip="partial" tabindex="0">${txt}</span>`;
+  return `<span class="pill warn" data-tip="partial" data-tiptext="${esc(why)}" tabindex="0">${txt}</span>`;   // hover: this row's own reasons and figures
 }
 function partialWhy(b, d, all, hasGoal){
   const node = `${d.gpus} × ${b.n} is the largest node this board allows (${layoutText(d)}), and it ${d.meets ? "serves" : "holds"} ${commas(d.served)} of your ${commas(all)} users`;
@@ -3986,8 +3986,9 @@ function renderCards(deps, active, suggested, picked){
     const d = deps.get(b.n), slow = notRecommended(d);
     const systems = systemsIn(d);          // counted in whole systems, the layout then says how they're used
     let status = "";                        // a pill only when something is wrong; a good fit is quiet
+    const pw = d.partial ? partialWhy(b, d, all, hasGoal) : "";   // the pill's hover and the Why row say the same
     if(!d.fits) status = `<span class="pill bad">${S.tpo==="auto" ? "Won't fit on a node" : `Not on ${d.tp} GPUs`}</span>`;
-    else if(d.partial) status = partialPill(d, all, hasGoal);
+    else if(d.partial) status = partialPill(d, all, hasGoal, pw);
     else if(!d.meets) status = `<span class="pill warn">Below goal</span>`;
     const layout = d.fits ? layoutText(d) : "—";
     if(!status && slow) status = `<span class="pill bad" data-tip="pcieSlow${b.fab ? "Amd" : ""}" tabindex="0">Not recommended</span><span class="lay">${layout}</span>`;
@@ -4011,7 +4012,7 @@ function renderCards(deps, active, suggested, picked){
         : !d.fits ? `The model needs ${fmtMem(d.perGB*d.tp)}, but ${d.tp} GPU${d.tp===1 ? "" : "s"} can use only ${fmtMem(b.cap*USABLE*d.tp)} (90% of capacity).${
             S.tpo!=="auto" ? "" : b.split && !S.pipe ? ` Its servers hold up to ${nodeMax(b)} cards, but an NVLink bridge joins at most ${b.split}, so one copy of a model spans at most ${b.split} of them. Turn on <b>Pipeline across bridge groups</b> in Advanced settings to let a copy span all ${nodeMax(b)}.`
             : nodeMax(b) < NODE ? ` Its servers hold up to ${nodeMax(b)} cards${S.srv ? " by NVIDIA's guidance" : ""}, and one copy of a model can be split across at most ${Math.max(...TP_OPTIONS.filter(t=> t<=nodeMax(b)))} of them.` : ""}`
-        : d.partial ? partialWhy(b, d, all, hasGoal)
+        : d.partial ? pw
         : forSpeed(d) ? `Fits on ${d.memOnly.gpus} GPU${d.memOnly.gpus===1 ? "" : "s"}, but ${
             tpsLow(d.memOnly.t) < GOALS[S.goal].tps ? `only at ${tpsSpan(d.memOnly.t.perUser).join(" ")} per user`
             : hideThink() ? `the answer starts after ${answerSpan(d.memOnly.t).join(" ")}`
@@ -4384,7 +4385,7 @@ const withinGoal = m => m.d.fits && m.d.meets && !m.d.partial;
 function modelPill(m){
   const d = m.d;
   if(!d.fits) return `<span class="pill bad">Won't fit</span>`;
-  if(d.partial) return partialPill(d, m.users, m.spec.goal!=="any");
+  if(d.partial) return partialPill(d, m.users, m.spec.goal!=="any", withSpec(m.spec, ()=> partialWhy(d.g, d, m.users, m.spec.goal!=="any")));
   if(!d.meets) return `<span class="pill warn">Below goal</span>`;
   if(notRecommended(d)) return `<span class="pill bad" data-tip="pcieSlow${d.g.fab ? "Amd" : ""}" tabindex="0">Not recommended</span>`;
   return "";
@@ -5623,7 +5624,7 @@ tipEl.id = 'tip'; tipEl.setAttribute('role','tooltip');
 document.body.appendChild(tipEl);
 
 function showTip(el){
-  const txt = tipText(el.dataset.tip); if(!txt) return;
+  const txt = el.dataset.tiptext || tipText(el.dataset.tip); if(!txt) return;   // its own text (a row's figures), else the dictionary's
   tipEl.textContent = txt;
   tipEl.classList.toggle('list', txt.includes("\n"));
   tipEl.classList.add('on');
@@ -5654,7 +5655,7 @@ window.addEventListener('resize', hideTip);
 /* give every trigger an accessible name; the "i" icons are also buttons, since a plain span's label isn't announced */
 function labelTips(){
   document.querySelectorAll('[data-tip]').forEach(el=>{
-    const txt = tipText(el.dataset.tip);
+    const txt = el.dataset.tiptext || tipText(el.dataset.tip);
     if(!txt) return;
     if(el.classList.contains('i')){ el.setAttribute('role', 'button'); el.setAttribute('aria-label', "Explain: " + txt); }
     else el.setAttribute('aria-description', txt);
