@@ -185,6 +185,7 @@
   .v-note ul{margin:4px 0; padding-left:18px}
   .v-note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; overflow-wrap:anywhere}
   .v-note .linkbtn{margin:2px 0 0}
+  .stack > .v-note{margin-bottom:0}
   .v-why .badx{color:var(--bad); font-weight:600}
   .v-why .linkbtn{margin:0; font-size:13px}
   .v-actions{padding-top:18px}
@@ -714,6 +715,9 @@
       </div>
     </section>
 
+    <!-- a link made with another version, or naming a model this copy doesn't list: said above whichever answer shows -->
+    <div class="v-note" id="vnote" role="status" hidden></div>
+
     <!-- ============ WHICH ANSWER: by server, or by GPU ============ -->
     <div class="viewbar" id="viewbar" role="group" aria-label="Answer by">
       <button type="button" data-view="srv" aria-pressed="true">Servers</button>
@@ -733,7 +737,6 @@
 
     <!-- ============ THE ANSWER (GPU view) ============ -->
     <section class="panel verdict" id="gpuAnswer" aria-label="Answer">
-      <div class="v-note" id="vnote" role="status" hidden></div>
       <div class="v-top">
         <div>
           <div class="lbl" id="vlbl">Suggested deployment</div>
@@ -3384,14 +3387,25 @@ function renderServerView(){
   renderScope(A); renderRec(A, cfgs); renderAll(A, cfgs);
   const shown = cfgById(cfgs, S.cfg) || A.rec, d = shown && shown.best || null;
   $('viewhint').textContent = "";
+  renderServerMath(shown ? shown.sv.short : "", d);
+}
+/* Show the math, Optimize for and the notes under Advanced settings, for the configuration the card shows. With none
+   (no server in scope, or none holds the model), the model alone, as the GPU view does when nothing fits, so the
+   panels never keep the figures of a configuration that is no longer on the page. */
+function renderServerMath(label, d){
   if(d){
     S.tp = d.tp; S.pp = d.pp;
-    $('mathState').textContent = `${(cfgById(cfgs, S.cfg) || A.rec).sv.short} · ${d.gpus} × ${d.g.n}: every figure worked out · speed · model architecture · memory breakdown · how it's calculated`;
+    $('mathState').textContent = `${label} · ${d.gpus} × ${d.g.n}: every figure worked out · speed · model architecture · memory breakdown · how it's calculated`;
     renderBreakdown(d.r, d.tp, d.reps, d);
-    renderChunkOptions(d);
-    renderThroughput(d);
-    renderWorked(d);
+  } else {
+    const tp = S.tp = S.tpo==="auto" ? 8 : S.tpo; S.pp = 1;
+    $('mathState').textContent = MATH_STATE;
+    renderBreakdown(compute(tp, 1), tp, 1, null);
   }
+  renderChunkOptions(d);
+  renderThroughput(d);
+  renderWorked(d);
+  renderTpNote(activeModel(), S.tp, d);
 }
 function renderServerFleet(){
   saveSpec();
@@ -3400,14 +3414,7 @@ function renderServerFleet(){
   renderScope(A); renderRecFleet(A, cfgs); renderAllFleet(A, cfgs);
   $('viewhint').textContent = `Sizing all ${S.models.length} models together, each on GPUs of its own.`;
   const c = cfgById(cfgs, S.cfg) || A.rec, d = c && c.fits ? c.f.models[S.edit].d : null;
-  if(d && d.fits){
-    S.tp = d.tp; S.pp = d.pp;
-    $('mathState').textContent = `${specName(S.models[S.edit])} on ${c.sv.short} · ${d.gpus} × ${d.g.n}: every figure worked out · speed · model architecture · memory breakdown · how it's calculated`;
-    renderBreakdown(d.r, d.tp, d.reps, d);
-    renderChunkOptions(d);
-    renderThroughput(d);
-    renderWorked(d);
-  }
+  renderServerMath(c && c.fits ? `${specName(S.models[S.edit])} on ${c.sv.short}` : "", d && d.fits ? d : null);
 }
 /* render() for the Servers view: the view, then the parts of the page both views share */
 function renderServers(){
@@ -4252,12 +4259,15 @@ function renderTpNote(m, tp, active){
   renderPipeNote(active);
 }
 /* under the Pipeline control: which boards it can apply to, in which HPE server, and whether the
-   deployment on screen uses it */
+   deployment on screen uses it. The GPU view sizes each board in one server; the Servers view searches every
+   server in scope, so there it is the servers in scope with more than one bridged group. */
 function renderPipeNote(active){
-  const bridged = boardsInPlay().filter(g=> g.split);
+  const bridged = S.view==="srv"
+    ? CATALOG.servers.filter(sv=> S.scope.has(sv.id)).flatMap(sv=> sv.gpus.map(x=> boardIn(sv, x))).filter(b=> b && b.split && b.split < nodeMax(b))
+    : boardsInPlay().filter(g=> g.split);
   const where = g => `${g.n}${g.host ? ` in the ${g.host.short}` : ""}`;
   const groups = g => `${nodeMax(g)/g.split} groups of ${g.split}${g.bridge ? ` (${g.bridge})` : ""}`;
-  let t = !bridged.length ? `No board in play has NVLink bridge groups, so this changes nothing.`
+  let t = !bridged.length ? `No ${S.view==="srv" ? "server in scope" : "board in play"} has NVLink bridge groups, so this changes nothing.`
         : !S.pipe ? `<b>Off</b> — one copy stays within one NVLink bridge: ${bridged.map(g=> `${where(g)}, ${groups(g)}`).join("; ")}, so a full server runs one copy per group.`
         : `<b>On</b> — one copy may span every bridge group of the server as pipeline stages, tensor-parallel within each: ${bridged.map(g=> `${where(g)}, TP ${g.split} × ${nodeMax(g)/g.split} stages`).join("; ")}. It holds a model or users that one group can't; speed per user stays about one group's, since every stage still reads all of its weights for each token.`;
   if(active && active.pp>1) t += ` The deployment shown uses it.`;
@@ -4786,8 +4796,8 @@ document.querySelector('.verdict').addEventListener('click', e=>{
   const b = e.target.closest('[data-act]'); if(!b) return;
   if(b.dataset.act==="auto"){ S.board = "auto"; render(); }
   if(b.dataset.act==="tpauto") $('tp').querySelector('[data-v="auto"]').click();
-  if(b.dataset.act==="vnote") $('vnote').hidden = true;
 });
+$('vnote').addEventListener('click', e=>{ if(e.target.closest('[data-act="vnote"]')) $('vnote').hidden = true; });
 
 /* speed goal */
 const updateGoalHint = () => { $('goalHint').textContent = goalDesc(); };
@@ -5056,13 +5066,16 @@ function noteVersion(v, recorded, unknown = [], swapped = false){   // unknown: 
   }
   note.innerHTML = parts.join("<br>") + `<br><button type="button" class="linkbtn" data-act="vnote">Dismiss</button>`;
 }
+/* a link's value names one of an object's own entries: "constructor" or "__proto__" would otherwise pass as a
+   workload, goal or precision, and the page would size nothing (NaN throughout) or throw */
+const own = (o, k) => k!=null && Object.hasOwn(o, k);
 /* One model's settings from a link, worked out on S without touching the page: get(key) reads that
    model's keys, and base is the spec it starts from. Anything missing takes its default. */
 function parseSpec(get, base){
   return withSpec({...base, m: (findModel(get("m")) || findModel(DEFAULT_SPEC.m)).id}, ()=>{
     if(M.custom && get("c")) get("c").split("_").forEach((v, i)=>{ if(CUSTOM_FIELDS[i] && +v>0) S.custom[CUSTOM_FIELDS[i]] = +v; });
     const wq = get("wq") || "NATIVE";
-    if(wq in WQ_BYTES) S.wqLbl = wq;
+    if(own(WQ_BYTES, wq)) S.wqLbl = wq;
     fitWq();
     S.think = thinkDefault();
     const th = get("th"), mode = thinksOf(activeModel());
@@ -5071,7 +5084,7 @@ function parseSpec(get, base){
       else if(+th>=0){ S.think = true; S.thinkTok = Math.min(131072, Math.round(+th)); }
     }
     S.seeThink = get("tv")!=="hidden";
-    const w = WORKLOADS[get("w")] ? get("w") : "chat";
+    const w = own(WORKLOADS, get("w")) ? get("w") : "chat";
     if(w==="custom"){
       const p = Math.round(+get("p")), r = Math.round(+get("r"));   // a length that isn't a count of tokens takes the default
       S.wantPrompt = p>=1 ? Math.min(1048576, p) : 2048; S.wantReply = r>=1 ? Math.min(1048576, r) : 512;
@@ -5081,14 +5094,14 @@ function parseSpec(get, base){
     S.chunk = CHUNK_NAME[+get("ck")] ? +get("ck") : S.chunkBase;
     const u = Math.round(+get("u"));
     S.users = u>=1 ? Math.min(USERS_MAX, u) : 16;
-    S.goal = GOALS[get("g")] ? get("g") : "smooth";
+    S.goal = own(GOALS, get("g")) ? get("g") : "smooth";
     S.kq = segValue('kq', get("kv") || "FP16") ?? S.kq;
     S.tpo = segValue('tp', get("tp") || "auto") ?? S.tpo;
     S.pipe = get("pp")==="on" ? 1 : 0;
     if(w==="custom" && get("sh")!==null){ S.shared = Math.max(0, Math.round(+get("sh")) || 0); S.fresh = get("fr")==="rest" || get("fr")===null ? null : Math.max(1, Math.round(+get("fr")) || 1); }
     S.extra = (get("x") || "").split(".").map(s=>{
       const [key, u, p, r, sh, fr] = s.split("_"), n = Math.round(+u);
-      if(!WORKLOADS[key] || !(n>=1)) return null;
+      if(!own(WORKLOADS, key) || !(n>=1)) return null;
       const x = presetInto({users: Math.min(USERS_MAX, n)}, key);
       if(key==="custom") Object.assign(x, {wantPrompt: Math.min(1048576, Math.max(1, Math.round(+p) || 2048)), wantReply: Math.min(1048576, Math.max(1, Math.round(+r) || 512)),
         shared: Math.max(0, Math.round(+sh) || 0), fresh: fr===undefined || fr==="rest" ? null : Math.max(1, Math.round(+fr) || 1)});
@@ -5139,7 +5152,7 @@ function applyHash(){
     S.ovpct = q.has("ov") && ov>=0 && ov<=25 ? ov : 7;
     S.cache = q.get("pc")==="off" ? 0 : 1;
     S.srv = q.get("sv")==="nv" ? 1 : 0;
-    if(q.get("tx")==="on"){ S.words = "tech"; syncWords(); }   // the sender's technical wording, not saved as this viewer's choice
+    S.words = q.get("tx")==="on" ? "tech" : loadWords(); syncWords();   // the sender's technical wording, not saved as this viewer's choice; without it, the viewer's own
     S.mem = q.get("mm")==="least" ? 0 : q.get("mm")==="all" ? 2 : 1;
     /* the Servers view is the answer unless the link says otherwise; links made before it existed open as they were, in the GPU view */
     S.view = q.get("vw")==="gpu" || (!q.has("vw") && olderThan(v || LINK_BEFORE, "1.7.0")) ? "gpu" : "srv";
