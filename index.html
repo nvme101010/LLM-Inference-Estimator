@@ -2145,6 +2145,7 @@ const S = { wq:2, wqLbl:"NATIVE", kq:2, tp:1, pp:1, tpo:"auto", pipe:0, chunk:51
             scope:null,        // the Servers view's servers in scope: a Set of catalog ids (every server, set at start)
             cfg:null,          // the configuration its detail shows: "<server id>|<board>", or null for the recommendation
             layoutsOpen:false, // whether the card's Other layouts on this server is open: closed to start, kept across redraws
+            gpusOpen:false,    // the same for its Other GPUs in this server
             workload:"chat", prompt:2048, reply:512, wantPrompt:2048, wantReply:512,
             think:false, thinkTok:4096, thinking:0,
             seeThink:true,     // Users see the thinking: the speed goal's wait is to the first token; off, to the answer
@@ -3106,7 +3107,7 @@ const growOf = c => c.best ? c.opts.filter(d=> d.gpus > c.best.gpus && d.meets &
    as such, with how it compares and the way back. */
 function renderRec(A, cfgs){
   const el = $('svRec'), all = allUsers(), pick = cfgById(cfgs, S.cfg);
-  if(pick && (!A.rec || pick.id!==A.rec.id)) return renderPick(A, pick);
+  if(pick && (!A.rec || pick.id!==A.rec.id)) return renderPick(A, pick, cfgs);
   if(!A.rec){
     el.innerHTML = `<span class="eyebrow-s warn">${S.scope.size ? "No server in scope holds it" : "No servers in scope"}</span>`
       + `<h2 class="rec-name">${S.scope.size ? "Too big for every server in scope" : "Pick at least one server"}</h2>`
@@ -3116,10 +3117,10 @@ function renderRec(A, cfgs){
   const c = A.rec;
   const eyebrow = c.ok ? `<span class="eyebrow-s">Recommended · least GPU memory that meets your goal</span>`
                        : `<span class="eyebrow-s warn">Closest · serves ${commas(c.best.served)} of ${commas(all)} within your goal</span>`;
-  el.innerHTML = configCard(c, eyebrow, "");
+  el.innerHTML = configCard(c, eyebrow, "", "", cfgs);
 }
 /* a picked configuration: as the recommendation's card, labelled, with the comparison and the way back */
-function renderPick(A, c){
+function renderPick(A, c, cfgs){
   const all = allUsers(), back = `<button type="button" class="linkbtn" data-cfg="">Back to the recommendation</button>`;
   const r = A.rec && A.rec.best, d = c.best;
   const eyebrow = !d ? `<span class="eyebrow-s warn">Your pick · won't hold the model</span>`
@@ -3127,7 +3128,29 @@ function renderPick(A, c){
                 : `<span class="eyebrow-s warn">Your pick · ${d.served ? `serves ${commas(d.served)} of ${commas(all)} within your goal` : "too slow for your goal"}</span>`;
   const cmp = !r || !d ? "" : `Against the recommended ${esc(A.rec.sv.short)} (${r.gpus} × ${esc(r.g.n)}): `
     + `${tpsSpan(d.t.perUser)[0]} vs ${tpsSpan(r.t.perUser).join(" ")} per user, room for ${commas(d.room)} vs ${commas(r.room)}, ${boxTotal(d.memGB)} vs ${boxTotal(r.memGB)} of GPU memory${cfgU(c) && cfgU(A.rec) && cfgU(c)!==cfgU(A.rec) ? `, ${cfgU(c)}U vs ${cfgU(A.rec)}U` : ""}.`;
-  $('svRec').innerHTML = configCard(c, eyebrow, cmp, back);
+  $('svRec').innerHTML = configCard(c, eyebrow, cmp, back, cfgs);
+}
+/* every GPU the card's server takes, each at its best configuration, folded away under the card: the same columns
+   and order as Every server in scope, with the card count beside every verdict; a row puts that GPU on the card */
+function gpusBox(c, cfgs){
+  const all = allUsers(), mine = cfgs.filter(o=> o.sv.id===c.sv.id);
+  if(mine.length < 2) return "";
+  const meet = mine.filter(o=> o.ok).sort(leanOrder), below = mine.filter(o=> o.fits && !o.ok).sort((x, y)=> y.best.served - x.best.served || leanOrder(x, y));
+  const cant = mine.filter(o=> !o.fits).sort((x, y)=> y.usable - x.usable), rows = [...meet, ...below];
+  return `<details class="more rec-layouts rec-gpus"${S.gpusOpen ? " open" : ""}><summary><span class="sum-title">Other GPUs in this server</span>`
+    + `<span class="sum-state">${mine.length} GPUs · ${meet.length} meet${meet.length===1 ? "s" : ""} your goal</span></summary>`
+    + `<span class="cap">Each at its best configuration in this server, ranked as the recommendation is. Click one to see it on this card.</span>`
+    + (rows.length ? `<div class="tbl"><table><thead><tr><th scope="col">GPUs</th><th scope="col" class="num">Per user</th><th scope="col" class="num">Room for</th><th scope="col" class="num">GPU memory</th></tr></thead><tbody>`
+      + rows.map(o=>{ const d = o.best;
+          return `<tr class="${o.id===c.id ? "sel" : ""}${o.ok ? "" : " dim"}"><th scope="row"><button type="button" class="rowbtn" data-cfg="${esc(o.id)}">${d.gpus} × ${esc(gpuName(d.g))}</button>`
+            + `${d.L.n>1 && !d.nr ? ` · ${wiringShort(o, d)}` : ""}${o===meet[0] ? ` <span class="pill sugg">Best in this server</span>` : ""}${flagPills(d)}</th>`
+            + `<td class="num">${tpsSpan(d.t.perUser).join(" ")}${star(d)}</td>`
+            + `<td class="num">${o.ok ? commas(d.room) : `<span class="warnx">${d.served ? `${commas(d.served)} of ${commas(all)}` : "none within goal"}</span>`}</td>`
+            + `<td class="num">${boxTotal(d.memGB)}</td></tr>`; }).join("")
+      + `</tbody></table></div>` : "")
+    + (cant.length ? `<p class="cap"><b>Won't hold it</b>, since one copy needs about ${fmtMem(needGB())}: `
+      + cant.map(o=> `<button type="button" class="linkbtn" data-cfg="${esc(o.id)}">${esc(gpuName({n: o.x.board}))}</button> (at most ${fmtMem(o.usable)})`).join(" · ") + `.</p>` : "")
+    + `</details>`;
 }
 /* every layout on the card's server, at each number of cards, folded away under the card */
 function layoutsBox(c){
@@ -3149,8 +3172,8 @@ function layoutsBox(c){
 /* where the server's GPUs, bridges, card count and constraints come from */
 const sourcesLine = sv => `<p class="cap">Sources: <a href="${CATALOG.matrix.url}" target="_blank" rel="noopener">${esc(CATALOG.matrix.title)}, version ${esc(CATALOG.matrix.version)}</a> for which GPUs and bridges the server takes; `
   + `<a href="${esc(sv.quickspecs.url)}" target="_blank" rel="noopener">its US QuickSpecs, version ${esc(sv.quickspecs.version)} (${esc(sv.quickspecs.date)})</a> for the card count and constraints. Confirm a build against the current QuickSpecs.</p>`;
-/* one configuration's card: server, build and bays, figures, layout, and every other layout on its cards */
-function configCard(c, eyebrow, cmp, back = ""){
+/* one configuration's card: server, build and bays, figures, layout, then the server's other GPUs and every other layout on its cards */
+function configCard(c, eyebrow, cmp, back = "", cfgs = []){
   const d = c.best, sv = c.sv, grow = growOf(c);
   if(!d) return `<div class="rec-top"><div class="rec-main">${eyebrow}`
     + `<h2 class="rec-name">${hostLink(HPE_HOSTS.find(h=> h.id===sv.id))}</h2>`
@@ -3159,6 +3182,7 @@ function configCard(c, eyebrow, cmp, back = ""){
     + `<p class="rec-why">One copy needs about ${fmtMem(needGB())} of GPU memory; this server carries ${fmtMem(c.usable)} at most with this GPU.</p>`
     + `</div>`
     + bridgeBays(c, null) + `</div>`
+    + gpusBox(c, cfgs)
     + `<div class="rec-acts">${back}</div>`;
   const extrap = !d.g.bench;
   return `<div class="rec-head">${eyebrow}<h2 class="rec-name">${hostLink(HPE_HOSTS.find(h=> h.id===sv.id))}</h2>`
@@ -3175,7 +3199,7 @@ function configCard(c, eyebrow, cmp, back = ""){
     + (grow ? `<p class="rec-grow">Room to grow: ${growText(grow)} in this server serve up to ${commas(grow.room)} users.</p>` : "")
     + `<h3 class="colh">Layout</h3><p class="rec-why">${layoutWhy(c, d)}</p>`
     + `</section></div>`
-    + layoutsBox(c)
+    + gpusBox(c, cfgs) + layoutsBox(c)
     + `<div class="rec-acts">${back}<button type="button" class="tool-btn" data-copylink>Copy link</button></div>`;
 }
 /* Every server in scope, in one table ranked as the recommendation is: those that meet the goal at their best
@@ -3408,7 +3432,10 @@ $('viewbar').addEventListener('click', e=>{
   S.view = b.dataset.view; render();
 });
 /* the card is drawn afresh on every change, so whether its Other layouts is open lives in S */
-$('svRec').addEventListener('toggle', e=>{ if(e.target.classList.contains('rec-layouts')) S.layoutsOpen = e.target.open; }, true);
+$('svRec').addEventListener('toggle', e=>{
+  if(e.target.classList.contains('rec-gpus')) S.gpusOpen = e.target.open;
+  else if(e.target.classList.contains('rec-layouts')) S.layoutsOpen = e.target.open;
+}, true);
 $('serverView').addEventListener('click', e=>{
   const t = e.target.closest('[data-scope],[data-scope-all],[data-scope-none],[data-cfg],[data-copylink]');
   if(!t) return;
