@@ -1969,7 +1969,6 @@ const HPE_HOSTS = CATALOG.servers.map(sv=> ({
     return [x.board, o];
   })),
 }));
-const HPE_UNSIZED = CATALOG.unsized;
 const findHost = id => HPE_HOSTS.find(h=> h.id===id);
 /* a board's default HPE server, the first that sells it; null if none */
 const hostOf = g => HPE_HOSTS.find(h=> h.boards[g.n]) || null;
@@ -3098,8 +3097,7 @@ function renderScope(A){
         `<div class="chipgroup" role="group" aria-label="${esc(grp)}"><span class="gl">${esc(grp)}</span><span class="chiprow">`
         + CATALOG.servers.filter(sv=> sv.group===grp).map(sv=>
             `<button type="button" class="chip" data-scope="${sv.id}" aria-pressed="${S.scope.has(sv.id)}">${esc(sv.short)}</button>`).join("")
-        + `</span></div>`).join("") + `</div>`
-    + `<p class="cap">Also sold with these GPUs, but HPE publishes no card count, so not sized: ${HPE_UNSIZED.map(u=> `${esc(u.name)} (${u.boards.map(esc).join(", ")})`).join("; ")}.</p>`;
+        + `</span></div>`).join("") + `</div>`;
 }
 /* the same server with more cards: the option with the most room that meets the goal for everyone */
 const growOf = c => c.best ? c.opts.filter(d=> d.gpus > c.best.gpus && d.meets && !d.partial && !d.nr).sort((a, b)=> b.room - a.room || a.gpus - b.gpus)[0] || null : null;
