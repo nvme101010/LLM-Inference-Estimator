@@ -3958,6 +3958,21 @@ function renderServer(d){
 /* every board in its smallest layout that serves everyone within the goal: one row each, with the
    reasoning behind a row's GPU count behind a chevron (open by default on the active board) */
 const OPEN_WHY = new Set();
+/* A board whose largest node can't serve everyone: the pill says so with the full node's figure, and the Why row says
+   what limits it. "Serves" counts users within the speed goal, "holds" users by memory alone, below the goal. */
+function partialPill(d, users, hasGoal){
+  const txt = d.meets ? `Full node serves ${commas(d.served)} of ${commas(users)}${hasGoal ? " within goal" : ""}`
+                      : `Full node holds ${commas(d.served)} of ${commas(users)}, below goal`;
+  return `<span class="pill warn" data-tip="partial" tabindex="0">${txt}</span>`;
+}
+function partialWhy(b, d, all, hasGoal){
+  const node = `${d.gpus} × ${b.n} is the largest node this board allows (${layoutText(d)}), and it ${d.meets ? "serves" : "holds"} ${commas(d.served)} of your ${commas(all)} users`;
+  if(!hasGoal) return `${node}: that is all its memory holds. Serving everyone takes more than one node, which this table doesn't size.`;
+  if(!d.meets) return `${node}, all of them below your speed goal. Serving everyone takes more than one node, which this table doesn't size.`;
+  const holds = copyCapacity(b, d.tp, 1e6, true) * d.reps;   // by memory alone, at the same layout
+  const limit = holds > d.served ? `By memory it would hold about ${commas(holds)}; the limit is speed: with more users on it, each one falls below your speed goal.` : `Its memory holds no more.`;
+  return `${node} within your speed goal. ${limit} Serving everyone takes more than one node, which this table doesn't size.`;
+}
 function renderCards(deps, active, suggested, picked){
   const hasGoal = S.goal!=="any", all = allUsers();
   $('fitcap').innerHTML = (S.tpo==="auto"
@@ -3972,7 +3987,7 @@ function renderCards(deps, active, suggested, picked){
     const systems = systemsIn(d);          // counted in whole systems, the layout then says how they're used
     let status = "";                        // a pill only when something is wrong; a good fit is quiet
     if(!d.fits) status = `<span class="pill bad">${S.tpo==="auto" ? "Won't fit on a node" : `Not on ${d.tp} GPUs`}</span>`;
-    else if(d.partial) status = `<span class="pill warn">${d.meets ? "Serves" : "Holds"} ${commas(d.served)} of ${commas(all)}</span>`;
+    else if(d.partial) status = partialPill(d, all, hasGoal);
     else if(!d.meets) status = `<span class="pill warn">Below goal</span>`;
     const layout = d.fits ? layoutText(d) : "—";
     if(!status && slow) status = `<span class="pill bad" data-tip="pcieSlow${b.fab ? "Amd" : ""}" tabindex="0">Not recommended</span><span class="lay">${layout}</span>`;
@@ -3996,7 +4011,7 @@ function renderCards(deps, active, suggested, picked){
         : !d.fits ? `The model needs ${fmtMem(d.perGB*d.tp)}, but ${d.tp} GPU${d.tp===1 ? "" : "s"} can use only ${fmtMem(b.cap*USABLE*d.tp)} (90% of capacity).${
             S.tpo!=="auto" ? "" : b.split && !S.pipe ? ` Its servers hold up to ${nodeMax(b)} cards, but an NVLink bridge joins at most ${b.split}, so one copy of a model spans at most ${b.split} of them. Turn on <b>Pipeline across bridge groups</b> in Advanced settings to let a copy span all ${nodeMax(b)}.`
             : nodeMax(b) < NODE ? ` Its servers hold up to ${nodeMax(b)} cards${S.srv ? " by NVIDIA's guidance" : ""}, and one copy of a model can be split across at most ${Math.max(...TP_OPTIONS.filter(t=> t<=nodeMax(b)))} of them.` : ""}`
-        : d.partial ? `This is the most one server can ${d.meets ? "serve" : "hold"}${hasGoal && d.meets ? " at your speed goal" : hasGoal ? ", and it is below your speed goal" : ""}.`
+        : d.partial ? partialWhy(b, d, all, hasGoal)
         : forSpeed(d) ? `Fits on ${d.memOnly.gpus} GPU${d.memOnly.gpus===1 ? "" : "s"}, but ${
             tpsLow(d.memOnly.t) < GOALS[S.goal].tps ? `only at ${tpsSpan(d.memOnly.t.perUser).join(" ")} per user`
             : hideThink() ? `the answer starts after ${answerSpan(d.memOnly.t).join(" ")}`
@@ -4369,7 +4384,7 @@ const withinGoal = m => m.d.fits && m.d.meets && !m.d.partial;
 function modelPill(m){
   const d = m.d;
   if(!d.fits) return `<span class="pill bad">Won't fit</span>`;
-  if(d.partial) return `<span class="pill warn">${d.meets ? "Serves" : "Holds"} ${commas(d.served)} of ${commas(m.users)}</span>`;
+  if(d.partial) return partialPill(d, m.users, m.spec.goal!=="any");
   if(!d.meets) return `<span class="pill warn">Below goal</span>`;
   if(notRecommended(d)) return `<span class="pill bad" data-tip="pcieSlow${d.g.fab ? "Amd" : ""}" tabindex="0">Not recommended</span>`;
   return "";
@@ -5504,10 +5519,11 @@ const TIPS = {
   units:"GB is 1,000,000,000 bytes, the unit on spec sheets and download pages. GiB is 1,073,741,824 bytes, the unit nvidia-smi, PyTorch and vLLM report. Switching only relabels memory; the recommendation doesn't change. Board capacities are the size on the box, counted as GB: 80 GB is 74.5 GiB.",
   usable:"The dashed line marks how much memory the model may use: 90% of each GPU. That is vLLM's default limit (gpu_memory_utilization = 0.9); the other 10% is left for the driver and anything else on the card. A setup fits only if its memory stays to the left of the line.",
   perGPU:"What each individual board must hold. This is the number that determines fit — a model can need 300 GB total and still run fine on 4 × 80 GB.",
-  fit:"What one node of each board takes to serve everyone: up to 8 GPUs, as one copy of the model or several, and how much GPU memory that adds up to. If one node can't serve everyone, its row says how many users it does serve. Assumes ~90% of board memory is usable; drivers and the CUDA context claim the rest.",
+  fit:"What one node of each board takes to serve everyone: up to 8 GPUs, as one copy of the model or several, and how much GPU memory that adds up to. If one node can't serve everyone, its row says how many its full node serves within your speed goal, which can be far fewer than its memory holds. Assumes ~90% of board memory is usable; drivers and the CUDA context claim the rest.",
   nvlink:"NVLink is the direct GPU-to-GPU link that splitting one copy of a model across GPUs needs to be fast. On the H200 NVL card, an NVLink bridge joins 2 or 4 cards to each other, never more: a server with 8 cards has two bridged groups of 4, so it runs two copies of the model, and one copy spans at most 4 — unless Pipeline across bridge groups is on in Advanced settings, which lets one copy span both groups as pipeline stages. In an 8-GPU HGX system (the HGX H200, HGX B200 and HGX B300) an NVSwitch joins all 8 GPUs' NVLink lanes, so every GPU reaches every other at full speed.",
   fabricAmd:"Infinity Fabric is AMD's direct GPU-to-GPU link. On the MI355X's 8-GPU board there is no switch: each GPU has one link to each of the other 7, at 76.8 GB/s each way. A copy split across all 8 uses all 7 links, 538 GB/s each way, but a copy on 2 GPUs uses only the link between them and a copy on 4 uses 3, where an NVSwitch in an HGX system gives any group of GPUs the full link speed. So splitting across 2 or 4 MI355X GPUs costs more per layer than on an HGX.",
   pcie:"PCIe-only — no NVLink. Fine for a single GPU, but tensor parallelism must all-reduce over a far slower link after every layer, so throughput suffers badly.",
+  partial:"The most one node of this board can do. The row shows its largest node (up to 8 GPUs) loaded with as many users as it serves within your speed goal, which is often far fewer than its memory holds, since every user added slows the others. Serving everyone takes more than one node, and the page sizes one node per board. Holds, rather than serves, means the count is by memory alone and every user on it is below the goal.",
   pcieSlow:"Not recommended. This board has no NVLink, and here one copy of the model has to be split across several of them, so the GPUs exchange data over PCIe after every layer. That is slower than the same number of NVLink cards, and the speed shown already reflects it. It works and can be picked, but it is never the suggestion; prefer a board that holds a copy on one GPU, or an NVLink board.",
   pcieAmd:"PCIe-only — no Infinity Fabric, AMD's direct GPU-to-GPU link. Fine for a single GPU, but tensor parallelism must all-reduce over a far slower link after every layer, so throughput suffers badly.",
   pcieSlowAmd:"Not recommended. This board has no Infinity Fabric, AMD's direct GPU-to-GPU link, and here one copy of the model has to be split across several of them, so the GPUs exchange data over PCIe after every layer. That is slower than the same number of directly linked cards, and the speed shown already reflects it. It works and can be picked, but it is never the suggestion; prefer a board that holds a copy on one GPU, or one with a direct GPU link.",
@@ -5568,10 +5584,11 @@ const TIPS_PLAIN = {
   units:"GB is a billion bytes, the unit on spec sheets. GiB is slightly bigger (about 1.07 GB) and is what GPU monitoring tools show. Switching only changes the labels, not the recommendation.",
   usable:"The dashed line is how much of each GPU the model may use: 90%. Serving software leaves the other 10% free for the GPU driver. A setup fits only if its memory stays left of the line.",
   perGPU:"What each single GPU has to hold. This decides whether it fits: a model can need 300 GB in total and still run fine on 4 GPUs of 80 GB each.",
-  fit:"What one server of each board needs to serve everyone: up to 8 GPUs, as one copy of the model or several, and how much GPU memory that adds up to. If one server can't serve everyone, its row says how many it does serve.",
+  fit:"What one server of each board needs to serve everyone: up to 8 GPUs, as one copy of the model or several, and how much GPU memory that adds up to. If one server can't serve everyone, its row says how many its biggest server serves at your speed goal, which can be far fewer than its memory would hold.",
   nvlink:"NVLink is NVIDIA's fast direct connection between GPUs, which splitting one copy of a model across GPUs needs. On H200 NVL cards a bridge joins 2 or 4 cards, never more, so 8 cards run as two groups of 4 with a copy in each. In an 8-GPU HGX system all 8 GPUs are joined by a switch, so any of them can work together at full speed.",
   fabricAmd:"Infinity Fabric is AMD's fast direct connection between GPUs. On the MI355X's 8-GPU board each GPU has its own link to each of the other 7, with no switch in between, so a copy split across 2 or 4 GPUs uses only some of the links and is slower per step than on an NVIDIA HGX.",
   pcie:"No direct connection between these GPUs, only the server's ordinary internal one. Fine for one GPU per copy, but splitting a copy across several GPUs makes them wait on that slow connection, so speed suffers badly.",
+  partial:"The most one server of this board can do. The row shows its biggest server (up to 8 GPUs) with as many users as it can serve at your speed goal, which is often far fewer than its memory would hold, since every user added slows the others down. Serving everyone takes more than one server, and the page sizes one per board. Holds, rather than serves, means the count is by memory alone and every user on it is below the goal.",
   pcieSlow:"Not recommended. This board has no fast direct connection between GPUs, and here one copy of the model has to be split across several of them, so they wait on the server's slower internal connection. The speed shown already includes that. It works, but it's never the suggestion: prefer a board that fits a copy on one GPU, or one with NVLink.",
   pcieAmd:"No Infinity Fabric (AMD's fast direct connection between GPUs), only the server's ordinary internal one. Fine for one GPU per copy, but splitting a copy across several GPUs makes them wait on that slow connection, so speed suffers badly.",
   pcieSlowAmd:"Not recommended. This board has no Infinity Fabric (AMD's fast direct connection between GPUs), and here one copy of the model has to be split across several of them, so they wait on the server's slower internal connection. The speed shown already includes that. It works, but it's never the suggestion.",

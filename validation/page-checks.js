@@ -65,6 +65,16 @@
   const h1 = stateToHash(); open(h1); const h2 = stateToHash();
   check("a complex link survives a round trip", h1===h2 && broken()===0, h1===h2 ? "" : `${h1}\n${h2}`);
 
+  /* 6. a board whose largest node can't serve everyone: its pill names the full node and that the count is within the
+        goal, with a tooltip in both wordings, and its Why row says what limits it. "Serves 31 of 150" beside "8 × GPU"
+        used to read as the layout of an 8-GPU node that supports only 31 users */
+  open("v=1.11.9&m=glm53-flash&u=150&w=agent&th=4096&g=smooth&vw=gpu");
+  const prow = [...document.querySelectorAll('.boards tbody tr.brow')].find(r=> r.textContent.includes("RTX PRO 6000"));
+  const ppill = prow && prow.querySelector('.pill.warn'), pwhy = prow && prow.nextElementSibling;
+  check("partial node: the pill names the full node and the goal", !!ppill && /^Full node serves [\d,]+ of 150 within goal$/.test(ppill.textContent) && ppill.dataset.tip==="partial", ppill ? ppill.textContent : "no pill on the RTX PRO 6000 row");
+  check("partial node: the Why row says what limits it", !!pwhy && pwhy.classList.contains("bwhy") && /largest node this board allows/.test(pwhy.textContent) && /the limit is speed/.test(pwhy.textContent), pwhy ? pwhy.textContent : "no Why row");
+  check("partial node: the tooltip exists in both wordings", typeof TIPS.partial==="string" && typeof TIPS_PLAIN.partial==="string");
+
   removeEventListener('error', onErr);
   check("no uncaught errors during the checks", errs.length===0, errs.join("; "));
   open("v=1.11.8&m=l31-8b&u=16&w=chat");   // leave the page at its defaults
