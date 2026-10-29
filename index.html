@@ -477,6 +477,7 @@
   .viewbar button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
   .viewhint{font-size:12.5px; color:var(--muted); margin-left:6px}
   .sview{display:flex; flex-direction:column; gap:18px}
+  .sv-list{border-top:1px solid var(--line)}   /* the server list folds away like Advanced settings */
   .sview[hidden], .sv[hidden]{display:none}
   .sv{padding:20px 22px; display:flex; flex-direction:column; gap:14px}
   .sv h2{margin:0; font-size:15px; font-weight:600}
@@ -724,7 +725,10 @@
     <div class="sview" id="serverView">
       <section class="panel sv" id="svScope" aria-label="Servers in scope"></section>
       <section class="panel sv rec" id="svRec" aria-label="Recommended server"></section>
-      <section class="panel sv" id="svAll" aria-label="Every server in scope"></section>
+      <details class="panel more" id="svAll">
+        <summary><span class="sum-title">Every server in scope</span><span class="sum-state" id="svAllState"></span></summary>
+        <div class="sv sv-list" id="svAllBody"></div>
+      </details>
     </div>
 
     <!-- ============ THE ANSWER (GPU view) ============ -->
@@ -3193,9 +3197,11 @@ function renderAll(A, cfgs){
   const tagOf = c => A.rec && c.sv.id===A.rec.sv.id ? ` <span class="pill sugg">Recommended</span>`
     : A.down && c.sv.id===A.down.sv.id ? ` <span class="pill neutral" data-tip="svSmaller" tabindex="0">Smaller server</span>`
     : A.upBig && c.sv.id===A.upBig.sv.id ? ` <span class="pill neutral" data-tip="svMoreRoom" tabindex="0">More room</span>` : "";
-  $('svAll').innerHTML = `<div class="svhead"><h2>Every server in scope</h2><span class="cap">${rows.length
+  $('svAllState').textContent = [`${meet.length} meet${meet.length===1 ? "s" : ""} your goal`, below.length ? `${below.length} below it` : "",
+    cant.length ? `${cant.length} can't hold it` : ""].filter(Boolean).join(" · ");
+  $('svAllBody').innerHTML = `<p class="cap">${rows.length
       ? `Ranked as the recommendation is${below.length ? `; dimmed, those that can't serve all ${plural(all, "user")} within your goal` : ""}. Click a server to see it on the card.`
-      : "None of them holds the model."}</span></div>`
+      : "None of them holds the model."}</p>`
     + (rows.length ? `<div class="tbl"><table><thead><tr><th scope="col">Server</th><th scope="col">GPUs</th>`
       + `<th scope="col" class="num">Per user</th><th scope="col" class="num">Room for</th><th scope="col" class="num">GPU memory</th></tr></thead><tbody>`
       + rows.map(x=>{ const c = x.top, d = c.best;
@@ -3332,9 +3338,11 @@ function renderAllFleet(A, cfgs){
   while(left.length){ const t = bestFleet(left.map(x=> x.top)); ranked.push(...left.splice(left.findIndex(x=> x.top===t), 1)); }
   const hold = [...ranked, ...servers.filter(x=> x.top && !x.top.ok).sort((x, y)=> fleetClose(x.top, y.top))];
   const cant = servers.filter(x=> !x.top), meet = ranked.length;
-  $('svAll').innerHTML = `<div class="svhead"><h2>Every server in scope</h2><span class="cap">${hold.length
+  $('svAllState').textContent = [`${meet} meet${meet===1 ? "s" : ""} every model's goal`, hold.length - meet ? `${hold.length - meet} below it` : "",
+    cant.length ? `${cant.length} can't hold them` : ""].filter(Boolean).join(" · ");
+  $('svAllBody').innerHTML = `<p class="cap">${hold.length
       ? `Ranked as the recommendation is${hold.length - meet ? "; dimmed, those that hold every model but not all within their goals" : ""}. Click a server to see it on the card.`
-      : "None of them holds every model."}</span></div>`
+      : "None of them holds every model."}</p>`
     + (hold.length ? `<div class="tbl"><table><thead><tr><th scope="col">Server</th><th scope="col">GPUs</th><th scope="col" class="num">Within goal</th><th scope="col" class="num">GPU memory</th></tr></thead><tbody>`
       + hold.map(x=>{ const c = x.top;
           const tag = A.rec && c.id===A.rec.id ? ` <span class="pill sugg">Recommended</span>` : "";
