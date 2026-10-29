@@ -563,14 +563,11 @@
   .tbl .pill{margin-left:6px; vertical-align:1px}
   .sv .warnx{color:var(--warn); font-weight:500}
   .sv .cap .linkbtn{margin:0; font-size:inherit}
-  .gpuswitch{display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:4px}
-  .gpuswitch .sublbl{width:100%}
   /* the other layouts on the card's server, folded away at the foot of the card */
   .rec-layouts{border-top:1px solid var(--line); margin-top:4px}
   .rec-layouts > summary{padding:14px 0 4px}
   .rec-layouts .tbl{margin-top:8px}
   .sv .cap a{color:var(--accent-ink); text-underline-offset:2px}
-  .chipnote{font-size:11px; color:var(--muted); font-weight:400; margin-left:4px}
   .svnotes{margin:0; padding-left:18px; font-size:12.5px; color:var(--ink-2); display:flex; flex-direction:column; gap:3px}
   @media (max-width:640px){
     .sv .rec-name{font-size:23px}
@@ -2881,7 +2878,7 @@ const needGB = () => compute(1, 1, 1).total/GB;
 
 /* ---------------- the Servers view: on the page ----------------
    Three parts, top to bottom: the servers in scope (chips); the card for the recommendation, or the configuration
-   picked from the list (its build, figures, the other GPUs its server takes and every layout on its cards); and
+   picked from the list (its build, figures and every layout on its cards); and
    every server in scope (those that hold the model, then bars for the servers that can't). */
 const cfgById = (cfgs, id) => cfgs.find(c=> c.id===id) || null;
 /* the bridge a configuration's copies need: the smallest that joins a copy's cards (per stage when pipelined);
@@ -3105,7 +3102,7 @@ const growOf = c => c.best ? c.opts.filter(d=> d.gpus > c.best.gpus && d.meets &
    as such, with how it compares and the way back. */
 function renderRec(A, cfgs){
   const el = $('svRec'), all = allUsers(), pick = cfgById(cfgs, S.cfg);
-  if(pick && (!A.rec || pick.id!==A.rec.id)) return renderPick(A, pick, cfgs);
+  if(pick && (!A.rec || pick.id!==A.rec.id)) return renderPick(A, pick);
   if(!A.rec){
     el.innerHTML = `<span class="eyebrow-s warn">${S.scope.size ? "No server in scope holds it" : "No servers in scope"}</span>`
       + `<h2 class="rec-name">${S.scope.size ? "Too big for every server in scope" : "Pick at least one server"}</h2>`
@@ -3115,10 +3112,10 @@ function renderRec(A, cfgs){
   const c = A.rec;
   const eyebrow = c.ok ? `<span class="eyebrow-s">Recommended · least GPU memory that meets your goal</span>`
                        : `<span class="eyebrow-s warn">Closest · serves ${commas(c.best.served)} of ${commas(all)} within your goal</span>`;
-  el.innerHTML = configCard(c, eyebrow, "", "", cfgs);
+  el.innerHTML = configCard(c, eyebrow, "");
 }
 /* a picked configuration: as the recommendation's card, labelled, with the comparison and the way back */
-function renderPick(A, c, cfgs){
+function renderPick(A, c){
   const all = allUsers(), back = `<button type="button" class="linkbtn" data-cfg="">Back to the recommendation</button>`;
   const r = A.rec && A.rec.best, d = c.best;
   const eyebrow = !d ? `<span class="eyebrow-s warn">Your pick · won't hold the model</span>`
@@ -3126,14 +3123,7 @@ function renderPick(A, c, cfgs){
                 : `<span class="eyebrow-s warn">Your pick · ${d.served ? `serves ${commas(d.served)} of ${commas(all)} within your goal` : "too slow for your goal"}</span>`;
   const cmp = !r || !d ? "" : `Against the recommended ${esc(A.rec.sv.short)} (${r.gpus} × ${esc(r.g.n)}): `
     + `${tpsSpan(d.t.perUser)[0]} vs ${tpsSpan(r.t.perUser).join(" ")} per user, room for ${commas(d.room)} vs ${commas(r.room)}, ${boxTotal(d.memGB)} vs ${boxTotal(r.memGB)} of GPU memory${cfgU(c) && cfgU(A.rec) && cfgU(c)!==cfgU(A.rec) ? `, ${cfgU(c)}U vs ${cfgU(A.rec)}U` : ""}.`;
-  $('svRec').innerHTML = configCard(c, eyebrow, cmp, back, cfgs);
-}
-/* the other GPUs the card's server takes, each a button to see it on the card */
-function gpuSwitch(c, cfgs){
-  const siblings = cfgs.filter(o=> o.sv.id===c.sv.id);
-  return siblings.length > 1 ? `<div class="gpuswitch" role="group" aria-label="GPUs in this server"><span class="sublbl">GPUs in this server</span>`
-    + siblings.map(o=> `<button type="button" class="chip" data-cfg="${esc(o.id)}" aria-pressed="${o.id===c.id}">${esc(o.x.board.replace(" Blackwell", ""))}`
-      + ` <span class="chipnote">${o.ok ? "meets goal" : o.fits ? "below goal" : "won't hold it"}</span></button>`).join("") + `</div>` : "";
+  $('svRec').innerHTML = configCard(c, eyebrow, cmp, back);
 }
 /* every layout on the card's server, at each number of cards, folded away under the card */
 function layoutsBox(c){
@@ -3155,20 +3145,20 @@ function layoutsBox(c){
 /* where the server's GPUs, bridges, card count and constraints come from */
 const sourcesLine = sv => `<p class="cap">Sources: <a href="${CATALOG.matrix.url}" target="_blank" rel="noopener">${esc(CATALOG.matrix.title)}, version ${esc(CATALOG.matrix.version)}</a> for which GPUs and bridges the server takes; `
   + `<a href="${esc(sv.quickspecs.url)}" target="_blank" rel="noopener">its US QuickSpecs, version ${esc(sv.quickspecs.version)} (${esc(sv.quickspecs.date)})</a> for the card count and constraints. Confirm a build against the current QuickSpecs.</p>`;
-/* one configuration's card: server, the other GPUs it takes, build and bays, figures, layout, and every other layout */
-function configCard(c, eyebrow, cmp, back = "", cfgs = []){
+/* one configuration's card: server, build and bays, figures, layout, and every other layout on its cards */
+function configCard(c, eyebrow, cmp, back = ""){
   const d = c.best, sv = c.sv, grow = growOf(c);
   if(!d) return `<div class="rec-top"><div class="rec-main">${eyebrow}`
     + `<h2 class="rec-name">${hostLink(HPE_HOSTS.find(h=> h.id===sv.id))}</h2>`
     + `<span class="rec-spec">${esc(formOf(c))} · ${sv.sockets} × ${esc(sv.cpu)}</span>`
     + `<p class="rec-cfg">Up to ${c.max} × ${esc(c.x.board)}, ${wiringShort(c)}</p>`
     + `<p class="rec-why">One copy needs about ${fmtMem(needGB())} of GPU memory; this server carries ${fmtMem(c.usable)} at most with this GPU.</p>`
-    + gpuSwitch(c, cfgs) + `</div>`
+    + `</div>`
     + bridgeBays(c, null) + `</div>`
     + `<div class="rec-acts">${back}</div>`;
   const extrap = !d.g.bench;
   return `<div class="rec-head">${eyebrow}<h2 class="rec-name">${hostLink(HPE_HOSTS.find(h=> h.id===sv.id))}</h2>`
-    + gpuSwitch(c, cfgs) + `</div>`
+    + `</div>`
     + (cmp ? `<p class="rec-cmp">${cmp}</p>` : "")
     + `<div class="rec-body">`
     + `<section class="rec-col"><h3 class="colh">Build</h3>${buildRows(c, d)}`
@@ -4288,13 +4278,13 @@ function renderTabs(){
 /* the controls show model i: save the one they showed, put i's settings on S and show them */
 function selectModel(i){ saveSpec(); S.edit = i; useSpec(S.models[i]); showSpec(); render(); }
 function removeModel(i){
-  saveSpec(); S.models.splice(i, 1); OPEN_MODELS.clear();
+  saveSpec(); S.models.splice(i, 1); OPEN_MODELS.clear(); S.cfg = null;   // a different set of models: back to the recommendation
   S.edit = i < S.edit ? S.edit - 1 : Math.min(S.edit, S.models.length - 1);
   useSpec(S.models[S.edit]); showSpec(); render();
 }
 $('modelAdd').addEventListener('click', ()=>{
   if(S.models.length >= MODEL_MAX) return;
-  saveSpec(); S.models.push(structuredClone(DEFAULT_SPEC));
+  saveSpec(); S.models.push(structuredClone(DEFAULT_SPEC)); S.cfg = null;   // likewise
   selectModel(S.models.length - 1);
   modelSel.focus();
 });
@@ -4770,9 +4760,9 @@ document.querySelector('.verdict').addEventListener('click', e=>{
 const updateGoalHint = () => { $('goalHint').textContent = goalDesc(); };
 $('goal').addEventListener('change', e=>{ S.goal = e.target.value; updateGoalHint(); render(); });
 
-/* model change */
+/* model change: a server picked from the list was for the old model, so the card goes back to the recommendation */
 modelSel.addEventListener('change', ()=>{
-  M = findModel(modelSel.value);
+  M = findModel(modelSel.value); S.cfg = null;
   $('customWrap').hidden = !M.custom;
   updateCfgNote(); syncWq(); resetThink();
   setLengths();                            // trims to the new model's context, or restores
