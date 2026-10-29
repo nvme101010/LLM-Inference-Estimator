@@ -499,17 +499,6 @@
   .rec-top{display:flex; flex-wrap:wrap; gap:18px 36px; justify-content:space-between; align-items:flex-start}
   .rec-main{flex:1 1 480px; min-width:0; display:flex; flex-direction:column; gap:5px}
   .sv .rec-name{margin:2px 0 0; font-size:30px; font-weight:700; line-height:1.15; letter-spacing:-.01em}   /* the card's focal point; .sv h2 would otherwise win */
-  .sv#svCfg .rec-name{font-size:22px}
-  /* the Configuration panel folds away behind its heading: closed to start, an arrow like Advanced settings' */
-  .cfgbox > summary{list-style:none; cursor:pointer; display:flex; flex-direction:column; gap:3px; position:relative; padding-left:20px}
-  .cfgbox > summary::-webkit-details-marker{display:none}
-  .cfgbox > summary::before{content:""; position:absolute; left:1px; top:4px; width:7px; height:7px; border-right:2px solid var(--ink-2); border-bottom:2px solid var(--ink-2); transform:rotate(-45deg); transition:transform .15s}
-  .cfgbox[open] > summary::before{transform:rotate(45deg)}
-  .cfgbox > summary:hover .rec-name{color:var(--accent-ink)}
-  .cfgbox > summary:focus-visible{outline:2px solid var(--accent); outline-offset:4px; border-radius:4px}
-  .cfgbox[open] .cfg-hint{display:none}
-  .cfgbody{display:flex; flex-direction:column; gap:14px; margin-top:14px}
-  @media (prefers-reduced-motion:reduce){ .cfgbox > summary::before{transition:none} }
   .rec-name a{color:inherit; text-decoration:none} .rec-name a:hover{text-decoration:underline}
   .rec-spec{font-size:14px; color:var(--muted)}
   .rec-cfg{margin:6px 0 0; font-size:16.5px; font-weight:500}
@@ -582,24 +571,19 @@
   .hbar{position:relative; display:block; height:9px; background:var(--panel-2); border:1px solid var(--line); border-radius:5px}
   .hbar i{display:block; height:100%; background:var(--ov); border-radius:5px}
   .hbar b{position:absolute; right:-1px; top:-4px; width:2px; height:15px; background:var(--ink)}
-  .wiring{display:flex; flex-wrap:wrap; gap:12px; align-items:stretch}
-  .wgroup{flex:1 1 260px; min-width:0; border:1px solid var(--line); border-radius:9px; padding:13px; display:flex; flex-direction:column; gap:9px}
-  .wgroup.on{border-color:var(--accent); background:color-mix(in srgb, var(--accent) 7%, var(--panel))}
-  .wgroup .wtop{display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 10px; font-size:13px}
-  .wgroup .cards{display:grid; grid-template-columns:repeat(var(--n), minmax(0, 1fr)); gap:6px}
-  .wgroup .card{border-radius:5px; padding:10px 3px; text-align:center; font-size:11px; font-weight:600; border:1px dashed var(--line-2); color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-  .wgroup .card.on{background:var(--accent); border:1px solid var(--accent); color:#06110f}
-  .wlink{flex:0 1 190px; display:flex; flex-direction:column; justify-content:center; gap:5px; text-align:center; font-size:12px; color:var(--muted); border-top:2px dashed var(--line-2); border-bottom:2px dashed var(--line-2); padding:8px}
-  .wlink b{color:var(--ink); font-size:13px}
   .gpuswitch{display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:4px}
   .gpuswitch .sublbl{width:100%}
+  /* the other layouts on the card's server, folded away at the foot of the card */
+  .rec-layouts{border-top:1px solid var(--line); margin-top:4px}
+  .rec-layouts > summary{padding:14px 0 4px}
+  .rec-layouts .tbl{margin-top:8px}
+  .sv .cap a{color:var(--accent-ink); text-underline-offset:2px}
   .chipnote{font-size:11px; color:var(--muted); font-weight:400; margin-left:4px}
   .svnotes{margin:0; padding-left:18px; font-size:12.5px; color:var(--ink-2); display:flex; flex-direction:column; gap:3px}
   @media (max-width:640px){
     .holds{grid-template-columns:1fr; gap:4px}
     .holds .hname{margin-top:8px}
     .sv .rec-name{font-size:23px}
-    .sv#svCfg .rec-name{font-size:19px}
   }
 </style>
 
@@ -754,7 +738,6 @@
       <section class="panel sv" id="svScope" aria-label="Servers in scope"></section>
       <section class="panel sv rec" id="svRec" aria-label="Recommended server"></section>
       <section class="panel sv" id="svAll" aria-label="Every server in scope"></section>
-      <section class="panel sv" id="svCfg" aria-label="Configuration"></section>
     </div>
 
     <!-- ============ THE ANSWER (GPU view) ============ -->
@@ -2170,7 +2153,7 @@ const S = { wq:2, wqLbl:"NATIVE", kq:2, tp:1, pp:1, tpo:"auto", pipe:0, chunk:51
             view:"srv",        // which answer shows: "srv" = the Servers view (configurations of HPE servers), "gpu" = boards
             scope:null,        // the Servers view's servers in scope: a Set of catalog ids (every server, set at start)
             cfg:null,          // the configuration its detail shows: "<server id>|<board>", or null for the recommendation
-            cfgOpen:false,     // whether the Configuration panel is open: closed to start, kept across redraws
+            layoutsOpen:false, // whether the card's Other layouts on this server is open: closed to start, kept across redraws
             workload:"chat", prompt:2048, reply:512, wantPrompt:2048, wantReply:512,
             think:false, thinkTok:4096, thinking:0,
             seeThink:true,     // Users see the thinking: the speed goal's wait is to the first token; off, to the answer
@@ -2907,9 +2890,9 @@ function serverAnswer(cfgs){
 const needGB = () => compute(1, 1, 1).total/GB;
 
 /* ---------------- the Servers view: on the page ----------------
-   Five parts, top to bottom: the servers in scope (chips), the recommendation, the alternatives (step down,
-   step up), every configuration in scope (those that hold the model, then bars for the servers that can't),
-   and the detail of one configuration (its wiring, every layout on its cards, its build). */
+   Three parts, top to bottom: the servers in scope (chips); the card for the recommendation, or the configuration
+   picked from the list (its build, figures, the other GPUs its server takes and every layout on its cards); and
+   every server in scope (those that hold the model, then bars for the servers that can't). */
 const cfgById = (cfgs, id) => cfgs.find(c=> c.id===id) || null;
 /* the bridge a configuration's copies need: the smallest that joins a copy's cards (per stage when pipelined);
    none when each copy runs on one card */
@@ -3112,13 +3095,6 @@ const growText = d => `${d.gpus} cards as ` + (d.reps>1 ? (d.tpw===1 && d.pp===1
 /* The bay picture, only where it shows something fixed: which cards an NVLink bridge joins. PCIe slots move with
    risers, front GPU cages and enablement kits, and an NVSwitch joins every GPU alike, so those get words instead. */
 const bridgeBays = (c, d) => linkKind(c.x)==="bridge" ? `<div class="rec-bays"><span class="sublbl">NVLink groups</span>${baysHtml(c, d)}</div>` : "";
-/* how a configuration's cards talk to each other, in one sentence, where there's no bridge to draw */
-function wiringSentence(c){
-  const k = linkKind(c.x), n = `${c.max} × ${esc(c.x.board)}`;
-  return k==="nvswitch" ? `An NVSwitch joins all ${c.max} GPUs, each to every other at full NVLink speed, so any split runs at the same speed.`
-       : k==="fabric" ? `Infinity Fabric wires each GPU straight to each of the other ${c.max - 1}, one link per pair, with no switch: a copy split across fewer GPUs uses only the links among them.`
-       : `No GPU-to-GPU link: the cards reach each other over PCIe Gen${c.b.slot} through the host, so a copy split across cards waits on PCIe. Up to ${n} in this server; which slots they use depends on its risers and GPU enablement kits.`;
-}
 const openBtn = (id, txt) => `<button type="button" class="linkbtn" data-cfg="${esc(id)}">${txt}</button>`;
 
 function renderScope(A){
@@ -3138,7 +3114,7 @@ const growOf = c => c.best ? c.opts.filter(d=> d.gpus > c.best.gpus && d.meets &
    as such, with how it compares and the way back. */
 function renderRec(A, cfgs){
   const el = $('svRec'), all = allUsers(), pick = cfgById(cfgs, S.cfg);
-  if(pick && (!A.rec || pick.id!==A.rec.id)) return renderPick(A, pick);
+  if(pick && (!A.rec || pick.id!==A.rec.id)) return renderPick(A, pick, cfgs);
   if(!A.rec){
     el.innerHTML = `<span class="eyebrow-s warn">${S.scope.size ? "No server in scope holds it" : "No servers in scope"}</span>`
       + `<h2 class="rec-name">${S.scope.size ? "Too big for every server in scope" : "Pick at least one server"}</h2>`
@@ -3148,10 +3124,10 @@ function renderRec(A, cfgs){
   const c = A.rec;
   const eyebrow = c.ok ? `<span class="eyebrow-s">Recommended · least GPU memory that meets your goal</span>`
                        : `<span class="eyebrow-s warn">Closest · serves ${commas(c.best.served)} of ${commas(all)} within your goal</span>`;
-  el.innerHTML = configCard(c, eyebrow, "");
+  el.innerHTML = configCard(c, eyebrow, "", "", cfgs);
 }
 /* a picked configuration: as the recommendation's card, labelled, with the comparison and the way back */
-function renderPick(A, c){
+function renderPick(A, c, cfgs){
   const all = allUsers(), back = `<button type="button" class="linkbtn" data-cfg="">Back to the recommendation</button>`;
   const r = A.rec && A.rec.best, d = c.best;
   const eyebrow = !d ? `<span class="eyebrow-s warn">Your pick · won't hold the model</span>`
@@ -3159,33 +3135,62 @@ function renderPick(A, c){
                 : `<span class="eyebrow-s warn">Your pick · ${d.served ? `serves ${commas(d.served)} of ${commas(all)} within your goal` : "too slow for your goal"}</span>`;
   const cmp = !r || !d ? "" : `Against the recommended ${esc(A.rec.sv.short)} (${r.gpus} × ${esc(r.g.n)}): `
     + `${tpsSpan(d.t.perUser)[0]} vs ${tpsSpan(r.t.perUser).join(" ")} per user, room for ${commas(d.room)} vs ${commas(r.room)}, ${boxTotal(d.memGB)} vs ${boxTotal(r.memGB)} of GPU memory${cfgU(c) && cfgU(A.rec) && cfgU(c)!==cfgU(A.rec) ? `, ${cfgU(c)}U vs ${cfgU(A.rec)}U` : ""}.`;
-  $('svRec').innerHTML = configCard(c, eyebrow, cmp, back);
+  $('svRec').innerHTML = configCard(c, eyebrow, cmp, back, cfgs);
 }
-/* one configuration's card: server, GPUs and wiring, bays, figures, layout and build checks */
-function configCard(c, eyebrow, cmp, back = ""){
+/* the other GPUs the card's server takes, each a button to see it on the card */
+function gpuSwitch(c, cfgs){
+  const siblings = cfgs.filter(o=> o.sv.id===c.sv.id);
+  return siblings.length > 1 ? `<div class="gpuswitch" role="group" aria-label="GPUs in this server"><span class="sublbl">GPUs in this server</span>`
+    + siblings.map(o=> `<button type="button" class="chip" data-cfg="${esc(o.id)}" aria-pressed="${o.id===c.id}">${esc(o.x.board.replace(" Blackwell", ""))}`
+      + ` <span class="chipnote">${o.ok ? "meets goal" : o.fits ? "below goal" : "won't hold it"}</span></button>`).join("") + `</div>` : "";
+}
+/* every layout on the card's server, at each number of cards, folded away under the card */
+function layoutsBox(c){
+  const d = c.best, all = allUsers();
+  const opts = c.opts.slice().sort((a, b)=> a.gpus - b.gpus || b.reps - a.reps || a.L.pp - b.L.pp);
+  if(opts.length < 2) return "";
+  return `<details class="more rec-layouts"${S.layoutsOpen ? " open" : ""}><summary><span class="sum-title">Other layouts on this server</span>`
+    + `<span class="sum-state">${opts.length} in all, ${opts[0].gpus===opts[opts.length-1].gpus ? `on ${opts[0].gpus} cards` : `from ${opts[0].gpus} to ${opts[opts.length-1].gpus} cards`}</span></summary>`
+    + `<span class="cap">Every layout the wiring allows, at each number of copies the server holds. You pick by what the customer is buying for.</span>`
+    + `<div class="tbl"><table><thead><tr><th scope="col">Cards</th><th scope="col">Layout</th><th scope="col" class="num">Per user</th><th scope="col" class="num">First token</th>`
+    + `<th scope="col" class="num">Room for</th><th scope="col" class="num">Cache room</th><th scope="col" class="num">Per card</th></tr></thead><tbody>`
+    + opts.map(o=> `<tr class="${o===d ? "sel" : ""}${o.meets && !o.partial ? "" : " dim"}"><td>${o.gpus}</td>`
+        + `<th scope="row">${layoutLine(o)}${o===d ? ` <span class="pill sugg">${c.ok ? "Best for your goal" : "Closest"}</span>` : ""}${flagPills(o)}</th>`
+        + `<td class="num">${tpsSpan(o.t.perUser).join(" ")}${star(o)}</td><td class="num">${timeSpan(o.t.ttft).join(" ")}</td>`
+        + `<td class="num">${o.partial ? `<span class="warnx">${commas(o.served)} of ${commas(all)}</span>` : commas(o.room)}</td><td class="num">${commas(o.memRoom)}</td>`
+        + `<td class="num">${fmtMem(o.perGB)}</td></tr>`).join("")
+    + `</tbody></table></div></details>`;
+}
+/* where the server's GPUs, bridges, card count and constraints come from */
+const sourcesLine = sv => `<p class="cap">Sources: <a href="${CATALOG.matrix.url}" target="_blank" rel="noopener">${esc(CATALOG.matrix.title)}, version ${esc(CATALOG.matrix.version)}</a> for which GPUs and bridges the server takes; `
+  + `<a href="${esc(sv.quickspecs.url)}" target="_blank" rel="noopener">its US QuickSpecs, version ${esc(sv.quickspecs.version)} (${esc(sv.quickspecs.date)})</a> for the card count and constraints. Confirm a build against the current QuickSpecs.</p>`;
+/* one configuration's card: server, the other GPUs it takes, build and bays, figures, layout, and every other layout */
+function configCard(c, eyebrow, cmp, back = "", cfgs = []){
   const d = c.best, sv = c.sv, grow = growOf(c);
   if(!d) return `<div class="rec-top"><div class="rec-main">${eyebrow}`
     + `<h2 class="rec-name">${hostLink(HPE_HOSTS.find(h=> h.id===sv.id))}</h2>`
     + `<span class="rec-spec">${esc(formOf(c))} · ${sv.sockets} × ${esc(sv.cpu)}</span>`
     + `<p class="rec-cfg">Up to ${c.max} × ${esc(c.x.board)}, ${wiringShort(c)}</p>`
-    + `<p class="rec-why">One copy needs about ${fmtMem(needGB())} of GPU memory; this server carries ${fmtMem(c.usable)} at most with this GPU.</p></div>`
+    + `<p class="rec-why">One copy needs about ${fmtMem(needGB())} of GPU memory; this server carries ${fmtMem(c.usable)} at most with this GPU.</p>`
+    + gpuSwitch(c, cfgs) + `</div>`
     + bridgeBays(c, null) + `</div>`
     + `<div class="rec-acts">${back}</div>`;
   const extrap = !d.g.bench;
   return `<div class="rec-head">${eyebrow}<h2 class="rec-name">${hostLink(HPE_HOSTS.find(h=> h.id===sv.id))}</h2>`
-    + `</div>`
+    + gpuSwitch(c, cfgs) + `</div>`
     + (cmp ? `<p class="rec-cmp">${cmp}</p>` : "")
     + `<div class="rec-body">`
     + `<section class="rec-col"><h3 class="colh">Build</h3>${buildRows(c, d)}`
     + bridgeBays(c, d)
     + ((c.x.constraints || []).length || (sv.notes || []).length ? `<div class="bom-notes"><span class="sublbl">Before you quote</span><ul class="svnotes">${[...(c.x.constraints || []), ...(sv.notes || [])].map(t=> `<li>${esc(t)}</li>`).join("")}</ul></div>` : "")
-    + `</section>`
+    + sourcesLine(sv) + `</section>`
     + `<section class="rec-col"><h3 class="colh">Estimated performance</h3>${statsHtml(d)}`
     + (extrap ? `<p class="cap">${say("Speeds are estimated from the spec sheet", "Speeds are extrapolated")}: the ${esc(d.g.n.replace(" Blackwell", ""))} has no published benchmark here <span class="i" data-tip="extrap" tabindex="0">i</span>. Load-test before quoting them.</p>` : "")
     + (warmParts().length ? `<p class="cap">${cacheNote(warmParts())}</p>` : "")
     + (grow ? `<p class="rec-grow">Room to grow: ${growText(grow)} in this server serve up to ${commas(grow.room)} users.</p>` : "")
     + `<h3 class="colh">Layout</h3><p class="rec-why">${layoutWhy(c, d)}</p>`
     + `</section></div>`
+    + layoutsBox(c)
     + `<div class="rec-acts">${back}<button type="button" class="tool-btn" data-copylink>Copy link</button></div>`;
 }
 /* Every server in scope, one line each: the servers that meet the goal, in the recommendation's order, each at
@@ -3228,41 +3233,6 @@ function renderAll(A, cfgs){
             `<span class="hbar" role="img" aria-label="${Math.round(h.usable)} of ${Math.round(need)} GB"><i style="width:${Math.min(100, h.usable/need*100).toFixed(1)}%"></i><b></b></span>`
           + `<span class="cap">${h.how} · ${fmtMem(h.usable)}${h.est ? ` · <span class="warnx">count to confirm</span>` : ""}</span>`)).join("") + `</div>` : "")
     + `<p class="cap">Also sold with these GPUs, but HPE publishes no card count, so not sized: ${HPE_UNSIZED.map(u=> `${esc(u.name)} (${u.boards.map(esc).join(", ")})`).join("; ")}.</p>`;
-}
-function renderCfg(A, cfgs){
-  const el = $('svCfg'), c = cfgById(cfgs, S.cfg) || A.rec;
-  el.hidden = !c;
-  if(!c) return null;
-  const sv = c.sv, d = c.best, all = allUsers(), k = linkKind(c.x), siblings = cfgs.filter(o=> o.sv.id===sv.id);
-  const b = bridgeOf(c, d), size = k==="bridge" ? (b ? b.n : c.x.link.bridge) : c.max, groups = Math.ceil(c.max/size), used = d ? d.gpus : 0;
-  const wire = k!=="bridge" ? `<p class="rec-why">${wiringSentence(c)}</p>` : `<div class="wiring">` + Array.from({length: groups}, (_, gi)=>{
-      const from = gi*size, n = Math.min(size, c.max - from), on = Math.max(0, Math.min(n, used - from));
-      const title = groups>1 ? `Group ${String.fromCharCode(65 + gi)} · bays ${from + 1}–${from + n}` : `Bays 1–${c.max}`;
-      const link = k==="bridge" ? (b ? esc(b.name) : "No bridge needed: one card per copy") : k==="nvswitch" ? "NVSwitch, every GPU to every GPU" : k==="fabric" ? "Infinity Fabric, one link per pair" : "PCIe Gen5 x16 per card";
-      return `<div class="wgroup${on ? " on" : ""}"><div class="wtop"><b>${title}</b><span class="cap">${link}</span></div>`
-        + `<div class="cards" style="--n:${Math.min(n, 8)}">${Array.from({length: n}, (_, i)=> `<span class="card${i < on ? " on" : ""}">${i < on ? esc(d.g.n.replace(" Blackwell", "")) : "open"}</span>`).join("")}</div></div>`
-        + (gi < groups - 1 ? `<div class="wlink"><b>PCIe Gen5</b><span>${PCIE_BW} GB/s each way, through the host. Only pipeline hand-offs cross here, never an all-reduce.</span></div>` : "");
-    }).join("") + `</div>`;
-  const opts = c.opts.slice().sort((a, b)=> a.gpus - b.gpus || b.reps - a.reps || a.L.pp - b.L.pp);
-  const table = opts.length ? `<div class="tbl"><table><thead><tr><th scope="col">Cards</th><th scope="col">Layout</th><th scope="col" class="num">Per user</th><th scope="col" class="num">First token</th>`
-      + `<th scope="col" class="num">Room for</th><th scope="col" class="num">Cache room</th><th scope="col" class="num">Per card</th></tr></thead><tbody>`
-      + opts.map(o=> `<tr class="${o===d ? "sel" : ""}${o.meets && !o.partial ? "" : " dim"}"><td>${o.gpus}</td>`
-          + `<th scope="row">${layoutLine(o)}${o===d ? ` <span class="pill sugg">${c.ok ? "Best for your goal" : "Closest"}</span>` : ""}${flagPills(o)}</th>`
-          + `<td class="num">${tpsSpan(o.t.perUser).join(" ")}${star(o)}</td><td class="num">${timeSpan(o.t.ttft).join(" ")}</td>`
-          + `<td class="num">${o.partial ? `<span class="warnx">${commas(o.served)} of ${commas(all)}</span>` : commas(o.room)}</td><td class="num">${commas(o.memRoom)}</td>`
-          + `<td class="num">${fmtMem(o.perGB)}</td></tr>`).join("")
-      + `</tbody></table></div>` : `<p class="note-warn">No layout on this server holds one copy: it needs about ${fmtMem(needGB())} of GPU memory, and the server carries ${fmtMem(c.usable)} at most.</p>`;
-  el.innerHTML = `<details class="cfgbox"${S.cfgOpen ? " open" : ""}><summary><span class="eyebrow-s">Configuration</span>`
-    + `<h2 class="rec-name">${esc(sv.name)} · ${esc(c.x.board)}</h2>`
-    + `<span class="cap cfg-hint">How the cards are wired and every layout on this server</span></summary><div class="cfgbody">`
-    + `<span class="rec-spec">${esc(formOf(c))} · ${sv.sockets} × ${esc(sv.cpu)} · up to ${c.max} × ${esc(c.x.board)}, ${wiringShort(c)}</span>`
-    + (siblings.length > 1 ? `<div class="gpuswitch" role="group" aria-label="GPUs in this server"><span class="sublbl">GPUs in this server</span>`
-      + siblings.map(o=> `<button type="button" class="chip" data-cfg="${esc(o.id)}" aria-pressed="${o.id===c.id}">${esc(o.x.board.replace(" Blackwell", ""))}`
-        + ` <span class="chipnote">${o.ok ? "meets goal" : o.fits ? "below goal" : "won't hold it"}</span></button>`).join("") + `</div>` : "")
-    + `<div class="svsub"><h3>How the cards are wired</h3></div>${wire}`
-    + `<div class="svsub"><h3>Layouts on this server</h3><span class="cap">Every layout the wiring allows, at each number of copies the server holds. You pick by what the customer is buying for.</span></div>${table}`
-    + `<p class="cap">Sources: <a href="${CATALOG.matrix.url}" target="_blank" rel="noopener">${esc(CATALOG.matrix.title)}, version ${esc(CATALOG.matrix.version)}</a> for which GPUs and bridges the server takes; <a href="${esc(sv.quickspecs.url)}" target="_blank" rel="noopener">this server's US QuickSpecs, version ${esc(sv.quickspecs.version)} (${esc(sv.quickspecs.date)})</a> for the card count and constraints. Confirm a build against the current QuickSpecs.</p></div></details>`;
-  return d || null;
 }
 /* ---------------- the Servers view with several models ----------------
    Every model is sized together, as the GPU view does (fleetFor): each runs as copies of its own, the copies
@@ -3402,7 +3372,7 @@ function renderServerView(){
   const cfgs = allConfigs(), A = serverAnswer(cfgs);
   if(S.cfg && !cfgById(cfgs, S.cfg)) S.cfg = null;
   renderScope(A); renderRec(A, cfgs); renderAll(A, cfgs);
-  const d = renderCfg(A, cfgs);
+  const shown = cfgById(cfgs, S.cfg) || A.rec, d = shown && shown.best || null;
   $('viewhint').textContent = "";
   if(d){
     S.tp = d.tp; S.pp = d.pp;
@@ -3418,7 +3388,6 @@ function renderServerFleet(){
   const cfgs = fleetConfigs(), A = fleetAnswer(cfgs);
   if(S.cfg && !cfgById(cfgs, S.cfg)) S.cfg = null;
   renderScope(A); renderRecFleet(A, cfgs); renderAllFleet(A, cfgs);
-  $('svCfg').hidden = true;
   $('viewhint').textContent = `Sizing all ${S.models.length} models together, each on GPUs of its own.`;
   const c = cfgById(cfgs, S.cfg) || A.rec, d = c && c.fits ? c.f.models[S.edit].d : null;
   if(d && d.fits){
@@ -3450,8 +3419,8 @@ $('viewbar').addEventListener('click', e=>{
   const b = e.target.closest('[data-view]'); if(!b || b.dataset.view===S.view) return;
   S.view = b.dataset.view; render();
 });
-/* the Configuration panel is drawn afresh on every change, so whether it's open lives in S */
-$('svCfg').addEventListener('toggle', e=>{ if(e.target.classList.contains('cfgbox')) S.cfgOpen = e.target.open; }, true);
+/* the card is drawn afresh on every change, so whether its Other layouts is open lives in S */
+$('svRec').addEventListener('toggle', e=>{ if(e.target.classList.contains('rec-layouts')) S.layoutsOpen = e.target.open; }, true);
 $('serverView').addEventListener('click', e=>{
   const t = e.target.closest('[data-scope],[data-scope-all],[data-scope-none],[data-cfg],[data-copylink]');
   if(!t) return;
