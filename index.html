@@ -562,15 +562,7 @@
   .tbl .rowbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:3px}
   .tbl .pill{margin-left:6px; vertical-align:1px}
   .sv .warnx{color:var(--warn); font-weight:500}
-  .holds{display:grid; grid-template-columns:minmax(120px, 160px) minmax(0, 1fr) minmax(180px, 260px); gap:8px 16px; align-items:center; font-size:13px}
-  .holds .hname{font-weight:600}
-  .holds .hname.sel .rowbtn{color:var(--accent-ink); text-decoration:underline}
-  .holds .rowbtn{font:inherit; font-weight:600; background:none; border:0; padding:4px 0; color:var(--ink); cursor:pointer; text-align:left}
-  .holds .rowbtn:hover{color:var(--accent-ink); text-decoration:underline}
-  .holds .rowbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:3px}
-  .hbar{position:relative; display:block; height:9px; background:var(--panel-2); border:1px solid var(--line); border-radius:5px}
-  .hbar i{display:block; height:100%; background:var(--ov); border-radius:5px}
-  .hbar b{position:absolute; right:-1px; top:-4px; width:2px; height:15px; background:var(--ink)}
+  .sv .cap .linkbtn{margin:0; font-size:inherit}
   .gpuswitch{display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:4px}
   .gpuswitch .sublbl{width:100%}
   /* the other layouts on the card's server, folded away at the foot of the card */
@@ -581,8 +573,6 @@
   .chipnote{font-size:11px; color:var(--muted); font-weight:400; margin-left:4px}
   .svnotes{margin:0; padding-left:18px; font-size:12.5px; color:var(--ink-2); display:flex; flex-direction:column; gap:3px}
   @media (max-width:640px){
-    .holds{grid-template-columns:1fr; gap:4px}
-    .holds .hname{margin-top:8px}
     .sv .rec-name{font-size:23px}
   }
 </style>
@@ -3106,7 +3096,8 @@ function renderScope(A){
         `<div class="chipgroup" role="group" aria-label="${esc(grp)}"><span class="gl">${esc(grp)}</span><span class="chiprow">`
         + CATALOG.servers.filter(sv=> sv.group===grp).map(sv=>
             `<button type="button" class="chip" data-scope="${sv.id}" aria-pressed="${S.scope.has(sv.id)}">${esc(sv.short)}</button>`).join("")
-        + `</span></div>`).join("") + `</div>`;
+        + `</span></div>`).join("") + `</div>`
+    + `<p class="cap">Also sold with these GPUs, but HPE publishes no card count, so not sized: ${HPE_UNSIZED.map(u=> `${esc(u.name)} (${u.boards.map(esc).join(", ")})`).join("; ")}.</p>`;
 }
 /* the same server with more cards: the option with the most room that meets the goal for everyone */
 const growOf = c => c.best ? c.opts.filter(d=> d.gpus > c.best.gpus && d.meets && !d.partial && !d.nr).sort((a, b)=> b.room - a.room || a.gpus - b.gpus)[0] || null : null;
@@ -3193,9 +3184,9 @@ function configCard(c, eyebrow, cmp, back = "", cfgs = []){
     + layoutsBox(c)
     + `<div class="rec-acts">${back}<button type="button" class="tool-btn" data-copylink>Copy link</button></div>`;
 }
-/* Every server in scope, one line each: the servers that meet the goal, in the recommendation's order, each at
-   its best configuration (its other GPUs are in its detail); then those that hold the model below the goal;
-   then those that can't hold it, as bars against what one copy needs. */
+/* Every server in scope, in one table ranked as the recommendation is: those that meet the goal at their best
+   configuration (a server's other GPUs are on its card), then, dimmed, those that hold the model below it. The
+   servers that can't hold it close the section in one line. */
 function renderAll(A, cfgs){
   const all = allUsers(), need = needGB(), selSv = (cfgById(cfgs, S.cfg) || A.rec || {sv: {}}).sv.id;
   const servers = CATALOG.servers.filter(sv=> S.scope.has(sv.id)).map(sv=>{
@@ -3205,34 +3196,28 @@ function renderAll(A, cfgs){
   });
   const meet = servers.filter(x=> x.ok.length).sort((x, y)=> leanOrder(x.top, y.top));
   const below = servers.filter(x=> !x.ok.length && x.fits.length).sort((x, y)=> y.top.best.served - x.top.best.served);
-  const cant = servers.filter(x=> !x.fits.length).map(x=>{
-    const most = Math.max(...x.mine.map(c=> c.usable)), at = x.mine.filter(c=> c.usable >= most*0.999);
-    return {sv: x.sv, usable: most, how: at.map(c=> `${c.max} × ${esc(c.x.board)}`).join(" or "), est: at.some(c=> c.x.unconfirmed)};
-  }).sort((x, y)=> y.usable - x.usable);
-  const out = CATALOG.servers.length - S.scope.size;
+  const closestOf = mine => mine.slice().sort((a, b)=> b.usable - a.usable)[0];
+  const cant = servers.filter(x=> !x.fits.length).map(x=> ({sv: x.sv, id: closestOf(x.mine).id, usable: closestOf(x.mine).usable, est: x.mine.some(c=> c.x.unconfirmed)}))
+    .sort((x, y)=> y.usable - x.usable);
+  const rows = [...meet, ...below];
   const tagOf = c => A.rec && c.sv.id===A.rec.sv.id ? ` <span class="pill sugg">Recommended</span>`
     : A.down && c.sv.id===A.down.sv.id ? ` <span class="pill neutral" data-tip="svSmaller" tabindex="0">Smaller server</span>`
     : A.upBig && c.sv.id===A.upBig.sv.id ? ` <span class="pill neutral" data-tip="svMoreRoom" tabindex="0">More room</span>` : "";
-  const closestOf = mine => mine.slice().sort((a, b)=> b.usable - a.usable)[0];
-  const line = (x, body) => `<span class="hname${hl(x.sv.id)}"><button type="button" class="rowbtn" data-cfg="${esc(x.top ? x.top.id : closestOf(x.mine).id)}">${esc(x.sv.short)}</button></span>${body}`;
-  const hl = id => id===selSv ? " sel" : "";
-  $('svAll').innerHTML = `<div class="svhead"><h2>Every server in scope</h2><span class="cap">${meet.length} meet${meet.length===1 ? "s" : ""} your goal`
-      + `${below.length ? ` · ${below.length} hold${below.length===1 ? "s" : ""} it below the goal` : ""}${cant.length ? ` · ${cant.length} can't hold it` : ""}${out ? ` · ${out} out of scope` : ""}. Click a server to see it in place of the recommendation.</span></div>`
-    + (meet.length ? `<div class="tbl"><table><thead><tr><th scope="col">Server</th><th scope="col">Best configuration</th><th scope="col">Layout</th>`
+  $('svAll').innerHTML = `<div class="svhead"><h2>Every server in scope</h2><span class="cap">${rows.length
+      ? `Ranked as the recommendation is${below.length ? `; dimmed, those that can't serve all ${plural(all, "user")} within your goal` : ""}. Click a server to see it on the card.`
+      : "None of them holds the model."}</span></div>`
+    + (rows.length ? `<div class="tbl"><table><thead><tr><th scope="col">Server</th><th scope="col">GPUs</th>`
       + `<th scope="col" class="num">Per user</th><th scope="col" class="num">Room for</th><th scope="col" class="num">GPU memory</th></tr></thead><tbody>`
-      + meet.map(x=>{ const c = x.top, d = c.best;
-          return `<tr class="${x.sv.id===selSv ? "sel" : ""}"><th scope="row"><button type="button" class="rowbtn" data-cfg="${esc(c.id)}">${esc(x.sv.short)}</button>${tagOf(c)}<br><span class="cap">${esc(formOf(x.top))}</span></th>`
-            + `<td>${d.gpus} × ${esc(gpuName(d.g))}${d.L.n>1 ? ` · ${wiringShort(c, d)}` : ""}</td><td>${layoutLine(d)}${flagPills(d)}${neededLine(d)}</td>`
-            + `<td class="num">${tpsSpan(d.t.perUser).join(" ")}${star(d)}</td><td class="num">${commas(d.room)}</td><td class="num">${boxTotal(d.memGB)}</td></tr>`; }).join("")
-      + `</tbody></table></div><p class="cap">* Speed extrapolated: no published benchmark for this board; it applies the shares fitted on other boards' runs.</p>` : "")
-    + (below.length ? `<div class="svsub"><h3>Below your goal</h3><span class="cap">They hold the model, but can't serve all ${plural(all, "user")}: not enough cache room, or not within your speed goal.</span></div>`
-      + `<div class="holds">` + below.map(x=> line(x, `<span class="cap">${x.top.best.gpus} × ${esc(gpuName(x.top.best.g))} · ${layoutLine(x.top.best)}</span>`
-          + `<span class="cap"><span class="warnx">${x.top.best.served ? `serves ${commas(x.top.best.served)} of ${commas(all)}` : "too slow for your goal, even for one user"}</span>${x.top.best.nr ? " · split over PCIe" : ""}</span>`)).join("") + `</div>` : "")
-    + (cant.length ? `<div class="svsub"><h3>Won't hold it</h3><span class="cap">One copy needs about ${fmtMem(need)} of GPU memory for one user. Bars show the most each server carries.</span></div>`
-      + `<div class="holds">` + cant.map(h=> line({sv: h.sv, top: null, mine: A.inScope.filter(c=> c.sv.id===h.sv.id)},
-            `<span class="hbar" role="img" aria-label="${Math.round(h.usable)} of ${Math.round(need)} GB"><i style="width:${Math.min(100, h.usable/need*100).toFixed(1)}%"></i><b></b></span>`
-          + `<span class="cap">${h.how} · ${fmtMem(h.usable)}${h.est ? ` · <span class="warnx">count to confirm</span>` : ""}</span>`)).join("") + `</div>` : "")
-    + `<p class="cap">Also sold with these GPUs, but HPE publishes no card count, so not sized: ${HPE_UNSIZED.map(u=> `${esc(u.name)} (${u.boards.map(esc).join(", ")})`).join("; ")}.</p>`;
+      + rows.map(x=>{ const c = x.top, d = c.best;
+          return `<tr class="${x.sv.id===selSv ? "sel" : ""}${c.ok ? "" : " dim"}"><th scope="row"><button type="button" class="rowbtn" data-cfg="${esc(c.id)}">${esc(x.sv.short)}</button>${tagOf(c)}<br><span class="cap">${esc(formOf(c))}</span></th>`
+            + `<td>${d.gpus} × ${esc(gpuName(d.g))}${d.L.n>1 && !d.nr ? ` · ${wiringShort(c, d)}` : ""}${flagPills(d)}${neededLine(d)}</td>`   // split over PCIe: the pill says so
+            + `<td class="num">${tpsSpan(d.t.perUser).join(" ")}${star(d)}</td>`
+            + `<td class="num">${c.ok ? commas(d.room) : `<span class="warnx">${d.served ? `${commas(d.served)} of ${commas(all)}` : "none within goal"}</span>`}</td>`
+            + `<td class="num">${boxTotal(d.memGB)}</td></tr>`; }).join("")
+      + `</tbody></table></div>` : "")
+    + (rows.some(x=> !x.top.best.g.bench) ? `<p class="cap">* Speed extrapolated: no published benchmark for this board; it applies the shares fitted on other boards' runs.</p>` : "")
+    + (cant.length ? `<p class="cap"><b>Won't hold it</b>, since one copy needs about ${fmtMem(need)}: `
+      + cant.map(h=> `<button type="button" class="linkbtn" data-cfg="${esc(h.id)}">${esc(h.sv.short)}</button> (at most ${fmtMem(h.usable)}${h.est ? ", count to confirm" : ""})`).join(" · ") + `.</p>` : "");
 }
 /* ---------------- the Servers view with several models ----------------
    Every model is sized together, as the GPU view does (fleetFor): each runs as copies of its own, the copies
@@ -3351,20 +3336,25 @@ function renderAllFleet(A, cfgs){
     const mine = A.inScope.filter(c=> c.sv.id===sv.id), fits = mine.filter(c=> c.fits), ok = fits.filter(c=> c.ok);
     return {sv, mine, top: bestFleet(ok) || fits.slice().sort(fleetClose)[0] || null};
   });
-  const hold = servers.filter(x=> x.top).sort((x, y)=> (+y.top.ok - +x.top.ok) || (x.top.ok ? fleetOrder(x.top, y.top) : fleetClose(x.top, y.top)));
-  const cant = servers.filter(x=> !x.top);
-  const out = CATALOG.servers.length - S.scope.size, meet = hold.filter(x=> x.top.ok).length;
-  $('svAll').innerHTML = `<div class="svhead"><h2>Every server in scope</h2><span class="cap">${meet} meet${meet===1 ? "s" : ""} every model's goal`
-      + `${hold.length - meet ? ` · ${hold.length - meet} hold${hold.length - meet===1 ? "s" : ""} them below it` : ""}${cant.length ? ` · ${cant.length} can't hold them` : ""}${out ? ` · ${out} out of scope` : ""}. Click a server to see it in place of the recommendation.</span></div>`
-    + (hold.length ? `<div class="tbl"><table><thead><tr><th scope="col">Server</th><th scope="col">Best configuration</th><th scope="col" class="num">Within goal</th><th scope="col" class="num">Rack</th><th scope="col" class="num">GPU memory</th></tr></thead><tbody>`
+  /* those within every goal in the recommendation's own order: bestFleet picks the first, then the next from the
+     rest, and so on, so its fewer-servers rule holds down the list as it does for the recommendation */
+  const ranked = [], left = servers.filter(x=> x.top && x.top.ok);
+  while(left.length){ const t = bestFleet(left.map(x=> x.top)); ranked.push(...left.splice(left.findIndex(x=> x.top===t), 1)); }
+  const hold = [...ranked, ...servers.filter(x=> x.top && !x.top.ok).sort((x, y)=> fleetClose(x.top, y.top))];
+  const cant = servers.filter(x=> !x.top), meet = ranked.length;
+  $('svAll').innerHTML = `<div class="svhead"><h2>Every server in scope</h2><span class="cap">${hold.length
+      ? `Ranked as the recommendation is${hold.length - meet ? "; dimmed, those that hold every model but not all within their goals" : ""}. Click a server to see it on the card.`
+      : "None of them holds every model."}</span></div>`
+    + (hold.length ? `<div class="tbl"><table><thead><tr><th scope="col">Server</th><th scope="col">GPUs</th><th scope="col" class="num">Within goal</th><th scope="col" class="num">GPU memory</th></tr></thead><tbody>`
       + hold.map(x=>{ const c = x.top;
           const tag = A.rec && c.id===A.rec.id ? ` <span class="pill sugg">Recommended</span>` : "";
-          return `<tr class="${x.sv.id===selSv ? "sel" : ""}${c.ok ? "" : " dim"}"><th scope="row"><button type="button" class="rowbtn" data-cfg="${esc(c.id)}">${esc(x.sv.short)}</button>${tag}<br><span class="cap">${esc(formOf(x.top))}</span></th>`
-            + `<td>${c.k > 1 ? `${c.k} servers · ` : ""}${c.f.gpus} × ${esc(c.f.g.n)}${c.nr ? ` <span class="pill bad">split over PCIe</span>` : ""}${star(c.f.models[0].d)}</td>`
-            + `<td class="num">${c.ok ? "" : `<span class="warnx">`}${fleetWithin(c)} of ${n}${c.ok ? "" : "</span>"}</td><td class="num">${fleetRackText(c)}</td><td class="num">${boxTotal(c.memGB)}</td></tr>`; }).join("")
-      + `</tbody></table></div><p class="cap">* Speed extrapolated: no published benchmark for this board; it applies the shares fitted on other boards' runs.</p>` : "")
-    + (cant.length ? `<div class="svsub"><h3>Won't hold them</h3><span class="cap">With every GPU it takes, at least one model needs more than one of these servers holds. Each model must fit on one server.</span></div>`
-      + `<p class="cap">${cant.map(x=> esc(x.sv.short)).join(" · ")}</p>` : "");
+          return `<tr class="${x.sv.id===selSv ? "sel" : ""}${c.ok ? "" : " dim"}"><th scope="row"><button type="button" class="rowbtn" data-cfg="${esc(c.id)}">${esc(x.sv.short)}</button>${tag}`
+            + `<br><span class="cap">${esc(formOf(c))}${c.k > 1 ? ` · ${fleetRackText(c)} in all` : ""}</span></th>`
+            + `<td>${c.f.gpus} × ${esc(gpuName(c.f.g))}${c.k > 1 ? ` in ${c.k} servers` : ""}${c.nr ? ` <span class="pill bad">split over PCIe</span>` : ""}${star(c.f.models[0].d)}</td>`
+            + `<td class="num">${c.ok ? (n===2 ? "Both" : `All ${n}`) : `<span class="warnx">${fleetWithin(c)} of ${n}</span>`}</td><td class="num">${boxTotal(c.memGB)}</td></tr>`; }).join("")
+      + `</tbody></table></div>` : "")
+    + (hold.some(x=> !x.top.f.g.bench) ? `<p class="cap">* Speed extrapolated: no published benchmark for this board; it applies the shares fitted on other boards' runs.</p>` : "")
+    + (cant.length ? `<p class="cap"><b>Won't hold them</b> (at least one model needs more than one server holds; each model must fit on one): ${cant.map(x=> esc(x.sv.short)).join(" · ")}.</p>` : "");
 }
 /* the whole Servers view, and Show the math for the configuration it details */
 function renderServerView(){
