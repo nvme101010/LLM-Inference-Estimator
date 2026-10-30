@@ -3961,15 +3961,21 @@ const OPEN_WHY = new Set();
 /* A board whose largest node can't serve everyone: the pill says so with the full node's figure, and the Why row says
    what limits it. "Serves" counts users within the speed goal, "holds" users by memory alone, below the goal. */
 function partialPill(d, users, hasGoal, why){
-  const txt = d.meets ? `Full node serves ${commas(d.served)} of ${commas(users)}${hasGoal ? " within goal" : ""}`
-                      : `Full node holds ${commas(d.served)} of ${commas(users)}, below goal`;
+  const txt = `Tops out at ${commas(d.served)} of ${commas(users)}${d.meets ? " users" : ", too slow"}`;
   return `<span class="pill warn" data-tip="partial" data-tiptext="${esc(why)}" tabindex="0">${txt}</span>`;   // hover: this row's own reasons and figures
 }
+/* in the viewer's wording: plain says it in a sales rep's words, technical names the node, its layout and the figures */
 function partialWhy(b, d, all, hasGoal){
+  const holds = hasGoal && d.meets ? copyCapacity(b, d.tp, 1e6, true) * d.reps : d.served;   // by memory alone, at the same layout
+  if(S.words!=="tech"){
+    const most = `${d.gpus} of these GPUs is the most one server takes`;
+    if(!hasGoal) return `${most}, and its memory holds ${commas(d.served)} of your ${commas(all)} users. Serving all ${commas(all)} takes more than one server.`;
+    if(!d.meets) return `${most}, and it holds ${commas(d.served)} of your ${commas(all)} users, all of them too slow for the speed you asked for. Serving all ${commas(all)} takes more than one server.`;
+    return `${most}, and that keeps ${commas(d.served)} of your ${commas(all)} users fast enough. ${holds > d.served ? "More would fit in memory, but they'd slow each other down." : "Its memory holds no more."} Serving all ${commas(all)} takes more than one server.`;
+  }
   const node = `${d.gpus} × ${b.n} is the largest node this board allows (${layoutText(d)}), and it ${d.meets ? "serves" : "holds"} ${commas(d.served)} of your ${commas(all)} users`;
   if(!hasGoal) return `${node}: that is all its memory holds. Serving everyone takes more than one node, which this table doesn't size.`;
   if(!d.meets) return `${node}, all of them below your speed goal. Serving everyone takes more than one node, which this table doesn't size.`;
-  const holds = copyCapacity(b, d.tp, 1e6, true) * d.reps;   // by memory alone, at the same layout
   const limit = holds > d.served ? `By memory it would hold about ${commas(holds)}; the limit is speed: with more users on it, each one falls below your speed goal.` : `Its memory holds no more.`;
   return `${node} within your speed goal. ${limit} Serving everyone takes more than one node, which this table doesn't size.`;
 }

@@ -71,13 +71,19 @@
   open("v=1.11.9&m=glm53-flash&u=150&w=agent&th=4096&g=smooth&vw=gpu");
   const prow = [...document.querySelectorAll('.boards tbody tr.brow')].find(r=> r.textContent.includes("RTX PRO 6000"));
   const ppill = prow && prow.querySelector('.pill.warn'), pwhy = prow && prow.nextElementSibling;
-  check("partial node: the pill names the full node and the goal", !!ppill && /^Full node serves [\d,]+ of 150 within goal$/.test(ppill.textContent) && ppill.dataset.tip==="partial", ppill ? ppill.textContent : "no pill on the RTX PRO 6000 row");
-  check("partial node: the Why row says what limits it", !!pwhy && pwhy.classList.contains("bwhy") && /largest node this board allows/.test(pwhy.textContent) && /the limit is speed/.test(pwhy.textContent), pwhy ? pwhy.textContent : "no Why row");
+  check("partial node: the pill says it is a ceiling", !!ppill && /^Tops out at [\d,]+ of 150 users$/.test(ppill.textContent) && ppill.dataset.tip==="partial", ppill ? ppill.textContent : "no pill on the RTX PRO 6000 row");
+  const plainWhy = S.words!=="tech";
+  check(`partial node: the Why row says what limits it (${plainWhy ? "plain" : "technical"} wording)`, !!pwhy && pwhy.classList.contains("bwhy") && (plainWhy ? /the most one server takes/.test(pwhy.textContent) && /slow each other down/.test(pwhy.textContent) : /largest node this board allows/.test(pwhy.textContent) && /the limit is speed/.test(pwhy.textContent)), pwhy ? pwhy.textContent : "no Why row");
   check("partial node: the tooltip exists in both wordings", typeof TIPS.partial==="string" && typeof TIPS_PLAIN.partial==="string");
-  ppill && ppill.focus();
+  ppill && ppill.dispatchEvent(new FocusEvent('focusin', {bubbles: true}));   // as keyboard focus does; a real focus() fires nothing while the window is in the background
   const tipEl = document.getElementById('tip');
-  check("partial node: hovering the pill shows the row's own explanation", !!ppill && tipEl.classList.contains('on') && tipEl.textContent===pwhy.textContent.replace(/ Not recommended:.*$/s, "") && /largest node this board allows/.test(tipEl.textContent), tipEl.textContent);
-  ppill && ppill.blur();
+  check("partial node: hovering the pill shows the row's own explanation", !!ppill && tipEl.classList.contains('on') && tipEl.textContent===pwhy.textContent.replace(/ Not recommended:.*$/s, "") && /more than one server|more than one node/.test(tipEl.textContent), tipEl.textContent);
+  hideTip();
+  const wasWords = S.words;
+  document.querySelector('#words [data-v="tech"]').click();
+  const trow = [...document.querySelectorAll('.boards tbody tr.brow')].find(r=> r.textContent.includes("RTX PRO 6000")), tpill = trow && trow.querySelector('.pill.warn');
+  check("partial node: technical wording keeps the detailed explanation", !!tpill && /largest node this board allows/.test(tpill.dataset.tiptext) && /the limit is speed/.test(tpill.dataset.tiptext), tpill ? tpill.dataset.tiptext : "no pill");
+  document.querySelector(`#words [data-v="${wasWords}"]`).click();
 
   removeEventListener('error', onErr);
   check("no uncaught errors during the checks", errs.length===0, errs.join("; "));
