@@ -1699,7 +1699,7 @@
 </script>
 <script>
 /* ---------------- model library ----------------
-   The most-used open models on Hugging Face as of October 2026. Architecture comes from each
+   The most-used open models on Hugging Face as of November 2026. Architecture comes from each
    model's config.json; parameter counts from its safetensors metadata (vision encoders and
    speculative-decoding heads included, since they load too); active parameters from the model card.
    p total params (B) · pa active per token (B) · E, K routed experts / used per token
@@ -1766,10 +1766,10 @@ const MODELS = [
      note:"Half the layers keep only the last 128 tokens."},
   ]},
   {g:"DeepSeek", items:[
-    {id:"dsv41-flash", n:"DeepSeek V4.1 Flash (763B-A16B)", p:763.21, pa:16, E:384, K:6, lookup:196.6, L:40, h:5120, ffn:16128, v:129280, ctx:1048576,
+    {id:"dsv41-flash", n:"DeepSeek V4.1 Flash 1017 (763B-A16B)", p:763.21, pa:16, E:384, K:6, lookup:196.6, L:40, h:5120, ffn:16128, v:129280, ctx:1048576,
      nat:{f:"FP4 experts + FP8", gb:510.3, cls:"FP4"},
      kv:[compressed(1,4,{read:512}), indexKeys(8,128,{r:4}), compressed(3,128), sliding(2,1,256,128)],
-     note:"Only 4 of 40 layers store a cache, shared by the others, and 197B of n-gram tables are looked up a row at a time. DeepSeek reports 890 bytes of cache per token; with the cache at FP16 the page sizes about 800. Modeled from config.json."},
+     note:"Only 4 of 40 layers store a cache, shared by the others, and 197B of n-gram tables are looked up a row at a time. DeepSeek reports 890 bytes of cache per token; with the cache at FP16 the page sizes about 800. Modeled from config.json; the 17 October update (1017) has the same architecture."},
     {id:"dsv4-flash", n:"DeepSeek V4 Flash (284B-A13B)", p:290.94, pa:13, E:256, K:6, L:43, h:4096, ffn:14336, v:129280, ctx:1048576,
      nat:{f:"FP4 experts + FP8", gb:159.6, cls:"FP4"},
      kv:[compressed(21,4,{read:512}), indexKeys(21,128,{r:4}), compressed(20,128), sliding(2,1,256,128)],
@@ -1806,6 +1806,9 @@ const MODELS = [
      kv:[latent(47,576)], note:"Latent attention (MLA). Active parameters computed from config.json."},
   ]},
   {g:"Moonshot Kimi", items:[
+    {id:"kimi-k31-pro", n:"Kimi K3.1 Pro (2.8T-A104B)", p:2780.11, pa:104, E:896, K:16, L:93, h:7168, ffn:55296, v:163840, ctx:1048576,
+     nat:{f:"MXFP4 + BF16", gb:1561.4, cls:"FP4"}, kv:[latent(24,512,{read:2048}), indexKeys(24,128), linear(69,kda(96),"linear-attention")],
+     note:"Kimi K3 post-trained; its 24 attention layers now read only 2,048 cache entries per step, and 69 of 93 layers use linear attention. As released, its weights alone are more than an 8-GPU HGX B200 system holds."},
     {id:"kimi-k3", n:"Kimi K3 (2.8T-A104B)", p:2779.93, pa:104, E:896, K:16, L:93, h:7168, ffn:55296, v:163840, ctx:1048576,
      nat:{f:"MXFP4 + BF16", gb:1560.9, cls:"FP4"}, kv:[latent(24,512), linear(69,kda(96),"linear-attention")],
      note:"69 of 93 layers use linear attention. As released, its weights alone are more than an 8-GPU HGX B200 system holds."},
@@ -1839,12 +1842,20 @@ const MODELS = [
      kv:[full(9,8,128), sliding(43,8,128,512)],
      note:"43 of 52 layers keep only the last 512 tokens. FP8 and NVFP4 builds are also published."},
   ]},
+  {g:"Thinking Machines", items:[
+    {id:"inkling2-small", n:"Inkling 2 Small (594B-A17B)", p:594.05, pa:17, E:384, K:8, L:48, h:4608, ffn:18432, v:201024, ctx:1048576,
+     nat:{f:"NVFP4 + BF16", gb:393.5, cls:"FP4"}, kv:[full(8,8,128), sliding(40,8,128,1024)],
+     note:"40 of 48 layers keep only the last 1,024 tokens. Vision-language. Trained in NVFP4, its native precision; an MXFP8 build (623 GB) is also published."},
+  ]},
   {g:"Aleph Alpha", items:[
     {id:"kolibri1", n:"Kolibri-1 (78B-A3.5B)", p:78.1, pa:3.46, E:384, K:6, L:50, h:2560, ffn:3584, v:128000, ctx:262144, nat:fp8(78.8),
      kv:[full(10,4,128), sliding(40,4,128,513)],
      note:"40 of 50 layers keep only the last 513 tokens. Built for German and English."},
   ]},
   {g:"Mistral", items:[
+    {id:"ml4", n:"Mistral Large 4 (1T-A52B)", p:1053.3, pa:52, E:128, K:4, L:72, h:6144, ffn:30720, v:204800, ctx:1048576,
+     nat:{f:"FP8 + BF16", gb:1060.6, cls:"FP8"}, kv:[latent(63,576,{read:2048}), indexKeys(44,128)],
+     note:"Latent attention (MLA) with sparse reads of 2,048 cache entries per step; 9 of 72 layers reuse another layer's cache. Vision-language. An NVFP4 build is also published. Parameters computed from config.json."},
     {id:"ms4", n:"Mistral Small 4 (119B-A6.5B)", p:119.4, pa:6.5, E:128, K:4, L:36, h:4096, ffn:10240, v:131072, ctx:1048576,
      nat:fp8(120.9), kv:[latent(36,320)], note:"Latent attention (MLA): one 320-value cache entry per token per layer."},
     {id:"mm35", n:"Mistral Medium 3.5 128B", p:127.7, L:88, h:12288, ffn:28672, v:131072, ctx:262144, nat:fp8(133.6), kv:[full(88,8,128)]},
@@ -1869,12 +1880,12 @@ const MODELS = [
 const findModel = id => MODELS.flatMap(g=>g.items).find(m=>m.id===id);
 
 /* Does the model think (reason step by step) before answering? From each model card and chat template,
-   October 2026. always = thinking can't be switched off · default = on unless switched off ·
+   November 2026. always = thinking can't be switched off · default = on unless switched off ·
    optional = off unless switched on (or no stated default). Anything unlisted doesn't think.
    The Thinking switch starts at the model's default; a custom model is treated as optional. */
 const THINKS = {
-  always:   ["muse-spark","mm-m31-flash","gptoss-120b","gptoss-20b","r1d-32b","glm53","glm53-flash","kimi-k3","mm-m27"],
-  default:  ["q38-27b","q38-flash","q36-35b","q35-9b","q35-4b","q3-32b","q3-30b","q3-8b","glm47-flash","nemo-super","nemo-nano","nemo35-super-vl","nemo35-bolt","mm-m3","kolibri1"],
+  always:   ["muse-spark","mm-m31-flash","gptoss-120b","gptoss-20b","r1d-32b","glm53","glm53-flash","kimi-k31-pro","kimi-k3","mm-m27","ml4"],
+  default:  ["q38-27b","q38-flash","q36-35b","q35-9b","q35-4b","q3-32b","q3-30b","q3-8b","glm47-flash","nemo-super","nemo-nano","nemo35-super-vl","nemo35-bolt","mm-m3","kolibri1","inkling2-small"],
   optional: ["dsv41-flash","dsv4-flash","dsv4-pro","dsv32","ms4","mm35","g4-31b","g4-26b","g4-12b","g4-e4b"],
 };
 const thinksOf = m => m.custom ? "optional" : Object.keys(THINKS).find(k=> THINKS[k].includes(m.id)) || "none";
@@ -2086,7 +2097,7 @@ const WORKLOADS = {
   custom:  {name:"Custom",                                                      desc:"Your own prompt and reply lengths."},
 };
 
-const DATA_AS_OF = "October 2026";   // when the model and board figures were last checked
+const DATA_AS_OF = "November 2026";   // when the model and board figures were last checked
 /* The estimator's version, carried in every shared link and summary. A link made under an older
    version opens with the changes since then listed, so a sizing never shifts without saying so.
    Bump it with each release tag; add to CHANGES whenever a release changes what the figures come to. */
